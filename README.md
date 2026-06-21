@@ -2,7 +2,7 @@
 
 **IliasTraxEventBridge** est un plugin **ILIAS 10 EventHook** qui transforme certains événements ILIAS en statements **xAPI** et les envoie vers **TRAX 3 LRS**.
 
-La version actuelle du dépôt est **v0.3.1**.
+La version actuelle du dépôt est **v0.4.0**.
 
 ## Fonctionnalités actuelles
 
@@ -16,9 +16,13 @@ Le plugin permet actuellement de :
 - configurer TRAX depuis l’interface d’administration du plugin ;
 - tester la connexion TRAX ;
 - envoyer manuellement les statements vers TRAX ;
-- suivre les statuts d’envoi : `generated`, `sending`, `sent`, `failed`.
+- envoyer automatiquement l’outbox vers TRAX via un job cron ILIAS ;
+- suivre les statuts d’envoi : `generated`, `sending`, `sent`, `failed` ;
+- limiter les tentatives d’envoi avec `retry_count` et `max_retry` ;
+- réinitialiser les statements `failed` depuis l’écran d’administration ;
+- consulter les diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron.
 
-## Événements métier couverts en v0.3.1
+## Événements métier couverts en v0.4.0
 
 | Action ILIAS | Événement détecté | Statement xAPI |
 |---|---|---|
@@ -29,33 +33,31 @@ Le plugin permet actuellement de :
 
 Les actions d’administration comme la suppression des résultats d’un test restent visibles dans le journal brut, mais ne sont pas envoyées dans l’outbox xAPI.
 
-## Ce qui n’est pas encore couvert
+## Nouveautés v0.4.0
 
-Les actions suivantes ne sont pas encore captées de manière fiable par EventHook seul :
+La V0.4 introduit l’exploitation automatique de l’outbox :
 
-- simple entrée dans un cours ;
-- simple ouverture d’un objet sans changement de statut ;
-- simple consultation passive d’une ressource déjà validée ;
-- temps passé dans un objet.
+- un job cron ILIAS `itxeb_send_outbox_to_trax` ;
+- un interrupteur **Activer le cron plugin** dans la configuration ;
+- une limite **Max retry** ;
+- les colonnes `retry_count`, `max_retry`, `last_attempt_at` ;
+- un bouton **Réinitialiser les failed** ;
+- un diagnostic persistant du dernier passage cron.
 
-Ces cas demanderont probablement un mécanisme complémentaire : point d’entrée UI, observer applicatif, lecture de tracking ILIAS, ou instrumentation ciblée.
+Le cron et le bouton manuel utilisent la même logique : seuls les statements `generated` ou `failed` avec `retry_count < max_retry` sont envoyés.
 
 ## Architecture fonctionnelle
 
 ```mermaid
 flowchart LR
     U[Utilisateur ILIAS] --> A[Action dans ILIAS 10]
-
     A --> E[EventHook ILIAS]
     E --> P[IliasTraxEventBridge]
-
     P --> L[(evnt_evhk_itxeb_log<br>journal brut)]
     P --> M[Mapping ILIAS vers xAPI]
     M --> O[(evnt_evhk_itxeb_out<br>outbox xAPI)]
-
-    O --> S{Envoi manuel}
+    O --> S{Envoi manuel ou cron}
     S -->|POST xAPI /statements| T[TRAX 3 LRS]
-
     T --> R[Statements consultables dans TRAX]
 ```
 
@@ -64,75 +66,12 @@ flowchart LR
 ```mermaid
 stateDiagram-v2
     [*] --> generated: statement créé localement
-    generated --> sending: envoi manuel
-    failed --> sending: nouvel essai manuel
+    generated --> sending: envoi manuel ou cron
+    failed --> sending: retry si retry_count < max_retry
     sending --> sent: HTTP 2xx
     sending --> failed: erreur réseau / HTTP 4xx / HTTP 5xx
+    failed --> generated: reset manuel
     sent --> [*]
-```
-
-## Séquence : tentative de test
-
-```mermaid
-sequenceDiagram
-    participant Learner as Apprenant
-    participant ILIAS as ILIAS 10
-    participant Plugin as IliasTraxEventBridge
-    participant DB as Outbox locale
-    participant TRAX as TRAX 3
-
-    Learner->>ILIAS: Démarre le test
-    ILIAS->>Plugin: Tracking:updateStatus cmd=startTest
-    Plugin->>DB: statement attempted, status=generated
-
-    Learner->>ILIAS: Termine le test
-    ILIAS->>Plugin: Tracking:updateStatus cmd=finishTest
-    Plugin->>DB: statement passed/failed, status=generated
-
-    Plugin->>TRAX: Envoi manuel POST /statements
-    TRAX-->>Plugin: HTTP 2xx
-    Plugin->>DB: status=sent
-```
-
-## Tables utilisées
-
-```mermaid
-erDiagram
-    evnt_evhk_itxeb_log {
-        int id PK
-        string component
-        string event_name
-        int user_id
-        int ref_id
-        int obj_id
-        string obj_type
-        text param_keys
-        text payload_json
-        text request_uri
-        string http_method
-        string created_at
-        int created_ts
-    }
-
-    evnt_evhk_itxeb_out {
-        int id PK
-        int event_log_id
-        string statement_uuid
-        string event_type
-        string verb_id
-        int user_id
-        int ref_id
-        int obj_id
-        string obj_type
-        text statement_json
-        string status
-        string created_at
-        int created_ts
-        string sent_at
-        text last_error
-    }
-
-    evnt_evhk_itxeb_log ||--o{ evnt_evhk_itxeb_out : "event_log_id"
 ```
 
 ## Installation dans ILIAS 10
@@ -142,7 +81,7 @@ Depuis la racine ILIAS :
 ```bash
 mkdir -p public/Customizing/global/plugins/Services/EventHandling/EventHook
 
-git clone https://github.com/<organisation>/IliasTraxEventBridge.git \
+git clone https://github.com/vincent-sayah/IliasTraxEventBridge.git \
 public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 
 cd /var/www/ilias
@@ -162,82 +101,45 @@ Selon l’installation, le chemin peut être sans `public/` :
 Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 ```
 
-## Configuration TRAX
+## Configuration TRAX et cron
 
 Dans l’écran de configuration du plugin :
 
 | Champ | Description |
 |---|---|
-| Endpoint xAPI TRAX | Endpoint xAPI racine ou endpoint complet `/statements` |
-| Identifiant client TRAX | Client xAPI TRAX, pas forcément un utilisateur humain |
-| Secret client TRAX | Secret associé au client xAPI |
-| Version xAPI | Recommandé : `1.0.3` |
-| Timeout HTTP | Timeout d’appel HTTP |
-| Taille batch manuel | Nombre maximum de statements envoyés par clic |
-| Base URL ILIAS forcée | Utilisée pour les IRIs xAPI et `actor.account.homePage` |
+| Activer le cron plugin | Autorise le job cron du plugin à envoyer l’outbox. Le cron ILIAS global doit aussi être actif. |
+| Endpoint xAPI TRAX | Endpoint xAPI racine ou endpoint complet `/statements`. |
+| Identifiant client TRAX | Client xAPI TRAX, pas forcément un utilisateur humain. |
+| Secret client TRAX | Secret associé au client xAPI. |
+| Version xAPI | Recommandé : `1.0.3`. |
+| Timeout HTTP | Timeout d’appel HTTP. |
+| Taille batch | Nombre maximum de statements envoyés par batch manuel ou cron. |
+| Max retry | Nombre maximum de tentatives par statement. |
+| Base URL ILIAS forcée | Utilisée pour les IRIs xAPI et `actor.account.homePage`. |
 
 Le plugin ajoute automatiquement `/statements` si l’endpoint fourni ne se termine pas déjà par `/statements`.
 
 ## Vérifications SQL utiles
 
-Voir les événements ILIAS bruts :
+Voir l’outbox xAPI avec les retries :
 
 ```sql
-SELECT id, created_at, component, event_name, user_id, ref_id, obj_id, obj_type, request_uri
-FROM evnt_evhk_itxeb_log
-ORDER BY id DESC
-LIMIT 30;
-```
-
-Voir l’outbox xAPI :
-
-```sql
-SELECT id, created_at, event_log_id, event_type, verb_id, user_id, ref_id, obj_id, obj_type, status, sent_at, last_error
+SELECT id, created_at, event_type, verb_id, user_id, ref_id, obj_id, obj_type,
+       status, retry_count, max_retry, last_attempt_at, sent_at, last_error
 FROM evnt_evhk_itxeb_out
 ORDER BY id DESC
 LIMIT 30;
 ```
 
-Voir les diagnostics TRAX :
+Voir les diagnostics TRAX et cron :
 
 ```sql
 SELECT keyword, value
 FROM settings
 WHERE module = 'itxeb'
-AND keyword LIKE 'last_trax_%'
+AND (keyword LIKE 'last_trax_%' OR keyword LIKE 'last_cron_%')
 ORDER BY keyword;
 ```
-
-## Branches et versions
-
-Le dépôt contient une branche par version :
-
-```text
-v0.1.0
-v0.1.1
-v0.1.2
-v0.1.3
-v0.1.4
-v0.1.5
-v0.2.0
-v0.2.1
-v0.3.0
-v0.3.1
-```
-
-La branche `main` pointe sur la dernière version documentée.
-
-## Roadmap courte
-
-Prochaine étape prévue : **v0.4**.
-
-Objectifs :
-
-- automatiser l’envoi via cron ILIAS ;
-- ajouter `retry_count` et `max_retry` ;
-- garder l’envoi manuel comme secours ;
-- ajouter un bouton de réinitialisation des `failed` ;
-- ajouter un diagnostic d’exploitation plus complet.
 
 ## Documentation complémentaire
 
