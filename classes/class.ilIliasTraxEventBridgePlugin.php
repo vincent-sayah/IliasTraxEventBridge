@@ -27,9 +27,9 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
     public function handleEvent(string $a_component, string $a_event, array $a_parameter): void
     {
         try {
-            $this->includeClass('class.ilIliasTraxEventBridgeConfig.php');
-            $this->includeClass('class.ilIliasTraxEventBridgeEventDebugRepository.php');
-            $this->includeClass('class.ilIliasTraxEventBridgeEventRouter.php');
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventRouter.php';
 
             $config = new ilIliasTraxEventBridgeConfig();
 

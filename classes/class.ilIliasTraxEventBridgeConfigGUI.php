@@ -9,6 +9,9 @@
  *
  * @ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI
  */
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
+
 class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 {
     /** @var ilIliasTraxEventBridgePlugin|null */
@@ -65,9 +68,6 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             );
         }
 
-        $this->plugin->includeClass('class.ilIliasTraxEventBridgeConfig.php');
-        $this->plugin->includeClass('class.ilIliasTraxEventBridgeEventDebugRepository.php');
-
         $this->config = new ilIliasTraxEventBridgeConfig();
         $this->repo = new ilIliasTraxEventBridgeEventDebugRepository();
     }
@@ -76,7 +76,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $html = '';
         $html .= '<h1>IliasTraxEventBridge — Debug événements ILIAS</h1>';
-        $html .= '<p><strong>Version 0.1.2 :</strong> écran de configuration minimal, compatible avec le routage ilCtrl ILIAS 10.</p>';
+        $html .= '<p><strong>Version 0.1.3 :</strong> écran de configuration minimal, compatible avec le routage ilCtrl ILIAS 10.</p>';
         $html .= '<p>Cette version sert uniquement à observer les événements réellement émis par ILIAS 10 avant le mapping xAPI vers TRAX.</p>';
 
         $html .= '<h2>État</h2>';

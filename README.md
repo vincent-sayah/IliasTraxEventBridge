@@ -1,10 +1,10 @@
-# IliasTraxEventBridge v0.1.2
+# IliasTraxEventBridge v0.1.3
 
 Version de debug pour ILIAS 10.
 
 Objectif : rendre le plugin visible/activable et journaliser les événements ILIAS reçus via le slot EventHook.
 
-## Correction v0.1.2
+## Correction v0.1.3
 
 - `ilIliasTraxEventBridgeConfigGUI` étend maintenant `ilPluginConfigGUI`.
 - Ajout de la directive ilCtrl obligatoire pour les écrans de configuration des plugins ILIAS 8+ :
