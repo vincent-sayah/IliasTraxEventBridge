@@ -2,7 +2,7 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS.
 
-Version stable actuelle : **v0.4.3**.
+Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.5**.
 
 ## Fonctionnalités v0.4.3
 
@@ -17,14 +17,25 @@ Version stable actuelle : **v0.4.3**.
 - Diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron.
 - Affichage amélioré des tableaux de configuration, notamment pour les colonnes Verb et URI.
 
-## Objets couverts en v0.4.3
+## Premier chantier v0.5
+
+La branche **v0.5** introduit le filtre métier suivant : un statement xAPI n'est généré que si l'objet ILIAS concerné est contenu dans un objet **cours**.
+
+Comportement :
+
+- l'événement brut reste journalisé dans `evnt_evhk_itxeb_log` ;
+- si aucun cours parent n'est trouvé, aucun statement n'est ajouté dans `evnt_evhk_itxeb_out` ;
+- les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours sont exclus de l'outbox xAPI ;
+- quand le cours parent est identifié, les extensions xAPI contiennent `course_ref_id` et `course_obj_id`.
+
+## Objets couverts en v0.4.3 / début v0.5
 
 | Action ILIAS | Statement xAPI |
 |---|---|
-| Démarrage d'un test | `attempted` |
-| Test réussi | `passed` |
-| Test échoué | `failed` |
-| Téléchargement d'un fichier | `experienced` |
+| Démarrage d'un test dans un cours | `attempted` |
+| Test réussi dans un cours | `passed` |
+| Test échoué dans un cours | `failed` |
+| Téléchargement d'un fichier dans un cours | `experienced` |
 
 Les actions d'administration comme la suppression des résultats de test sont journalisées mais ne sont pas envoyées dans l'outbox xAPI.
 
@@ -58,11 +69,11 @@ La V0.5 doit limiter le périmètre métier aux objets contenus dans un objet co
 
 Objectifs :
 
-- n'envoyer des traces xAPI que pour les objets contenus dans un objet **cours** ;
-- exclure les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
-- permettre à l'administrateur du cours d'activer ou désactiver l'envoi xAPI vers TRAX dans les paramètres du cours ;
-- permettre à l'administrateur du cours de choisir les types d'objets traçables ;
-- étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module web et module SCORM.
+- [x] n'envoyer des traces xAPI que pour les objets contenus dans un objet **cours** ;
+- [x] exclure les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
+- [ ] permettre à l'administrateur du cours d'activer ou désactiver l'envoi xAPI vers TRAX dans les paramètres du cours ;
+- [ ] permettre à l'administrateur du cours de choisir les types d'objets traçables ;
+- [ ] étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module web et module SCORM.
 
 ### Cible v0.6
 
