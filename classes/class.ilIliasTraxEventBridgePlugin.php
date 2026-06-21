@@ -1,7 +1,5 @@
 <?php
 
-use ILIAS\Cron\Job\JobProvider;
-
 /**
  * ILIAS 10 EventHook plugin.
  *
@@ -12,7 +10,7 @@ use ILIAS\Cron\Job\JobProvider;
  * - send the outbox manually or automatically through ILIAS cron;
  * - never block or break ILIAS user navigation.
  */
-class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements JobProvider
+class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJobProvider
 {
     public const PLUGIN_NAME = 'IliasTraxEventBridge';
 
