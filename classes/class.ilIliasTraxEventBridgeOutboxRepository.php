@@ -3,7 +3,7 @@
 /**
  * Local outbox for generated xAPI statements.
  *
- * V0.3 can send generated/failed statements manually to TRAX.
+ * V0.4 supports automatic cron delivery with retry counters.
  */
 class ilIliasTraxEventBridgeOutboxRepository
 {
@@ -44,13 +44,11 @@ class ilIliasTraxEventBridgeOutboxRepository
             $verbId = (string) $statement['verb']['id'];
         }
 
-        $eventType = $this->detectEventType($eventRecord);
-
         $this->db->insert(self::TABLE_NAME, [
             'id' => ['integer', $id],
             'event_log_id' => ['integer', $eventLogId],
             'statement_uuid' => ['text', (string) ($statement['id'] ?? '')],
-            'event_type' => ['text', $eventType],
+            'event_type' => ['text', $this->detectEventType($eventRecord)],
             'verb_id' => ['text', $verbId],
             'user_id' => ['integer', (int) ($eventRecord['user_id'] ?? 0)],
             'ref_id' => ['integer', (int) ($eventRecord['ref_id'] ?? 0)],
@@ -62,30 +60,25 @@ class ilIliasTraxEventBridgeOutboxRepository
             'created_ts' => ['integer', (int) ($eventRecord['created_ts'] ?? time())],
             'sent_at' => ['text', ''],
             'last_error' => ['clob', ''],
+            'retry_count' => ['integer', 0],
+            'max_retry' => ['integer', 5],
+            'last_attempt_at' => ['text', ''],
         ]);
 
         return $id;
     }
 
-    /**
-     * @return array<int,array<string,mixed>>
-     */
+    /** @return array<int,array<string,mixed>> */
     public function findRecent(int $limit = 50): array
     {
         $limit = max(1, min(200, $limit));
         $rows = [];
+        if (!$this->tableExists()) { return $rows; }
 
-        if (!$this->tableExists()) {
-            return $rows;
-        }
-
-        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at, sent_at, last_error '
+        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at, sent_at, last_error, retry_count, max_retry, last_attempt_at '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
 
-        if (method_exists($this->db, 'setLimit')) {
-            $this->db->setLimit($limit);
-        }
-
+        if (method_exists($this->db, 'setLimit')) { $this->db->setLimit($limit); }
         $set = $this->db->query($query);
 
         $count = 0;
@@ -93,30 +86,23 @@ class ilIliasTraxEventBridgeOutboxRepository
             $rows[] = $row;
             $count++;
         }
-
         return $rows;
     }
 
-    /**
-     * @return array<int,array<string,mixed>>
-     */
-    public function findSendable(int $limit): array
+    /** @return array<int,array<string,mixed>> */
+    public function findSendable(int $limit, int $maxRetry): array
     {
         $limit = max(1, min(100, $limit));
+        $maxRetry = max(0, min(50, $maxRetry));
         $rows = [];
+        if (!$this->tableExists()) { return $rows; }
 
-        if (!$this->tableExists()) {
-            return $rows;
-        }
-
-        $query = 'SELECT id, statement_json FROM ' . self::TABLE_NAME
+        $query = 'SELECT id, statement_json, retry_count FROM ' . self::TABLE_NAME
             . ' WHERE status IN (' . $this->db->quote('generated', 'text') . ', ' . $this->db->quote('failed', 'text') . ')'
+            . ' AND retry_count < ' . (int) $maxRetry
             . ' ORDER BY id ASC';
 
-        if (method_exists($this->db, 'setLimit')) {
-            $this->db->setLimit($limit);
-        }
-
+        if (method_exists($this->db, 'setLimit')) { $this->db->setLimit($limit); }
         $set = $this->db->query($query);
 
         $count = 0;
@@ -124,27 +110,19 @@ class ilIliasTraxEventBridgeOutboxRepository
             $rows[] = $row;
             $count++;
         }
-
         return $rows;
     }
 
-    /**
-     * @param array<int,int> $ids
-     */
+    /** @param array<int,int> $ids */
     public function markSending(array $ids): void
     {
-        $this->updateStatusForIds($ids, 'sending', '');
+        $this->updateStatusForIds($ids, 'sending', '', false);
     }
 
-    /**
-     * @param array<int,int> $ids
-     */
+    /** @param array<int,int> $ids */
     public function markSent(array $ids): void
     {
-        if (count($ids) === 0 || !$this->tableExists()) {
-            return;
-        }
-
+        if (count($ids) === 0 || !$this->tableExists()) { return; }
         $this->db->manipulate(
             'UPDATE ' . self::TABLE_NAME
             . ' SET status = ' . $this->db->quote('sent', 'text')
@@ -154,46 +132,49 @@ class ilIliasTraxEventBridgeOutboxRepository
         );
     }
 
-    /**
-     * @param array<int,int> $ids
-     */
+    /** @param array<int,int> $ids */
     public function markFailed(array $ids, string $error): void
     {
-        $this->updateStatusForIds($ids, 'failed', substr($error, 0, 4000));
+        $this->updateStatusForIds($ids, 'failed', substr($error, 0, 4000), true);
     }
 
     public function resetStuckSending(): int
     {
-        if (!$this->tableExists()) {
-            return 0;
-        }
-
+        if (!$this->tableExists()) { return 0; }
         $this->db->manipulate(
             'UPDATE ' . self::TABLE_NAME
             . ' SET status = ' . $this->db->quote('failed', 'text')
-            . ', last_error = ' . $this->db->quote('Réinitialisé depuis status=sending au chargement de la V0.3.', 'clob')
+            . ', last_error = ' . $this->db->quote('Réinitialisé depuis status=sending au chargement de la V0.4.', 'clob')
             . ' WHERE status = ' . $this->db->quote('sending', 'text')
         );
-
         return 0;
     }
 
-    public function countAll(): int
+    public function resetFailedToGenerated(): int
     {
-        return $this->countWhere('');
+        if (!$this->tableExists()) { return 0; }
+        $count = $this->countByStatus('failed');
+        $this->db->manipulate(
+            'UPDATE ' . self::TABLE_NAME
+            . ' SET status = ' . $this->db->quote('generated', 'text')
+            . ', retry_count = 0'
+            . ', last_error = ' . $this->db->quote('Réinitialisé manuellement depuis l’écran plugin.', 'clob')
+            . ', last_attempt_at = ' . $this->db->quote('', 'text')
+            . ' WHERE status = ' . $this->db->quote('failed', 'text')
+        );
+        return $count;
     }
 
-    public function countByStatus(string $status): int
+    public function countAll(): int { return $this->countWhere(''); }
+    public function countByStatus(string $status): int { return $this->countWhere(' WHERE status = ' . $this->db->quote($status, 'text')); }
+    public function countRetryExhausted(int $maxRetry): int
     {
-        return $this->countWhere(' WHERE status = ' . $this->db->quote($status, 'text'));
+        return $this->countWhere(' WHERE status = ' . $this->db->quote('failed', 'text') . ' AND retry_count >= ' . (int) $maxRetry);
     }
 
     public function clear(): void
     {
-        if (!$this->tableExists()) {
-            return;
-        }
-
+        if (!$this->tableExists()) { return; }
         $this->db->manipulate('DELETE FROM ' . self::TABLE_NAME);
     }
 
@@ -202,42 +183,29 @@ class ilIliasTraxEventBridgeOutboxRepository
         return method_exists($this->db, 'tableExists') && $this->db->tableExists(self::TABLE_NAME);
     }
 
-    /**
-     * @param array<int,int> $ids
-     */
-    private function updateStatusForIds(array $ids, string $status, string $error): void
+    /** @param array<int,int> $ids */
+    private function updateStatusForIds(array $ids, string $status, string $error, bool $incrementRetry): void
     {
-        if (count($ids) === 0 || !$this->tableExists()) {
-            return;
-        }
-
+        if (count($ids) === 0 || !$this->tableExists()) { return; }
         $this->db->manipulate(
             'UPDATE ' . self::TABLE_NAME
             . ' SET status = ' . $this->db->quote($status, 'text')
             . ', last_error = ' . $this->db->quote($error, 'clob')
+            . ', last_attempt_at = ' . $this->db->quote(date('Y-m-d H:i:s'), 'text')
+            . ($incrementRetry ? ', retry_count = retry_count + 1' : '')
             . ' WHERE id IN (' . implode(',', array_map('intval', $ids)) . ')'
         );
     }
 
     private function countWhere(string $where): int
     {
-        if (!$this->tableExists()) {
-            return 0;
-        }
-
+        if (!$this->tableExists()) { return 0; }
         $set = $this->db->query('SELECT COUNT(*) cnt FROM ' . self::TABLE_NAME . $where);
         $row = $this->db->fetchAssoc($set);
-
-        if (!is_array($row)) {
-            return 0;
-        }
-
-        return (int) ($row['cnt'] ?? 0);
+        return is_array($row) ? (int) ($row['cnt'] ?? 0) : 0;
     }
 
-    /**
-     * @param array<string,mixed> $eventRecord
-     */
+    /** @param array<string,mixed> $eventRecord */
     private function detectEventType(array $eventRecord): string
     {
         $component = (string) ($eventRecord['component'] ?? '');
@@ -245,27 +213,15 @@ class ilIliasTraxEventBridgeOutboxRepository
         $type = (string) ($eventRecord['obj_type'] ?? '');
         $uri = (string) ($eventRecord['request_uri'] ?? '');
 
-        if ($component === 'components/ILIAS/ILIASObject'
-            && $event === 'update'
-            && $type === 'file'
-            && strpos($uri, 'cmd=sendfile') !== false
-        ) {
+        if ($component === 'components/ILIAS/ILIASObject' && $event === 'update' && $type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
             return 'file_downloaded';
         }
-
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
-            if ($type === 'tst'
-                || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false
-                || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false
-                || strpos($uri, 'cmd=startTest') !== false
-                || strpos($uri, 'cmd=finishTest') !== false
-            ) {
+            if ($type === 'tst' || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false || strpos($uri, 'cmd=startTest') !== false || strpos($uri, 'cmd=finishTest') !== false) {
                 return 'test_tracking_status';
             }
-
             return 'learning_tracking_status';
         }
-
         return 'unknown';
     }
 }

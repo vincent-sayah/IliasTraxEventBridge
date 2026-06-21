@@ -2,16 +2,31 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.4.0
+
+### Ajouté
+
+- Envoi automatique des statements xAPI vers TRAX via un job cron ILIAS.
+- Nouveau service partagé `ilIliasTraxEventBridgeOutboxSender` utilisé par l’envoi manuel et le cron.
+- Paramètre d’administration **Activer le cron plugin**.
+- Paramètre **Max retry** pour limiter les tentatives d’envoi.
+- Colonnes outbox : `retry_count`, `max_retry`, `last_attempt_at`.
+- Bouton **Réinitialiser les failed** pour remettre les statements en échec au statut `generated` avec `retry_count = 0`.
+- Diagnostic persistant du dernier passage cron : date, succès, HTTP, message.
+- Compteur des statements dont le retry est épuisé.
+
+### Changé
+
+- L’envoi manuel et l’envoi cron utilisent la même logique de batch.
+- Les statements `failed` ne sont retentés que si `retry_count < max_retry`.
+- Les statements JSON invalides sont marqués en erreur sans bloquer tout le batch.
+
 ## v0.3.1
 
 ### Ajouté
 
 - Diagnostic persistant du bouton **Tester connexion TRAX**.
-- Affichage du dernier test de connexion dans la configuration :
-  - date ;
-  - succès ;
-  - code HTTP ;
-  - message retourné.
+- Affichage du dernier test de connexion dans la configuration : date, succès, code HTTP, message retourné.
 - Affichage du dernier envoi manuel vers TRAX.
 
 ### Corrigé
@@ -23,20 +38,10 @@ Toutes les évolutions notables du plugin sont listées ici.
 ### Ajouté
 
 - Configuration TRAX dans l’écran du plugin.
-- Endpoint xAPI.
-- Identifiant client TRAX.
-- Secret client TRAX.
-- Version xAPI.
-- Timeout HTTP.
-- Taille du batch manuel.
-- Bouton **Tester connexion TRAX**.
-- Bouton **Envoyer les statements générés vers TRAX**.
+- Endpoint xAPI, identifiant client, secret client, version xAPI, timeout HTTP, taille de batch.
+- Boutons **Tester connexion TRAX** et **Envoyer les statements générés vers TRAX**.
 - Client HTTP xAPI.
-- Statuts outbox :
-  - `generated`
-  - `sending`
-  - `sent`
-  - `failed`
+- Statuts outbox : `generated`, `sending`, `sent`, `failed`.
 
 ### Validé
 
@@ -89,16 +94,14 @@ Toutes les évolutions notables du plugin sont listées ici.
 ### Corrigé
 
 - Remplacement de `includeClass()` par `require_once`.
-- Correction de l’erreur ILIAS 10 :
-  `Call to undefined method ilIliasTraxEventBridgePlugin::includeClass()`.
+- Correction de l’erreur ILIAS 10 : `Call to undefined method ilIliasTraxEventBridgePlugin::includeClass()`.
 
 ## v0.1.2
 
 ### Corrigé
 
 - Correction de l’écran de configuration du plugin.
-- Ajout de la directive ilCtrl :
-  `@ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI`.
+- Ajout de la directive ilCtrl : `@ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI`.
 - Utilisation correcte de `ilPluginConfigGUI`.
 
 ## v0.1.1
@@ -106,10 +109,6 @@ Toutes les évolutions notables du plugin sont listées ici.
 ### Corrigé
 
 - Signature ILIAS 10 de `handleEvent`.
-- Passage de :
-  `handleEvent($a_component, $a_event, $a_params): bool`
-  à :
-  `handleEvent(string $a_component, string $a_event, array $a_parameter): void`.
 
 ## v0.1.0
 

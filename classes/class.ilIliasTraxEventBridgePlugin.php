@@ -3,10 +3,11 @@
 /**
  * ILIAS 10 EventHook plugin.
  *
- * V0.2 objective:
+ * V0.4 objective:
  * - listen to active ILIAS events through EventHook;
  * - persist compact debug records into evnt_evhk_itxeb_log;
- * - generate local xAPI statements for confirmed events into evnt_evhk_itxeb_out;
+ * - generate local xAPI statements into evnt_evhk_itxeb_out;
+ * - send the outbox manually or automatically through ILIAS cron;
  * - never block or break ILIAS user navigation.
  */
 class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
@@ -18,13 +19,6 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
         return self::PLUGIN_NAME;
     }
 
-    /**
-     * Called by ILIAS for events received by active EventHook plugins.
-     *
-     * @param string $a_component Example: "components/ILIAS/Tracking".
-     * @param string $a_event     Example: "updateStatus".
-     * @param array  $a_parameter Event-specific payload.
-     */
     public function handleEvent(string $a_component, string $a_event, array $a_parameter): void
     {
         try {
@@ -35,7 +29,6 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventRouter.php';
 
             $config = new ilIliasTraxEventBridgeConfig();
-
             if (!$config->isEnabled() || !$config->isDebugEnabled()) {
                 return;
             }
@@ -47,31 +40,46 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
                 new ilIliasTraxEventBridgeStatementFactory($config),
                 new ilIliasTraxEventBridgeOutboxRepository()
             );
-
             $router->handle($a_component, $a_event, $a_parameter);
         } catch (Throwable $e) {
-            // Critical rule: this plugin must never interrupt normal ILIAS execution.
-            if (class_exists('ilLoggerFactory')) {
-                try {
-                    ilLoggerFactory::getLogger('itxeb')->error($e->getMessage());
-                } catch (Throwable $ignored) {
-                    error_log('[IliasTraxEventBridge] ' . $e->getMessage());
-                }
-            } else {
-                error_log('[IliasTraxEventBridge] ' . $e->getMessage());
-            }
+            $this->logNonBlockingError($e);
         }
     }
 
-    /**
-     * Called after uninstall. Removes plugin settings only.
-     * Debug/outbox tables are intentionally kept in V0.2.
-     */
+    /** @return array<int,ilCronJob> */
+    public function getCronJobInstances(): array
+    {
+        require_once __DIR__ . '/class.ilIliasTraxEventBridgeCron.php';
+        return [new ilIliasTraxEventBridgeCron()];
+    }
+
+    public function getCronJobInstance(string $a_job_id): ?ilCronJob
+    {
+        require_once __DIR__ . '/class.ilIliasTraxEventBridgeCron.php';
+        if ($a_job_id === ilIliasTraxEventBridgeCron::JOB_ID) {
+            return new ilIliasTraxEventBridgeCron();
+        }
+        return null;
+    }
+
     protected function afterUninstall(): void
     {
         if (class_exists('ilSetting')) {
             $settings = new ilSetting('itxeb');
             $settings->deleteAll();
         }
+    }
+
+    private function logNonBlockingError(Throwable $e): void
+    {
+        if (class_exists('ilLoggerFactory')) {
+            try {
+                ilLoggerFactory::getLogger('itxeb')->error($e->getMessage());
+                return;
+            } catch (Throwable $ignored) {
+                // Fallback below.
+            }
+        }
+        error_log('[IliasTraxEventBridge] ' . $e->getMessage());
     }
 }
