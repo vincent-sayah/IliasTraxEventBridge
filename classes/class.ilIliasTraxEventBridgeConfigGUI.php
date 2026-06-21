@@ -1,12 +1,18 @@
 <?php
 
 /**
- * Minimal admin configuration GUI for V0.1.
+ * Administration screen for the IliasTraxEventBridge debug version.
+ *
+ * ILIAS 8+ requires an explicit ilCtrl directive for plugin configuration
+ * screens. Without this directive, the plugin administration may display
+ * "The requested page could not be found" after activation.
+ *
+ * @ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI
  */
-class ilIliasTraxEventBridgeConfigGUI
+class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 {
-    /** @var ilIliasTraxEventBridgePlugin */
-    private $plugin;
+    /** @var ilIliasTraxEventBridgePlugin|null */
+    private $plugin = null;
 
     /** @var ilCtrl|mixed */
     private $ctrl;
@@ -14,43 +20,25 @@ class ilIliasTraxEventBridgeConfigGUI
     /** @var ilGlobalTemplateInterface|mixed */
     private $tpl;
 
-    /** @var ilLanguage|mixed */
-    private $lng;
+    /** @var ilIliasTraxEventBridgeConfig|null */
+    private $config = null;
 
-    /** @var ilIliasTraxEventBridgeConfig */
-    private $config;
-
-    /** @var ilIliasTraxEventBridgeEventDebugRepository */
-    private $repo;
+    /** @var ilIliasTraxEventBridgeEventDebugRepository|null */
+    private $repo = null;
 
     public function __construct()
     {
-        global $DIC, $ilCtrl, $tpl, $lng;
+        global $DIC, $ilCtrl, $tpl;
 
         $this->ctrl = isset($DIC) && method_exists($DIC, 'ctrl') ? $DIC->ctrl() : $ilCtrl;
-        $this->tpl = $tpl;
-        $this->lng = isset($DIC) && method_exists($DIC, 'language') ? $DIC->language() : $lng;
-
-        $this->plugin = ilPlugin::getPluginObject(
-            IL_COMP_SERVICE,
-            'EventHandling',
-            'evhk',
-            'IliasTraxEventBridge'
-        );
-
-        $this->plugin->includeClass('class.ilIliasTraxEventBridgeConfig.php');
-        $this->plugin->includeClass('class.ilIliasTraxEventBridgeEventDebugRepository.php');
-
-        $this->config = new ilIliasTraxEventBridgeConfig();
-        $this->repo = new ilIliasTraxEventBridgeEventDebugRepository();
+        $this->tpl = isset($DIC) && isset($DIC['tpl']) ? $DIC['tpl'] : $tpl;
     }
 
     public function performCommand(string $cmd): void
     {
+        $this->init();
+
         switch ($cmd) {
-            case 'save':
-                $this->save();
-                break;
             case 'clearLog':
                 $this->clearLog();
                 break;
@@ -61,78 +49,61 @@ class ilIliasTraxEventBridgeConfigGUI
         }
     }
 
-    private function configure(): void
+    private function init(): void
     {
-        $form = $this->buildForm();
-        $html = $form->getHTML();
-        $html .= $this->renderRecentEvents();
-        $this->setContent($html);
-    }
+        $plugin = $this->getPluginObject();
 
-    private function save(): void
-    {
-        $form = $this->buildForm();
-
-        if ($form->checkInput()) {
-            $this->config->setEnabled((bool) $form->getInput('enabled'));
-            $this->config->setDebugEnabled((bool) $form->getInput('debug_enabled'));
-            $this->config->setMaxPayloadChars((int) $form->getInput('max_payload_chars'));
-            $this->config->setRetentionDays((int) $form->getInput('retention_days'));
-            $this->repo->deleteOlderThanDays($this->config->getRetentionDays());
-
-            $this->message('success', 'Configuration enregistrée.');
-            $this->ctrl->redirect($this, 'configure');
-            return;
+        if ($plugin instanceof ilIliasTraxEventBridgePlugin) {
+            $this->plugin = $plugin;
+        } else {
+            // Defensive fallback for unusual plugin-admin execution paths.
+            $this->plugin = ilPlugin::getPluginObject(
+                IL_COMP_SERVICE,
+                'EventHandling',
+                'evhk',
+                'IliasTraxEventBridge'
+            );
         }
 
-        $form->setValuesByPost();
-        $this->setContent($form->getHTML() . $this->renderRecentEvents());
+        $this->plugin->includeClass('class.ilIliasTraxEventBridgeConfig.php');
+        $this->plugin->includeClass('class.ilIliasTraxEventBridgeEventDebugRepository.php');
+
+        $this->config = new ilIliasTraxEventBridgeConfig();
+        $this->repo = new ilIliasTraxEventBridgeEventDebugRepository();
+    }
+
+    private function configure(): void
+    {
+        $html = '';
+        $html .= '<h1>IliasTraxEventBridge — Debug événements ILIAS</h1>';
+        $html .= '<p><strong>Version 0.1.2 :</strong> écran de configuration minimal, compatible avec le routage ilCtrl ILIAS 10.</p>';
+        $html .= '<p>Cette version sert uniquement à observer les événements réellement émis par ILIAS 10 avant le mapping xAPI vers TRAX.</p>';
+
+        $html .= '<h2>État</h2>';
+        $html .= '<table class="std">';
+        $html .= '<tr><td>Plugin actif</td><td>' . ($this->config->isEnabled() ? 'oui' : 'non') . '</td></tr>';
+        $html .= '<tr><td>Mode debug</td><td>' . ($this->config->isDebugEnabled() ? 'oui' : 'non') . '</td></tr>';
+        $html .= '<tr><td>Taille maximum payload</td><td>' . $this->esc((string) $this->config->getMaxPayloadChars()) . ' caractères</td></tr>';
+        $html .= '<tr><td>Rétention</td><td>' . $this->esc((string) $this->config->getRetentionDays()) . ' jours</td></tr>';
+        $html .= '</table>';
+
+        $html .= '<p>';
+        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearLog')) . '">Vider le journal</a>';
+        $html .= '</p>';
+
+        $html .= $this->renderRecentEvents();
+        $this->setContent($html);
     }
 
     private function clearLog(): void
     {
         $this->repo->clear();
-        $this->message('success', 'Journal des événements vidé.');
+
+        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
+            ilUtil::sendSuccess('Journal des événements vidé.', true);
+        }
+
         $this->ctrl->redirect($this, 'configure');
-    }
-
-    private function buildForm(): ilPropertyFormGUI
-    {
-        include_once './Services/Form/classes/class.ilPropertyFormGUI.php';
-
-        $form = new ilPropertyFormGUI();
-        $form->setTitle('IliasTraxEventBridge — Debug événements ILIAS');
-        $form->setFormAction($this->ctrl->getFormAction($this));
-
-        $enabled = new ilCheckboxInputGUI('Activer le plugin', 'enabled');
-        $enabled->setChecked($this->config->isEnabled());
-        $enabled->setInfo('Si désactivé, aucun événement n’est journalisé.');
-        $form->addItem($enabled);
-
-        $debug = new ilCheckboxInputGUI('Mode debug événements', 'debug_enabled');
-        $debug->setChecked($this->config->isDebugEnabled());
-        $debug->setInfo('En V0.1, ce mode doit rester activé pour identifier les événements ILIAS 10 à mapper vers xAPI.');
-        $form->addItem($debug);
-
-        $maxPayload = new ilNumberInputGUI('Taille maximum du payload journalisé', 'max_payload_chars');
-        $maxPayload->setRequired(true);
-        $maxPayload->setMinValue(500);
-        $maxPayload->setMaxValue(30000);
-        $maxPayload->setValue((string) $this->config->getMaxPayloadChars());
-        $maxPayload->setInfo('Valeur recommandée : 10000 caractères. Les payloads trop longs sont tronqués.');
-        $form->addItem($maxPayload);
-
-        $retention = new ilNumberInputGUI('Rétention du journal en jours', 'retention_days');
-        $retention->setRequired(true);
-        $retention->setMinValue(1);
-        $retention->setMaxValue(365);
-        $retention->setValue((string) $this->config->getRetentionDays());
-        $form->addItem($retention);
-
-        $form->addCommandButton('save', 'Enregistrer');
-        $form->addCommandButton('clearLog', 'Vider le journal');
-
-        return $form;
     }
 
     private function renderRecentEvents(): string
@@ -140,7 +111,7 @@ class ilIliasTraxEventBridgeConfigGUI
         $rows = $this->repo->findRecent(100);
 
         $html = '<h2>100 derniers événements reçus</h2>';
-        $html .= '<p>Objectif : entrer dans un cours, ouvrir des objets, lancer/terminer un test, puis relever les couples component/event utiles.</p>';
+        $html .= '<p>Effectue les actions cibles dans ILIAS : entrer dans un cours, ouvrir un objet, lancer puis terminer un test. Les événements apparaîtront ici.</p>';
 
         if (count($rows) === 0) {
             return $html . '<p><em>Aucun événement journalisé pour le moment.</em></p>';
@@ -174,20 +145,10 @@ class ilIliasTraxEventBridgeConfigGUI
     {
         if (is_object($this->tpl) && method_exists($this->tpl, 'setContent')) {
             $this->tpl->setContent($html);
-        } else {
-            echo $html;
+            return;
         }
-    }
 
-    private function message(string $type, string $text): void
-    {
-        if (class_exists('ilUtil')) {
-            if ($type === 'success' && method_exists('ilUtil', 'sendSuccess')) {
-                ilUtil::sendSuccess($text, true);
-            } elseif (method_exists('ilUtil', 'sendInfo')) {
-                ilUtil::sendInfo($text, true);
-            }
-        }
+        echo $html;
     }
 
     private function esc(string $value): string

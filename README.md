@@ -1,55 +1,29 @@
-# IliasTraxEventBridge V0.1
+# IliasTraxEventBridge v0.1.2
 
-Plugin ILIAS 10 de type `Services/EventHandling/EventHook`.
+Version de debug pour ILIAS 10.
 
-## But de cette version
+Objectif : rendre le plugin visible/activable et journaliser les événements ILIAS reçus via le slot EventHook.
 
-Cette première version sert uniquement à valider les événements réellement émis par ILIAS 10 lors de la navigation dans les cours, objets et tests.
+## Correction v0.1.2
 
-Elle ne pousse pas encore de statements xAPI vers TRAX 3.
+- `ilIliasTraxEventBridgeConfigGUI` étend maintenant `ilPluginConfigGUI`.
+- Ajout de la directive ilCtrl obligatoire pour les écrans de configuration des plugins ILIAS 8+ :
+  `@ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI`
+- Suppression de la dépendance au formulaire legacy `ilPropertyFormGUI` dans l'écran de configuration.
 
 ## Installation
 
-Chemin standard :
-
-```bash
-Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-```
-
-Chemin possible sur certaines installations ILIAS 10 :
+Copier le dossier dans :
 
 ```bash
 public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 ```
 
-Dans ILIAS :
+Puis exécuter depuis la racine ILIAS :
 
-1. Administration > Plugins
-2. Update
-3. Activate
-4. Refresh Languages
-5. Configure
-
-## Table créée
-
-```text
-evnt_evhk_itxeb_log
+```bash
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
 ```
 
-## Commande SQL de contrôle
-
-```sql
-SELECT id, created_at, component, event_name, user_id, ref_id, obj_id, obj_type, param_keys
-FROM evnt_evhk_itxeb_log
-ORDER BY id DESC
-LIMIT 100;
-```
-
-## Étape suivante
-
-Après observation des événements réels :
-
-1. choisir les événements utiles ;
-2. créer le mapping ILIAS -> xAPI ;
-3. ajouter l'outbox ;
-4. connecter TRAX 3.
+Ensuite : Administration > Extending ILIAS > Plugins > Update / Activate.
