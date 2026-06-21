@@ -1,9 +1,10 @@
 <?php
 
 /**
- * V0.2 router:
+ * V0.5 router:
  * - persists every received event in debug mode;
- * - generates local xAPI statements for reliable events and stores them in the outbox.
+ * - generates local xAPI statements only for reliable events contained in a course;
+ * - stores accepted statements in the outbox.
  */
 class ilIliasTraxEventBridgeEventRouter
 {
@@ -22,18 +23,23 @@ class ilIliasTraxEventBridgeEventRouter
     /** @var ilIliasTraxEventBridgeOutboxRepository|null */
     private $outboxRepository;
 
+    /** @var ilIliasTraxEventBridgeCourseContextResolver|null */
+    private $courseContextResolver;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeEventDebugRepository $repository,
         ilIliasTraxEventBridgePlugin $plugin,
         ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
-        ?ilIliasTraxEventBridgeOutboxRepository $outboxRepository = null
+        ?ilIliasTraxEventBridgeOutboxRepository $outboxRepository = null,
+        ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null
     ) {
         $this->config = $config;
         $this->repository = $repository;
         $this->plugin = $plugin;
         $this->statementFactory = $statementFactory;
         $this->outboxRepository = $outboxRepository;
+        $this->courseContextResolver = $courseContextResolver;
     }
 
     public function handle(string $component, string $event, array $params): void
@@ -62,6 +68,17 @@ class ilIliasTraxEventBridgeEventRouter
         if ($this->statementFactory === null || $this->outboxRepository === null) {
             return;
         }
+
+        $courseContext = $this->getCourseContextResolver()->resolve($record);
+        if (!$courseContext['is_in_course']) {
+            return;
+        }
+
+        if ((int) $record['ref_id'] <= 0 && (int) $courseContext['ref_id'] > 0) {
+            $record['ref_id'] = (int) $courseContext['ref_id'];
+        }
+        $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
+        $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
 
         $statement = $this->statementFactory->createFromEventRecord($record);
         if ($statement !== null) {
@@ -264,6 +281,15 @@ class ilIliasTraxEventBridgeEventRouter
         }
 
         return '';
+    }
+
+    private function getCourseContextResolver(): ilIliasTraxEventBridgeCourseContextResolver
+    {
+        if ($this->courseContextResolver === null) {
+            $this->courseContextResolver = new ilIliasTraxEventBridgeCourseContextResolver();
+        }
+
+        return $this->courseContextResolver;
     }
 
     private function getServerValue(string $key): string
