@@ -4,7 +4,7 @@
 $id = "itxeb";
 
 // Code version; must be changed for all code changes.
-$version = "0.2.0";
+$version = "0.2.1";
 
 // Target ILIAS version range.
 // Adjust max version if your local ILIAS 10 patch level enforces a stricter check.

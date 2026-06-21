@@ -1,10 +1,12 @@
 <?php
 
 /**
- * Builds local xAPI statements from the ILIAS events that have already been
- * confirmed as reliable in ILIAS 10:
- * - file download via ilObjFileGUI::sendfile
- * - tracking/test progress via components/ILIAS/Tracking::updateStatus
+ * Builds local xAPI statements from reliable ILIAS 10 events.
+ *
+ * V0.2.1 cleanup:
+ * - ignores test administration events such as deleting participant results;
+ * - generates test statements only for real test-player tracking events or obj_type=tst;
+ * - ignores ambiguous Tracking/updateStatus events with empty obj_type unless they clearly come from the test player.
  */
 class ilIliasTraxEventBridgeStatementFactory
 {
@@ -27,6 +29,10 @@ class ilIliasTraxEventBridgeStatementFactory
         $type = (string) ($record['obj_type'] ?? '');
         $uri = (string) ($record['request_uri'] ?? '');
 
+        if ($this->isIgnoredForXapi($record)) {
+            return null;
+        }
+
         if ($component === 'components/ILIAS/ILIASObject'
             && $event === 'update'
             && $type === 'file'
@@ -36,10 +42,67 @@ class ilIliasTraxEventBridgeStatementFactory
         }
 
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
-            return $this->createTrackingStatement($record);
+            if ($this->isTestTrackingEvent($record)) {
+                $record['obj_type'] = 'tst';
+                return $this->createTrackingStatement($record);
+            }
+
+            // Avoid false learning traces caused by admin maintenance actions or unknown empty types.
+            // Non-test learning tracking is kept only when ILIAS gives us a concrete object type.
+            if ($type !== '') {
+                return $this->createTrackingStatement($record);
+            }
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     */
+    public function getIgnoreReason(array $record): string
+    {
+        $uri = (string) ($record['request_uri'] ?? '');
+
+        if (strpos($uri, 'cmdClass=ilTestParticipantsGUI') !== false) {
+            return 'ignored: test administration';
+        }
+
+        if (strpos($uri, 'pt_action=delete_results') !== false || strpos($uri, 'delete_results') !== false) {
+            return 'ignored: test results deletion';
+        }
+
+        if (strpos($uri, 'cmd=executeTableAction') !== false) {
+            return 'ignored: admin table action';
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     */
+    private function isIgnoredForXapi(array $record): bool
+    {
+        return $this->getIgnoreReason($record) !== '';
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     */
+    private function isTestTrackingEvent(array $record): bool
+    {
+        $type = (string) ($record['obj_type'] ?? '');
+        $uri = (string) ($record['request_uri'] ?? '');
+
+        if ($type === 'tst') {
+            return true;
+        }
+
+        return strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false
+            || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false
+            || strpos($uri, 'cmd=startTest') !== false
+            || strpos($uri, 'cmd=finishTest') !== false;
     }
 
     /**

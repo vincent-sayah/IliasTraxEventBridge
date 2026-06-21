@@ -8,6 +8,7 @@
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
 
 class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 {
@@ -81,8 +82,8 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= $this->renderInlineStyles();
         $html .= '<div class="itxeb-page">';
         $html .= '<h1>IliasTraxEventBridge — Debug événements et xAPI locale</h1>';
-        $html .= '<p><strong>Version 0.2.0 :</strong> génération locale de statements xAPI pour les événements fiables déjà observés.</p>';
-        $html .= '<p>Cette version ne contacte pas encore TRAX. Elle stocke les statements xAPI générés dans une outbox locale pour validation.</p>';
+        $html .= '<p><strong>Version 0.2.1 :</strong> nettoyage du mapping xAPI local et exclusion des actions d’administration de test.</p>';
+        $html .= '<p>Cette version ne contacte pas encore TRAX. Elle stocke uniquement les statements xAPI métier dans une outbox locale pour validation.</p>';
 
         $html .= $this->renderState();
         $html .= $this->renderOutbox();
@@ -269,8 +270,27 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $uri = (string) ($row['request_uri'] ?? '');
         $type = (string) ($row['obj_type'] ?? '');
 
+        $factory = new ilIliasTraxEventBridgeStatementFactory($this->config);
+        $ignoreReason = $factory->getIgnoreReason($row);
+        if ($ignoreReason !== '') {
+            return $ignoreReason;
+        }
+
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
-            return 'candidat xAPI: progression/test';
+            if ($type === 'tst'
+                || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false
+                || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false
+                || strpos($uri, 'cmd=startTest') !== false
+                || strpos($uri, 'cmd=finishTest') !== false
+            ) {
+                return 'candidat xAPI: test';
+            }
+
+            if ($type !== '') {
+                return 'candidat xAPI: progression';
+            }
+
+            return 'observation: tracking ignoré';
         }
 
         if ($type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
@@ -297,6 +317,8 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $class = 'itxeb-badge';
         if (strpos($analysis, 'candidat xAPI') === 0) {
             $class .= ' itxeb-badge-xapi';
+        } elseif (strpos($analysis, 'ignored') === 0 || strpos($analysis, 'observation: tracking ignoré') === 0) {
+            $class .= ' itxeb-badge-ignored';
         } elseif (strpos($analysis, 'administration') === 0) {
             $class .= ' itxeb-badge-admin';
         } elseif (strpos($analysis, 'indexation') === 0) {
@@ -364,6 +386,7 @@ table.itxeb-events tr:nth-child(even) td { background: #fafafa; }
 .itxeb-badge-admin { border-color: #c9a044; background: #fff7dc; }
 .itxeb-badge-index { border-color: #7a9ac2; background: #eef5ff; }
 .itxeb-badge-observation { border-color: #b8b8b8; background: #f6f6f6; }
+.itxeb-badge-ignored { border-color: #b95d5d; background: #fff0f0; }
 @media (max-width: 1200px) {
     table.itxeb-events { min-width: 1280px; }
 }

@@ -147,7 +147,16 @@ class ilIliasTraxEventBridgeOutboxRepository
         }
 
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
-            return $type === 'tst' ? 'test_tracking_status' : 'learning_tracking_status';
+            if ($type === 'tst'
+                || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false
+                || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false
+                || strpos($uri, 'cmd=startTest') !== false
+                || strpos($uri, 'cmd=finishTest') !== false
+            ) {
+                return 'test_tracking_status';
+            }
+
+            return 'learning_tracking_status';
         }
 
         return 'unknown';
