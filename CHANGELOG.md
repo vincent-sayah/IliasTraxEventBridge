@@ -2,6 +2,14 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.4.1
+
+### Corrigé
+
+- Déclaration explicite du plugin comme fournisseur de jobs cron ILIAS via `ILIAS\Cron\Job\JobProvider`.
+- Correction de la méthode `getCronJobInstance()` pour respecter le comportement attendu par ILIAS : retour du job connu ou exception `OutOfBoundsException`.
+- Le job `itxeb_send_outbox_to_trax` peut maintenant apparaître dans la liste des tâches cron ILIAS.
+
 ## v0.4.0
 
 ### Ajouté
