@@ -3,10 +3,10 @@
 /**
  * Builds local xAPI statements from reliable ILIAS 10 events.
  *
- * V0.2.1 cleanup:
+ * V0.5 cleanup:
  * - ignores test administration events such as deleting participant results;
- * - generates test statements only for real test-player tracking events or obj_type=tst;
- * - ignores ambiguous Tracking/updateStatus events with empty obj_type unless they clearly come from the test player.
+ * - generates statements only after the router has confirmed a course context;
+ * - adds course identifiers to xAPI context extensions when available.
  */
 class ilIliasTraxEventBridgeStatementFactory
 {
@@ -139,15 +139,7 @@ class ilIliasTraxEventBridgeStatementFactory
             ],
             'context' => [
                 'platform' => 'ILIAS 10',
-                'extensions' => [
-                    $baseUrl . '/xapi/extensions/source_event' => 'file_downloaded',
-                    $baseUrl . '/xapi/extensions/component' => (string) ($record['component'] ?? ''),
-                    $baseUrl . '/xapi/extensions/event_name' => (string) ($record['event_name'] ?? ''),
-                    $baseUrl . '/xapi/extensions/ref_id' => $refId,
-                    $baseUrl . '/xapi/extensions/obj_id' => $objId,
-                    $baseUrl . '/xapi/extensions/obj_type' => 'file',
-                    $baseUrl . '/xapi/extensions/request_uri' => (string) ($record['request_uri'] ?? '')
-                ]
+                'extensions' => $this->contextExtensions($record, 'file_downloaded', 'file')
             ],
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
@@ -208,15 +200,7 @@ class ilIliasTraxEventBridgeStatementFactory
             ],
             'context' => [
                 'platform' => 'ILIAS 10',
-                'extensions' => [
-                    $baseUrl . '/xapi/extensions/source_event' => 'tracking_update_status',
-                    $baseUrl . '/xapi/extensions/component' => (string) ($record['component'] ?? ''),
-                    $baseUrl . '/xapi/extensions/event_name' => (string) ($record['event_name'] ?? ''),
-                    $baseUrl . '/xapi/extensions/ref_id' => $refId,
-                    $baseUrl . '/xapi/extensions/obj_id' => $objId,
-                    $baseUrl . '/xapi/extensions/obj_type' => $objType,
-                    $baseUrl . '/xapi/extensions/request_uri' => (string) ($record['request_uri'] ?? '')
-                ]
+                'extensions' => $this->contextExtensions($record, 'tracking_update_status', $objType)
             ],
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
@@ -230,6 +214,27 @@ class ilIliasTraxEventBridgeStatementFactory
         }
 
         return $statement;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,mixed>
+     */
+    private function contextExtensions(array $record, string $sourceEvent, string $objType): array
+    {
+        $baseUrl = $this->config->getIliasBaseUrl();
+
+        return [
+            $baseUrl . '/xapi/extensions/source_event' => $sourceEvent,
+            $baseUrl . '/xapi/extensions/component' => (string) ($record['component'] ?? ''),
+            $baseUrl . '/xapi/extensions/event_name' => (string) ($record['event_name'] ?? ''),
+            $baseUrl . '/xapi/extensions/ref_id' => (int) ($record['ref_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/obj_id' => (int) ($record['obj_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/obj_type' => $objType,
+            $baseUrl . '/xapi/extensions/course_ref_id' => (int) ($record['course_ref_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/course_obj_id' => (int) ($record['course_obj_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/request_uri' => (string) ($record['request_uri'] ?? '')
+        ];
     }
 
     /**
