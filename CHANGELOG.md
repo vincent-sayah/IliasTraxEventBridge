@@ -2,6 +2,18 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.5.2 — développement
+
+### Corrigé
+
+- Assouplissement de la génération xAPI pour les objets de dépôt contenus dans un cours : les événements `create` et `update` des types supportés sont acceptés quel que soit le composant ILIAS émetteur.
+- Conservation prioritaire du traitement spécifique `Tracking:updateStatus` afin de ne pas remplacer les traces de progression par des interactions génériques.
+
+### Note de test
+
+- Cette correction cible notamment blog, lien web et mediacast lorsque ILIAS les journalise avec un composant différent de `components/ILIAS/ILIASObject`.
+- La table outbox réelle est `evnt_evhk_itxeb_out`.
+
 ## v0.5.1 — développement
 
 ### Corrigé
@@ -10,10 +22,6 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout des mappings de classes GUI pour les objets blog, lien web et mediacast.
 - Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
 - Classification outbox des nouveaux statements avec le type `repository_object_update`.
-
-### Note de test
-
-- La table outbox réelle est `evnt_evhk_itxeb_out`.
 
 ## v0.5.0 — développement
 
@@ -77,57 +85,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les statements JSON invalides sont marqués en erreur sans bloquer tout le batch.
 
 ## v0.3.1
-
-### Ajouté
-
-- Diagnostic persistant du bouton **Tester connexion TRAX**.
-- Affichage du dernier test de connexion dans la configuration : date, succès, code HTTP, message retourné.
-- Affichage du dernier envoi manuel vers TRAX.
-
-### Corrigé
-
-- Le bouton de test peut maintenant être diagnostiqué même si les messages flash ILIAS ne s’affichent pas.
-
-## v0.3.0
-
-### Ajouté
-
-- Configuration TRAX dans l’écran du plugin.
-- Endpoint xAPI, identifiant client, secret client, version xAPI, timeout HTTP, taille de batch.
-- Boutons **Tester connexion TRAX** et **Envoyer les statements générés vers TRAX**.
-- Client HTTP xAPI.
-- Statuts outbox : `generated`, `sending`, `sent`, `failed`.
-
-### Validé
-
-- Envoi manuel de statements vers TRAX.
-- Passage des lignes outbox au statut `sent`.
-- Gestion de l’erreur HTTP 401 avec passage au statut `failed`.
-
-## v0.2.1
-
-### Corrigé
-
-- Exclusion des événements d’administration liés à la suppression des résultats de test.
-- Les événements contenant `cmdClass=ilTestParticipantsGUI`, `pt_action=delete_results` ou `cmd=executeTableAction` restent dans le journal brut mais ne sont plus transformés en xAPI.
-- Les événements `Tracking:updateStatus` ambigus avec `obj_type` vide sont ignorés pour l’outbox s’ils ne viennent pas clairement du player de test.
-
-## v0.2.0
-
-### Ajouté
-
-- Table outbox locale `evnt_evhk_itxeb_out`.
-- Génération locale de statements xAPI.
-- Mapping fichier téléchargé vers `experienced`.
-- Mapping début de test vers `attempted`.
-- Mapping test réussi vers `passed`.
-- Mapping test échoué vers `failed`.
-- Affichage de l’outbox dans la configuration du plugin.
-
-## v0.1.5
-
-### Amélioré
-
-- Tableau de configuration plus lisible.
-- Colonnes regroupées.
-- Retour à la ligne dans les cellules.
