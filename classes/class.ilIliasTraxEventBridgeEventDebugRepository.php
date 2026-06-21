@@ -63,6 +63,12 @@ class ilIliasTraxEventBridgeEventDebugRepository
 
         $query = 'SELECT id, component, event_name, user_id, ref_id, obj_id, obj_type, param_keys, payload_json, request_uri, http_method, created_at '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
+
+        // Portable ILIAS limit. If unavailable, the PHP loop below still caps the display.
+        if (method_exists($this->db, 'setLimit')) {
+            $this->db->setLimit($limit);
+        }
+
         $set = $this->db->query($query);
 
         $count = 0;
@@ -72,6 +78,22 @@ class ilIliasTraxEventBridgeEventDebugRepository
         }
 
         return $rows;
+    }
+
+    public function countAll(): int
+    {
+        if (!$this->tableExists()) {
+            return 0;
+        }
+
+        $set = $this->db->query('SELECT COUNT(*) cnt FROM ' . self::TABLE_NAME);
+        $row = $this->db->fetchAssoc($set);
+
+        if (!is_array($row)) {
+            return 0;
+        }
+
+        return (int) ($row['cnt'] ?? 0);
     }
 
     public function deleteOlderThanDays(int $days): void
