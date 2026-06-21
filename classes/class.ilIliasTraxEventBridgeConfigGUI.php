@@ -76,7 +76,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $html = '';
         $html .= '<h1>IliasTraxEventBridge — Debug événements ILIAS</h1>';
-        $html .= '<p><strong>Version 0.1.3 :</strong> écran de configuration minimal, compatible avec le routage ilCtrl ILIAS 10.</p>';
+        $html .= '<p><strong>Version 0.1.4 :</strong> écran de configuration avec affichage des payloads et pré-classification des événements ILIAS 10.</p>';
         $html .= '<p>Cette version sert uniquement à observer les événements réellement émis par ILIAS 10 avant le mapping xAPI vers TRAX.</p>';
 
         $html .= '<h2>État</h2>';
@@ -118,20 +118,28 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         }
 
         $html .= '<table class="std"><thead><tr>'
-            . '<th>ID</th><th>Date</th><th>Component</th><th>Event</th><th>User</th><th>ref_id</th><th>obj_id</th><th>type</th><th>Params</th><th>URI</th>'
+            . '<th>ID</th><th>Date</th><th>Analyse</th><th>Component</th><th>Event</th><th>User</th><th>ref_id</th><th>obj_id</th><th>type</th><th>Params / payload</th><th>URI</th>'
             . '</tr></thead><tbody>';
 
         foreach ($rows as $row) {
+            $analysis = $this->classifyEvent($row);
+            $payload = isset($row['payload_json']) ? (string) $row['payload_json'] : '';
+            if (strlen($payload) > 3500) {
+                $payload = substr($payload, 0, 3500) . '...<truncated for display>';
+            }
+
             $html .= '<tr>'
                 . '<td>' . $this->esc((string) $row['id']) . '</td>'
                 . '<td>' . $this->esc((string) $row['created_at']) . '</td>'
+                . '<td><strong>' . $this->esc($analysis) . '</strong></td>'
                 . '<td>' . $this->esc((string) $row['component']) . '</td>'
                 . '<td><strong>' . $this->esc((string) $row['event_name']) . '</strong></td>'
                 . '<td>' . $this->esc((string) $row['user_id']) . '</td>'
                 . '<td>' . $this->esc((string) $row['ref_id']) . '</td>'
                 . '<td>' . $this->esc((string) $row['obj_id']) . '</td>'
                 . '<td>' . $this->esc((string) $row['obj_type']) . '</td>'
-                . '<td>' . $this->esc((string) $row['param_keys']) . '</td>'
+                . '<td>' . $this->esc((string) $row['param_keys'])
+                . '<details><summary>payload</summary><pre style="white-space: pre-wrap; max-width: 900px;">' . $this->esc($payload) . '</pre></details></td>'
                 . '<td>' . $this->esc((string) $row['request_uri']) . '</td>'
                 . '</tr>';
         }
@@ -139,6 +147,39 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= '</tbody></table>';
 
         return $html;
+    }
+
+    /**
+     * Classification is only a discovery aid. It does not send anything to TRAX.
+     */
+    private function classifyEvent(array $row): string
+    {
+        $component = (string) ($row['component'] ?? '');
+        $event = (string) ($row['event_name'] ?? '');
+        $uri = (string) ($row['request_uri'] ?? '');
+        $type = (string) ($row['obj_type'] ?? '');
+
+        if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
+            return 'candidat xAPI: progression/test';
+        }
+
+        if ($type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
+            return 'candidat xAPI: fichier téléchargé';
+        }
+
+        if ($component === 'components/ILIAS/ILIASObject' && $event === 'create') {
+            return 'administration: création objet';
+        }
+
+        if ($component === 'components/ILIAS/ILIASObject' && $event === 'update') {
+            return 'administration: mise à jour objet';
+        }
+
+        if ($component === 'components/ILIAS/Search' && $event === 'contentChanged') {
+            return 'indexation: contenu modifié';
+        }
+
+        return 'observation';
     }
 
     private function setContent(string $html): void

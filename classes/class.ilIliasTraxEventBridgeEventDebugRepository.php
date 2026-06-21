@@ -61,7 +61,7 @@ class ilIliasTraxEventBridgeEventDebugRepository
             return $rows;
         }
 
-        $query = 'SELECT id, component, event_name, user_id, ref_id, obj_id, obj_type, param_keys, request_uri, http_method, created_at '
+        $query = 'SELECT id, component, event_name, user_id, ref_id, obj_id, obj_type, param_keys, payload_json, request_uri, http_method, created_at '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
         $set = $this->db->query($query);
 

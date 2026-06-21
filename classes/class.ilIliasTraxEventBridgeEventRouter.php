@@ -31,9 +31,9 @@ class ilIliasTraxEventBridgeEventRouter
             'component' => $component,
             'event_name' => $event,
             'user_id' => $this->detectCurrentUserId($params),
-            'ref_id' => $this->detectInt($params, ['ref_id', 'refId', 'reference_id', 'test_ref_id', 'course_ref_id']),
-            'obj_id' => $this->detectInt($params, ['obj_id', 'objId', 'object_id', 'test_obj_id', 'course_obj_id']),
-            'obj_type' => $this->detectString($params, ['obj_type', 'type', 'object_type']),
+            'ref_id' => $this->detectRefId($params),
+            'obj_id' => $this->detectObjId($params),
+            'obj_type' => $this->detectObjType($params),
             'param_keys' => implode(',', array_slice(array_keys($params), 0, 80)),
             'payload_json' => $this->safeJson($params, $this->config->getMaxPayloadChars()),
             'created_at' => date('Y-m-d H:i:s'),
@@ -68,6 +68,46 @@ class ilIliasTraxEventBridgeEventRouter
         }
 
         return 0;
+    }
+
+    private function detectRefId(array $params): int
+    {
+        $fromParams = $this->detectInt($params, ['ref_id', 'refId', 'reference_id', 'test_ref_id', 'course_ref_id']);
+        if ($fromParams > 0) {
+            return $fromParams;
+        }
+
+        return $this->detectRequestInt(['ref_id', 'refId', 'reference_id']);
+    }
+
+    private function detectObjId(array $params): int
+    {
+        return $this->detectInt($params, ['obj_id', 'objId', 'object_id', 'test_obj_id', 'course_obj_id']);
+    }
+
+    private function detectObjType(array $params): string
+    {
+        $fromParams = $this->detectString($params, ['obj_type', 'type', 'object_type']);
+        if ($fromParams !== '') {
+            return $fromParams;
+        }
+
+        $cmdClass = $this->detectRequestString(['cmdClass']);
+        $map = [
+            'ilObjCourseGUI' => 'crs',
+            'ilObjFileGUI' => 'file',
+            'ilObjTestGUI' => 'tst',
+            'ilTestPlayerFixedQuestionSetGUI' => 'tst',
+            'ilTestPlayerDynamicQuestionSetGUI' => 'tst',
+            'ilObjLearningModuleGUI' => 'lm',
+            'ilObjWikiGUI' => 'wiki',
+            'ilObjForumGUI' => 'frm',
+            'ilObjExerciseGUI' => 'exc',
+            'ilObjSCORM2004LearningModuleGUI' => 'sahs',
+            'ilObjSAHSLearningModuleGUI' => 'sahs',
+        ];
+
+        return $map[$cmdClass] ?? '';
     }
 
     private function detectInt(array $params, array $keys): int
@@ -151,8 +191,60 @@ class ilIliasTraxEventBridgeEventRouter
         return gettype($value);
     }
 
+    /**
+     * Read integer values from GET first, then from REQUEST_URI.
+     * This is useful for events like Tracking/updateStatus where ILIAS gives obj_id
+     * in the event payload but keeps ref_id only in the current URL.
+     */
+    private function detectRequestInt(array $keys): int
+    {
+        foreach ($keys as $key) {
+            if (isset($_GET[$key]) && is_scalar($_GET[$key])) {
+                return (int) $_GET[$key];
+            }
+        }
+
+        $query = parse_url($this->getServerValue('REQUEST_URI'), PHP_URL_QUERY);
+        if (!is_string($query) || $query === '') {
+            return 0;
+        }
+
+        parse_str($query, $values);
+        foreach ($keys as $key) {
+            if (isset($values[$key]) && is_scalar($values[$key])) {
+                return (int) $values[$key];
+            }
+        }
+
+        return 0;
+    }
+
+    private function detectRequestString(array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (isset($_GET[$key]) && is_scalar($_GET[$key])) {
+                return substr((string) $_GET[$key], 0, 128);
+            }
+        }
+
+        $query = parse_url($this->getServerValue('REQUEST_URI'), PHP_URL_QUERY);
+        if (!is_string($query) || $query === '') {
+            return '';
+        }
+
+        parse_str($query, $values);
+        foreach ($keys as $key) {
+            if (isset($values[$key]) && is_scalar($values[$key])) {
+                return substr((string) $values[$key], 0, 128);
+            }
+        }
+
+        return '';
+    }
+
     private function getServerValue(string $key): string
     {
         return isset($_SERVER[$key]) && is_scalar($_SERVER[$key]) ? substr((string) $_SERVER[$key], 0, 512) : '';
     }
 }
+
