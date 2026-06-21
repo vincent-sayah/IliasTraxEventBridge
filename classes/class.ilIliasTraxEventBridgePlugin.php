@@ -3,10 +3,10 @@
 /**
  * ILIAS 10 EventHook plugin.
  *
- * V0.4 objective:
+ * V0.5 objective:
  * - listen to active ILIAS events through EventHook;
  * - persist compact debug records into evnt_evhk_itxeb_log;
- * - generate local xAPI statements into evnt_evhk_itxeb_out;
+ * - generate local xAPI statements only for objects contained in a course;
  * - send the outbox manually or automatically through ILIAS cron;
  * - never block or break ILIAS user navigation.
  */
@@ -26,6 +26,7 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJo
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseContextResolver.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventRouter.php';
 
             $config = new ilIliasTraxEventBridgeConfig();
@@ -38,7 +39,8 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJo
                 new ilIliasTraxEventBridgeEventDebugRepository(),
                 $this,
                 new ilIliasTraxEventBridgeStatementFactory($config),
-                new ilIliasTraxEventBridgeOutboxRepository()
+                new ilIliasTraxEventBridgeOutboxRepository(),
+                new ilIliasTraxEventBridgeCourseContextResolver()
             );
             $router->handle($a_component, $a_event, $a_parameter);
         } catch (Throwable $e) {
