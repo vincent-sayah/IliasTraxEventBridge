@@ -17,7 +17,14 @@ class ilIliasTraxEventBridgeCourseContextResolver
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
 
-        $candidateRefIds = $refId > 0 ? [$refId] : $this->lookupRefIdsForObject($objId);
+        // Creation/insertion events may carry the container ref_id instead of the
+        // freshly created object's ref_id. Prefer object references when available,
+        // then fall back to the event ref_id, which may itself be the course ref_id.
+        $candidateRefIds = array_values(array_unique(array_filter(array_merge(
+            $this->lookupRefIdsForObject($objId),
+            $refId > 0 ? [$refId] : []
+        ))));
+
         foreach ($candidateRefIds as $candidateRefId) {
             $courseRefId = $this->findCourseParentRefId((int) $candidateRefId);
             if ($courseRefId > 0) {
@@ -26,7 +33,9 @@ class ilIliasTraxEventBridgeCourseContextResolver
                     'ref_id' => (int) $candidateRefId,
                     'course_ref_id' => $courseRefId,
                     'course_obj_id' => $this->lookupObjectId($courseRefId),
-                    'reason' => 'matched course parent',
+                    'reason' => $courseRefId === (int) $candidateRefId
+                        ? 'matched course ref_id'
+                        : 'matched course parent',
                 ];
             }
         }
@@ -73,6 +82,12 @@ class ilIliasTraxEventBridgeCourseContextResolver
     {
         if ($refId <= 0) {
             return 0;
+        }
+
+        // Some lifecycle events, especially object creation, pass the current
+        // container ref_id. If this container is the course itself, accept it.
+        if ($this->lookupTypeByRefId($refId) === 'crs') {
+            return $refId;
         }
 
         $tree = $this->getRepositoryTree();
