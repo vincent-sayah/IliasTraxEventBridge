@@ -1,40 +1,30 @@
 <?php
 
 /**
- * Administration screen for the IliasTraxEventBridge debug/local xAPI/TRAX version.
+ * Administration screen for IliasTraxEventBridge.
  *
  * @ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI
  */
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
-require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeTraxClient.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
 
 class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 {
-    /** @var ilIliasTraxEventBridgePlugin|null */
-    private $plugin = null;
-
-    /** @var ilCtrl|mixed */
     private $ctrl;
-
-    /** @var ilGlobalTemplateInterface|mixed */
     private $tpl;
-
-    /** @var ilIliasTraxEventBridgeConfig|null */
-    private $config = null;
-
-    /** @var ilIliasTraxEventBridgeEventDebugRepository|null */
-    private $repo = null;
-
-    /** @var ilIliasTraxEventBridgeOutboxRepository|null */
-    private $outbox = null;
+    /** @var ilIliasTraxEventBridgeConfig */
+    private $config;
+    /** @var ilIliasTraxEventBridgeEventDebugRepository */
+    private $repo;
+    /** @var ilIliasTraxEventBridgeOutboxRepository */
+    private $outbox;
 
     public function __construct()
     {
         global $DIC, $ilCtrl, $tpl;
-
         $this->ctrl = isset($DIC) && method_exists($DIC, 'ctrl') ? $DIC->ctrl() : $ilCtrl;
         $this->tpl = isset($DIC) && isset($DIC['tpl']) ? $DIC['tpl'] : $tpl;
     }
@@ -42,45 +32,20 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     public function performCommand(string $cmd): void
     {
         $this->init();
-
         switch ($cmd) {
-            case 'saveConfig':
-                $this->saveConfig();
-                break;
-            case 'testTraxConnection':
-                $this->testTraxConnection();
-                break;
-            case 'sendGenerated':
-                $this->sendGenerated();
-                break;
-            case 'clearLog':
-                $this->clearLog();
-                break;
-            case 'clearOutbox':
-                $this->clearOutbox();
-                break;
+            case 'saveConfig': $this->saveConfig(); break;
+            case 'testTraxConnection': $this->testTraxConnection(); break;
+            case 'sendGenerated': $this->sendGenerated(); break;
+            case 'resetFailed': $this->resetFailed(); break;
+            case 'clearLog': $this->clearLog(); break;
+            case 'clearOutbox': $this->clearOutbox(); break;
             case 'configure':
-            default:
-                $this->configure();
-                break;
+            default: $this->configure(); break;
         }
     }
 
     private function init(): void
     {
-        $plugin = $this->getPluginObject();
-
-        if ($plugin instanceof ilIliasTraxEventBridgePlugin) {
-            $this->plugin = $plugin;
-        } else {
-            $this->plugin = ilPlugin::getPluginObject(
-                IL_COMP_SERVICE,
-                'EventHandling',
-                'evhk',
-                'IliasTraxEventBridge'
-            );
-        }
-
         $this->config = new ilIliasTraxEventBridgeConfig();
         $this->repo = new ilIliasTraxEventBridgeEventDebugRepository();
         $this->outbox = new ilIliasTraxEventBridgeOutboxRepository();
@@ -89,565 +54,227 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
     private function configure(): void
     {
-        $html = '';
-        $html .= $this->renderInlineStyles();
-        $html .= '<div class="itxeb-page">';
-        $html .= '<h1>IliasTraxEventBridge — Debug événements, xAPI locale et envoi TRAX</h1>';
-        $html .= '<p><strong>Version 0.3.1 :</strong> test de connexion TRAX visible et diagnostic persistant dans l’écran de configuration.</p>';
-        $html .= '<p>Cette version n’a pas encore de cron automatique. L’envoi vers TRAX est déclenché manuellement depuis cet écran.</p>';
-
+        $html = $this->styles();
+        $html .= '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.4.0</h1>';
+        $html .= '<p><strong>V0.4 :</strong> cron ILIAS, retry_count/max_retry, reset des failed et diagnostics cron.</p>';
         $html .= $this->renderState();
-        $html .= $this->renderTraxConfigForm();
+        $html .= $this->renderConfigForm();
         $html .= $this->renderSendActions();
         $html .= $this->renderOutbox();
         $html .= $this->renderRecentEvents();
         $html .= '</div>';
-
         $this->setContent($html);
     }
 
     private function renderState(): string
     {
-        $html = '<h2>État</h2>';
-        $html .= '<div class="itxeb-state">';
-        $html .= '<table class="std itxeb-state-table">';
+        $html = '<h2>État</h2><table class="std itxeb-state-table">';
         $html .= '<tr><td>Plugin actif</td><td><strong>' . ($this->config->isEnabled() ? 'oui' : 'non') . '</strong></td></tr>';
         $html .= '<tr><td>Mode debug</td><td><strong>' . ($this->config->isDebugEnabled() ? 'oui' : 'non') . '</strong></td></tr>';
         $html .= '<tr><td>Génération xAPI locale</td><td><strong>' . ($this->config->isLocalXapiGenerationEnabled() ? 'oui' : 'non') . '</strong></td></tr>';
-        $html .= '<tr><td>Base URL ILIAS utilisée dans les statements</td><td><code>' . $this->esc($this->config->getIliasBaseUrl()) . '</code></td></tr>';
-        $html .= '<tr><td>Endpoint xAPI statements</td><td><code>' . $this->esc($this->config->getStatementsEndpoint()) . '</code></td></tr>';
+        $html .= '<tr><td>Cron plugin</td><td><strong>' . ($this->config->isCronEnabled() ? 'activé' : 'désactivé') . '</strong></td></tr>';
+        $html .= '<tr><td>Endpoint statements</td><td><code>' . $this->esc($this->config->getStatementsEndpoint()) . '</code></td></tr>';
         $html .= '</table>';
-
-        $html .= $this->renderTraxDiagnostics();
-
-        $html .= '<p class="itxeb-actions">';
-        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearLog')) . '">Vider le journal debug</a> ';
-        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearOutbox')) . '">Vider l’outbox xAPI locale</a>';
-        $html .= '</p>';
-        $html .= '</div>';
-
+        $html .= '<h3>Diagnostics</h3><table class="std itxeb-state-table">';
+        $html .= $this->diagRow('Dernier test connexion', $this->config->getLastTraxTestAt(), $this->config->getLastTraxTestSuccess(), $this->config->getLastTraxTestHttpStatus(), $this->config->getLastTraxTestMessage());
+        $html .= $this->diagRow('Dernier envoi manuel', $this->config->getLastTraxSendAt(), $this->config->getLastTraxSendSuccess(), $this->config->getLastTraxSendHttpStatus(), $this->config->getLastTraxSendMessage());
+        $html .= $this->diagRow('Dernier cron', $this->config->getLastCronAt(), $this->config->getLastCronSuccess(), $this->config->getLastCronHttpStatus(), $this->config->getLastCronMessage());
+        $html .= '</table>';
+        $html .= '<p class="itxeb-actions"><a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearLog')) . '">Vider le journal debug</a> ';
+        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearOutbox')) . '">Vider l’outbox xAPI locale</a></p>';
         return $html;
     }
 
-    private function renderTraxDiagnostics(): string
+    private function diagRow(string $label, string $at, string $success, string $http, string $message): string
     {
-        $html = '<h3>Derniers diagnostics TRAX</h3>';
-        $html .= '<table class="std itxeb-state-table">';
-
-        $lastTestAt = $this->config->getLastTraxTestAt();
-        if ($lastTestAt === '') {
-            $html .= '<tr><td>Dernier test connexion</td><td><em>Aucun test lancé depuis le plugin.</em></td></tr>';
-        } else {
-            $html .= '<tr><td>Dernier test connexion</td><td>'
-                . '<strong>date :</strong> ' . $this->esc($lastTestAt)
-                . '<br><strong>succès :</strong> ' . $this->esc($this->config->getLastTraxTestSuccess())
-                . '<br><strong>HTTP :</strong> ' . $this->esc($this->config->getLastTraxTestHttpStatus())
-                . '<br><strong>message :</strong> ' . $this->esc($this->config->getLastTraxTestMessage())
-                . '</td></tr>';
+        if ($at === '') {
+            return '<tr><td>' . $this->esc($label) . '</td><td><em>Aucun diagnostic disponible.</em></td></tr>';
         }
-
-        $lastSendAt = $this->config->getLastTraxSendAt();
-        if ($lastSendAt === '') {
-            $html .= '<tr><td>Dernier envoi manuel</td><td><em>Aucun envoi manuel lancé depuis le plugin.</em></td></tr>';
-        } else {
-            $html .= '<tr><td>Dernier envoi manuel</td><td>'
-                . '<strong>date :</strong> ' . $this->esc($lastSendAt)
-                . '<br><strong>succès :</strong> ' . $this->esc($this->config->getLastTraxSendSuccess())
-                . '<br><strong>HTTP :</strong> ' . $this->esc($this->config->getLastTraxSendHttpStatus())
-                . '<br><strong>message :</strong> ' . $this->esc($this->config->getLastTraxSendMessage())
-                . '</td></tr>';
-        }
-
-        $html .= '</table>';
-        return $html;
+        return '<tr><td>' . $this->esc($label) . '</td><td><strong>date :</strong> ' . $this->esc($at)
+            . '<br><strong>succès :</strong> ' . $this->esc($success)
+            . '<br><strong>HTTP :</strong> ' . $this->esc($http)
+            . '<br><strong>message :</strong> ' . $this->esc($message) . '</td></tr>';
     }
 
-    private function renderTraxConfigForm(): string
+    private function renderConfigForm(): string
     {
-        $html = '<h2>Configuration TRAX 3 / xAPI</h2>';
-        $html .= '<form method="post" action="' . $this->esc($this->ctrl->getLinkTarget($this, 'saveConfig')) . '" class="itxeb-form">';
-        $html .= '<table class="std itxeb-form-table">';
-
-        $html .= $this->inputRow('Endpoint xAPI TRAX', 'trax_endpoint', $this->config->getTraxEndpoint(), 'Exemple : https://trax.example.com/trax/ws/xapi ou URL complète finissant par /statements');
-        $html .= $this->inputRow('Identifiant client TRAX', 'trax_username', $this->config->getTraxUsername(), 'Client xAPI TRAX autorisé à écrire les statements.');
-        $html .= $this->passwordRow('Secret client TRAX', 'trax_password', 'Laisser vide pour conserver le secret déjà enregistré.');
-        $html .= $this->inputRow('Version xAPI', 'xapi_version', $this->config->getXapiVersion(), 'Valeur recommandée : 1.0.3');
+        $html = '<h2>Configuration TRAX / cron</h2><form method="post" action="' . $this->esc($this->ctrl->getLinkTarget($this, 'saveConfig')) . '"><table class="std itxeb-form-table">';
+        $html .= $this->checkboxRow('Activer le cron plugin', 'cron_enabled', $this->config->isCronEnabled(), 'Le cron ILIAS global doit aussi être actif.');
+        $html .= $this->inputRow('Endpoint xAPI TRAX', 'trax_endpoint', $this->config->getTraxEndpoint(), 'Endpoint xAPI racine ou URL complète /statements.');
+        $html .= $this->inputRow('Identifiant client TRAX', 'trax_username', $this->config->getTraxUsername(), 'Client xAPI autorisé à écrire.');
+        $html .= $this->passwordRow('Secret client TRAX', 'trax_password', 'Laisser vide pour conserver le secret.');
+        $html .= $this->inputRow('Version xAPI', 'xapi_version', $this->config->getXapiVersion(), 'Recommandé : 1.0.3.');
         $html .= $this->inputRow('Timeout HTTP', 'http_timeout', (string) $this->config->getHttpTimeout(), 'Entre 2 et 120 secondes.');
-        $html .= $this->inputRow('Taille batch manuel', 'batch_size', (string) $this->config->getBatchSize(), 'Entre 1 et 100 statements.');
-        $html .= $this->inputRow('Base URL ILIAS forcée', 'ilias_base_url', $this->config->getIliasBaseUrl(), 'Optionnel. Sert à construire actor.account.homePage et les IRIs des activités.');
-
-        $html .= '</table>';
-        $html .= '<p class="itxeb-actions"><button class="btn btn-primary" type="submit">Enregistrer la configuration</button></p>';
-        $html .= '</form>';
-
-        $html .= '<form method="post" action="' . $this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')) . '" class="itxeb-inline-form">';
-        $html .= '<p class="itxeb-actions"><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p>';
-        $html .= '</form>';
-
+        $html .= $this->inputRow('Taille batch', 'batch_size', (string) $this->config->getBatchSize(), 'Entre 1 et 100 statements.');
+        $html .= $this->inputRow('Max retry', 'max_retry', (string) $this->config->getMaxRetry(), 'Nombre maximum de tentatives par statement.');
+        $html .= $this->inputRow('Base URL ILIAS forcée', 'ilias_base_url', $this->config->getIliasBaseUrl(), 'Optionnel. Utilisé pour les IRIs xAPI.');
+        $html .= '</table><p class="itxeb-actions"><button class="btn btn-primary" type="submit">Enregistrer</button></p></form>';
+        $html .= '<form method="post" action="' . $this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')) . '"><p><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p></form>';
         return $html;
     }
 
     private function renderSendActions(): string
     {
-        $generated = $this->outbox->countByStatus('generated');
-        $failed = $this->outbox->countByStatus('failed');
-        $sent = $this->outbox->countByStatus('sent');
-
-        $html = '<h2>Envoi manuel vers TRAX</h2>';
-        $html .= '<div class="itxeb-summary">';
-        $html .= '<span><strong>generated :</strong> ' . $this->esc((string) $generated) . '</span>';
-        $html .= '<span><strong>failed :</strong> ' . $this->esc((string) $failed) . '</span>';
-        $html .= '<span><strong>sent :</strong> ' . $this->esc((string) $sent) . '</span>';
+        $html = '<h2>Envoi vers TRAX</h2><div class="itxeb-summary">';
+        $html .= '<span><strong>generated :</strong> ' . $this->esc((string) $this->outbox->countByStatus('generated')) . '</span>';
+        $html .= '<span><strong>failed :</strong> ' . $this->esc((string) $this->outbox->countByStatus('failed')) . '</span>';
+        $html .= '<span><strong>retry épuisé :</strong> ' . $this->esc((string) $this->outbox->countRetryExhausted($this->config->getMaxRetry())) . '</span>';
+        $html .= '<span><strong>sent :</strong> ' . $this->esc((string) $this->outbox->countByStatus('sent')) . '</span>';
         $html .= '<span><strong>batch :</strong> ' . $this->esc((string) $this->config->getBatchSize()) . '</span>';
-        $html .= '</div>';
-        $html .= '<p>Le bouton ci-dessous envoie uniquement les statements au statut <code>generated</code> ou <code>failed</code>. Les statements déjà <code>sent</code> ne sont pas renvoyés.</p>';
-        $html .= '<p class="itxeb-actions"><a class="btn btn-primary" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'sendGenerated')) . '">Envoyer les statements générés vers TRAX</a></p>';
-
+        $html .= '<span><strong>max_retry :</strong> ' . $this->esc((string) $this->config->getMaxRetry()) . '</span></div>';
+        $html .= '<p>L’envoi manuel et le cron traitent les statements <code>generated</code> ou <code>failed</code> lorsque <code>retry_count &lt; max_retry</code>.</p>';
+        $html .= '<p class="itxeb-actions"><a class="btn btn-primary" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'sendGenerated')) . '">Envoyer maintenant</a> ';
+        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'resetFailed')) . '">Réinitialiser les failed</a></p>';
         return $html;
-    }
-
-    private function inputRow(string $label, string $name, string $value, string $help): string
-    {
-        return '<tr><td><label for="' . $this->esc($name) . '">' . $this->esc($label) . '</label></td><td>'
-            . '<input id="' . $this->esc($name) . '" name="' . $this->esc($name) . '" type="text" value="' . $this->esc($value) . '" class="form-control itxeb-input">'
-            . '<div class="itxeb-help">' . $this->esc($help) . '</div></td></tr>';
-    }
-
-    private function passwordRow(string $label, string $name, string $help): string
-    {
-        return '<tr><td><label for="' . $this->esc($name) . '">' . $this->esc($label) . '</label></td><td>'
-            . '<input id="' . $this->esc($name) . '" name="' . $this->esc($name) . '" type="password" value="" class="form-control itxeb-input">'
-            . '<div class="itxeb-help">' . $this->esc($help) . '</div></td></tr>';
     }
 
     private function saveConfig(): void
     {
+        $this->config->setCronEnabled($this->postString('cron_enabled') === '1');
         $this->config->setTraxEndpoint($this->postString('trax_endpoint'));
         $this->config->setTraxUsername($this->postString('trax_username'));
-
         $password = $this->postString('trax_password');
-        if ($password !== '') {
-            $this->config->setTraxPassword($password);
-        }
-
+        if ($password !== '') { $this->config->setTraxPassword($password); }
         $this->config->setXapiVersion($this->postString('xapi_version'));
         $this->config->setHttpTimeout((int) $this->postString('http_timeout'));
         $this->config->setBatchSize((int) $this->postString('batch_size'));
+        $this->config->setMaxRetry((int) $this->postString('max_retry'));
         $this->config->setIliasBaseUrl($this->postString('ilias_base_url'));
-
-        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-            ilUtil::sendSuccess('Configuration TRAX enregistrée.', true);
-        }
-
+        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess('Configuration enregistrée.', true); }
         $this->ctrl->redirect($this, 'configure');
     }
 
     private function testTraxConnection(): void
     {
-        $client = new ilIliasTraxEventBridgeTraxClient($this->config);
-        $result = $client->testConnection();
-
+        $result = (new ilIliasTraxEventBridgeTraxClient($this->config))->testConnection();
         $message = $result->getShortMessage();
         $this->config->setLastTraxTestResult($result->isSuccess(), $result->getHttpStatus(), $message);
-
-        if ($result->isSuccess()) {
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-                ilUtil::sendSuccess('Connexion TRAX réussie : ' . $message, true);
-            }
-        } else {
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
-                ilUtil::sendFailure('Connexion TRAX échouée : ' . $message, true);
-            }
+        if ($result->isSuccess() && class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
+            ilUtil::sendSuccess('Connexion TRAX réussie : ' . $message, true);
+        } elseif (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
+            ilUtil::sendFailure('Connexion TRAX échouée : ' . $message, true);
         }
-
         $this->ctrl->redirect($this, 'configure');
     }
 
     private function sendGenerated(): void
     {
-        $rows = $this->outbox->findSendable($this->config->getBatchSize());
-
-        if (count($rows) === 0) {
-            $this->config->setLastTraxSendResult(true, 0, 'Aucun statement generated/failed à envoyer.');
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendInfo')) {
-                ilUtil::sendInfo('Aucun statement generated/failed à envoyer.', true);
-            }
-            $this->ctrl->redirect($this, 'configure');
-            return;
+        $result = (new ilIliasTraxEventBridgeOutboxSender($this->config, $this->outbox))->sendBatch();
+        $this->config->setLastTraxSendResult((bool) $result['success'], (int) $result['http_status'], (string) $result['message']);
+        if ($result['success'] && class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
+            ilUtil::sendSuccess((string) $result['message'], true);
+        } elseif (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
+            ilUtil::sendFailure((string) $result['message'], true);
         }
+        $this->ctrl->redirect($this, 'configure');
+    }
 
-        $ids = [];
-        $statements = [];
-
-        foreach ($rows as $row) {
-            $ids[] = (int) $row['id'];
-            $decoded = json_decode((string) $row['statement_json'], true);
-            if (is_array($decoded)) {
-                $statements[] = $decoded;
-            }
-        }
-
-        if (count($statements) === 0) {
-            $this->outbox->markFailed($ids, 'Aucun statement JSON valide dans le batch.');
-            $this->config->setLastTraxSendResult(false, 0, 'Aucun statement JSON valide dans le batch.');
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
-                ilUtil::sendFailure('Aucun statement JSON valide dans le batch.', true);
-            }
-            $this->ctrl->redirect($this, 'configure');
-            return;
-        }
-
-        $this->outbox->markSending($ids);
-
-        $client = new ilIliasTraxEventBridgeTraxClient($this->config);
-        $result = $client->sendStatements($statements);
-
-        if ($result->isSuccess()) {
-            $this->outbox->markSent($ids);
-            $message = count($ids) . ' statement(s) envoyé(s) vers TRAX. ' . $result->getShortMessage();
-            $this->config->setLastTraxSendResult(true, $result->getHttpStatus(), $message);
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-                ilUtil::sendSuccess($message, true);
-            }
-        } else {
-            $message = 'Envoi TRAX échoué : ' . $result->getShortMessage();
-            $this->outbox->markFailed($ids, $result->getShortMessage());
-            $this->config->setLastTraxSendResult(false, $result->getHttpStatus(), $message);
-            if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
-                ilUtil::sendFailure($message, true);
-            }
-        }
-
+    private function resetFailed(): void
+    {
+        $count = $this->outbox->resetFailedToGenerated();
+        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess($count . ' statement(s) failed réinitialisé(s).', true); }
         $this->ctrl->redirect($this, 'configure');
     }
 
     private function clearLog(): void
     {
         $this->repo->clear();
-
-        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-            ilUtil::sendSuccess('Journal des événements vidé.', true);
-        }
-
+        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess('Journal vidé.', true); }
         $this->ctrl->redirect($this, 'configure');
     }
 
     private function clearOutbox(): void
     {
         $this->outbox->clear();
-
-        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-            ilUtil::sendSuccess('Outbox xAPI locale vidée.', true);
-        }
-
+        if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess('Outbox vidée.', true); }
         $this->ctrl->redirect($this, 'configure');
     }
 
     private function renderOutbox(): string
     {
-        $limit = 50;
-        $rows = $this->outbox->findRecent($limit);
-        $total = $this->outbox->countAll();
-
+        $rows = $this->outbox->findRecent(50);
         $html = '<h2>Outbox xAPI locale</h2>';
-        $html .= '<p>Cette table contient les statements xAPI générés localement et leur statut d’envoi vers TRAX.</p>';
-
-        $html .= '<div class="itxeb-summary">';
-        $html .= '<span><strong>Total statements :</strong> ' . $this->esc((string) $total) . '</span>';
-        $html .= '<span><strong>Affichés :</strong> ' . $this->esc((string) count($rows)) . ' / ' . $this->esc((string) min($limit, max($total, 0))) . '</span>';
-        $html .= '<span><strong>generated :</strong> ' . $this->esc((string) $this->outbox->countByStatus('generated')) . '</span>';
-        $html .= '<span><strong>sent :</strong> ' . $this->esc((string) $this->outbox->countByStatus('sent')) . '</span>';
-        $html .= '<span><strong>failed :</strong> ' . $this->esc((string) $this->outbox->countByStatus('failed')) . '</span>';
-        $html .= '</div>';
-
-        if (count($rows) === 0) {
-            return $html . '<p><em>Aucun statement xAPI généré pour le moment.</em></p>';
-        }
-
-        $html .= '<div class="itxeb-table-wrapper">';
-        $html .= '<table class="std itxeb-events">';
-        $html .= '<thead><tr>'
-            . '<th class="itxeb-col-id">ID<br>Date</th>'
-            . '<th class="itxeb-col-analysis">Type</th>'
-            . '<th class="itxeb-col-event">Verb</th>'
-            . '<th class="itxeb-col-object">Utilisateur / objet</th>'
-            . '<th class="itxeb-col-statement">Statement / erreur</th>'
-            . '</tr></thead><tbody>';
-
+        if (count($rows) === 0) { return $html . '<p><em>Aucun statement xAPI généré pour le moment.</em></p>'; }
+        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events"><thead><tr><th>ID / date</th><th>Statut</th><th>Retry</th><th>Verb</th><th>Objet</th><th>Erreur / statement</th></tr></thead><tbody>';
         foreach ($rows as $row) {
-            $statement = $this->formatPayload((string) ($row['statement_json'] ?? ''));
             $lastError = trim((string) ($row['last_error'] ?? ''));
-
-            $html .= '<tr>'
-                . '<td class="itxeb-id-cell">'
-                    . '<div class="itxeb-id">#' . $this->esc((string) ($row['id'] ?? '')) . '</div>'
-                    . '<div class="itxeb-date">' . $this->esc((string) ($row['created_at'] ?? '')) . '</div>'
-                    . '<div class="itxeb-date">log #' . $this->esc((string) ($row['event_log_id'] ?? '')) . '</div>'
-                    . '<div class="itxeb-date">sent: ' . $this->esc((string) ($row['sent_at'] ?? '')) . '</div>'
-                . '</td>'
-                . '<td>'
-                    . '<span class="itxeb-badge ' . $this->statusBadgeClass((string) ($row['status'] ?? '')) . '">' . $this->esc((string) ($row['status'] ?? '')) . '</span>'
-                    . '<div class="itxeb-date">' . $this->esc((string) ($row['event_type'] ?? '')) . '</div>'
-                . '</td>'
-                . '<td><div class="itxeb-uri">' . $this->esc((string) ($row['verb_id'] ?? '')) . '</div></td>'
-                . '<td>'
-                    . '<div><strong>User :</strong> ' . $this->esc((string) ($row['user_id'] ?? '')) . '</div>'
-                    . '<div><strong>ref_id :</strong> ' . $this->esc((string) ($row['ref_id'] ?? '')) . '</div>'
-                    . '<div><strong>obj_id :</strong> ' . $this->esc((string) ($row['obj_id'] ?? '')) . '</div>'
-                    . '<div><strong>type :</strong> ' . $this->esc((string) ($row['obj_type'] ?? '')) . '</div>'
-                . '</td>'
-                . '<td>'
-                    . ($lastError !== '' ? '<div class="itxeb-error"><strong>Erreur :</strong> ' . $this->esc($lastError) . '</div>' : '')
-                    . '<details class="itxeb-details"><summary>Afficher le statement xAPI</summary><pre>' . $this->esc($statement) . '</pre></details>'
-                . '</td>'
-                . '</tr>';
+            $html .= '<tr><td>#' . $this->esc((string) ($row['id'] ?? '')) . '<br><span class="itxeb-date">' . $this->esc((string) ($row['created_at'] ?? '')) . '</span><br><span class="itxeb-date">last try: ' . $this->esc((string) ($row['last_attempt_at'] ?? '')) . '</span></td>';
+            $html .= '<td><span class="itxeb-badge ' . $this->statusBadgeClass((string) ($row['status'] ?? '')) . '">' . $this->esc((string) ($row['status'] ?? '')) . '</span></td>';
+            $html .= '<td>' . $this->esc((string) ($row['retry_count'] ?? '0')) . ' / ' . $this->esc((string) ($row['max_retry'] ?? $this->config->getMaxRetry())) . '</td>';
+            $html .= '<td><div class="itxeb-uri">' . $this->esc((string) ($row['verb_id'] ?? '')) . '</div></td>';
+            $html .= '<td>user ' . $this->esc((string) ($row['user_id'] ?? '')) . '<br>ref ' . $this->esc((string) ($row['ref_id'] ?? '')) . '<br>obj ' . $this->esc((string) ($row['obj_id'] ?? '')) . '<br>' . $this->esc((string) ($row['obj_type'] ?? '')) . '</td>';
+            $html .= '<td>' . ($lastError !== '' ? '<div class="itxeb-error">' . $this->esc($lastError) . '</div>' : '') . '<details><summary>Statement</summary><pre>' . $this->esc($this->formatPayload((string) ($row['statement_json'] ?? ''))) . '</pre></details></td></tr>';
         }
-
-        $html .= '</tbody></table></div>';
-
-        return $html;
+        return $html . '</tbody></table></div>';
     }
 
     private function renderRecentEvents(): string
     {
-        $limit = 100;
-        $rows = $this->repo->findRecent($limit);
-        $total = $this->repo->countAll();
-
+        $rows = $this->repo->findRecent(100);
         $html = '<h2>Derniers événements ILIAS reçus</h2>';
-        $html .= '<p>Ces lignes sont le journal brut des événements EventHook reçus par le plugin.</p>';
-
-        $html .= '<div class="itxeb-summary">';
-        $html .= '<span><strong>Total journalisé :</strong> ' . $this->esc((string) $total) . '</span>';
-        $html .= '<span><strong>Affichés :</strong> ' . $this->esc((string) count($rows)) . ' / ' . $this->esc((string) min($limit, max($total, 0))) . '</span>';
-        $html .= '<span><strong>Limite d’affichage :</strong> ' . $this->esc((string) $limit) . '</span>';
-        $html .= '</div>';
-
-        if (count($rows) === 0) {
-            return $html . '<p><em>Aucun événement journalisé pour le moment.</em></p>';
-        }
-
-        $html .= '<div class="itxeb-table-wrapper">';
-        $html .= '<table class="std itxeb-events">';
-        $html .= '<thead><tr>'
-            . '<th class="itxeb-col-id">ID<br>Date</th>'
-            . '<th class="itxeb-col-analysis">Analyse</th>'
-            . '<th class="itxeb-col-event">Événement ILIAS</th>'
-            . '<th class="itxeb-col-object">Utilisateur / objet</th>'
-            . '<th class="itxeb-col-payload">Paramètres / payload</th>'
-            . '<th class="itxeb-col-uri">URI</th>'
-            . '</tr></thead><tbody>';
-
+        if (count($rows) === 0) { return $html . '<p><em>Aucun événement journalisé pour le moment.</em></p>'; }
+        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events"><thead><tr><th>ID / date</th><th>Événement</th><th>Objet</th><th>Payload</th><th>URI</th></tr></thead><tbody>';
         foreach ($rows as $row) {
-            $analysis = $this->classifyEvent($row);
-            $payload = $this->formatPayload((string) ($row['payload_json'] ?? ''));
-            $eventName = (string) ($row['event_name'] ?? '');
-            $component = (string) ($row['component'] ?? '');
-
-            $html .= '<tr>'
-                . '<td class="itxeb-id-cell">'
-                    . '<div class="itxeb-id">#' . $this->esc((string) ($row['id'] ?? '')) . '</div>'
-                    . '<div class="itxeb-date">' . $this->esc((string) ($row['created_at'] ?? '')) . '</div>'
-                . '</td>'
-                . '<td>' . $this->renderAnalysisBadge($analysis) . '</td>'
-                . '<td>'
-                    . '<div class="itxeb-component">' . $this->esc($component) . '</div>'
-                    . '<div class="itxeb-event-name">' . $this->esc($eventName) . '</div>'
-                . '</td>'
-                . '<td>'
-                    . '<div><strong>User :</strong> ' . $this->esc((string) ($row['user_id'] ?? '')) . '</div>'
-                    . '<div><strong>ref_id :</strong> ' . $this->esc((string) ($row['ref_id'] ?? '')) . '</div>'
-                    . '<div><strong>obj_id :</strong> ' . $this->esc((string) ($row['obj_id'] ?? '')) . '</div>'
-                    . '<div><strong>type :</strong> ' . $this->esc((string) ($row['obj_type'] ?? '')) . '</div>'
-                . '</td>'
-                . '<td>'
-                    . '<div class="itxeb-param-keys">' . $this->esc((string) ($row['param_keys'] ?? '')) . '</div>'
-                    . '<details class="itxeb-details"><summary>Afficher le payload</summary><pre>' . $this->esc($payload) . '</pre></details>'
-                . '</td>'
-                . '<td><div class="itxeb-uri">' . $this->esc((string) ($row['request_uri'] ?? '')) . '</div></td>'
-                . '</tr>';
+            $html .= '<tr><td>#' . $this->esc((string) ($row['id'] ?? '')) . '<br><span class="itxeb-date">' . $this->esc((string) ($row['created_at'] ?? '')) . '</span></td>';
+            $html .= '<td>' . $this->esc((string) ($row['component'] ?? '')) . '<br><strong>' . $this->esc((string) ($row['event_name'] ?? '')) . '</strong></td>';
+            $html .= '<td>user ' . $this->esc((string) ($row['user_id'] ?? '')) . '<br>ref ' . $this->esc((string) ($row['ref_id'] ?? '')) . '<br>obj ' . $this->esc((string) ($row['obj_id'] ?? '')) . '<br>' . $this->esc((string) ($row['obj_type'] ?? '')) . '</td>';
+            $html .= '<td><details><summary>Payload</summary><pre>' . $this->esc($this->formatPayload((string) ($row['payload_json'] ?? ''))) . '</pre></details></td>';
+            $html .= '<td><div class="itxeb-uri">' . $this->esc((string) ($row['request_uri'] ?? '')) . '</div></td></tr>';
         }
-
-        $html .= '</tbody></table></div>';
-
-        return $html;
+        return $html . '</tbody></table></div>';
     }
 
-    private function classifyEvent(array $row): string
+    private function inputRow(string $label, string $name, string $value, string $help): string
     {
-        $component = (string) ($row['component'] ?? '');
-        $event = (string) ($row['event_name'] ?? '');
-        $uri = (string) ($row['request_uri'] ?? '');
-        $type = (string) ($row['obj_type'] ?? '');
-
-        $factory = new ilIliasTraxEventBridgeStatementFactory($this->config);
-        $ignoreReason = $factory->getIgnoreReason($row);
-        if ($ignoreReason !== '') {
-            return $ignoreReason;
-        }
-
-        if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
-            if ($type === 'tst'
-                || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false
-                || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false
-                || strpos($uri, 'cmd=startTest') !== false
-                || strpos($uri, 'cmd=finishTest') !== false
-            ) {
-                return 'candidat xAPI: test';
-            }
-
-            if ($type !== '') {
-                return 'candidat xAPI: progression';
-            }
-
-            return 'observation: tracking ignoré';
-        }
-
-        if ($type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
-            return 'candidat xAPI: fichier téléchargé';
-        }
-
-        if ($component === 'components/ILIAS/ILIASObject' && $event === 'create') {
-            return 'administration: création objet';
-        }
-
-        if ($component === 'components/ILIAS/ILIASObject' && $event === 'update') {
-            return 'administration: mise à jour objet';
-        }
-
-        if ($component === 'components/ILIAS/Search' && $event === 'contentChanged') {
-            return 'indexation: contenu modifié';
-        }
-
-        return 'observation';
+        return '<tr><td><label for="' . $this->esc($name) . '">' . $this->esc($label) . '</label></td><td><input id="' . $this->esc($name) . '" name="' . $this->esc($name) . '" type="text" value="' . $this->esc($value) . '" class="form-control itxeb-input"><div class="itxeb-help">' . $this->esc($help) . '</div></td></tr>';
     }
 
-    private function renderAnalysisBadge(string $analysis): string
+    private function passwordRow(string $label, string $name, string $help): string
     {
-        $class = 'itxeb-badge';
-        if (strpos($analysis, 'candidat xAPI') === 0) {
-            $class .= ' itxeb-badge-xapi';
-        } elseif (strpos($analysis, 'ignored') === 0 || strpos($analysis, 'observation: tracking ignoré') === 0) {
-            $class .= ' itxeb-badge-ignored';
-        } elseif (strpos($analysis, 'administration') === 0) {
-            $class .= ' itxeb-badge-admin';
-        } elseif (strpos($analysis, 'indexation') === 0) {
-            $class .= ' itxeb-badge-index';
-        } else {
-            $class .= ' itxeb-badge-observation';
-        }
+        return '<tr><td><label for="' . $this->esc($name) . '">' . $this->esc($label) . '</label></td><td><input id="' . $this->esc($name) . '" name="' . $this->esc($name) . '" type="password" value="" class="form-control itxeb-input"><div class="itxeb-help">' . $this->esc($help) . '</div></td></tr>';
+    }
 
-        return '<span class="' . $class . '">' . $this->esc($analysis) . '</span>';
+    private function checkboxRow(string $label, string $name, bool $checked, string $help): string
+    {
+        return '<tr><td><label for="' . $this->esc($name) . '">' . $this->esc($label) . '</label></td><td><input id="' . $this->esc($name) . '" name="' . $this->esc($name) . '" type="checkbox" value="1"' . ($checked ? ' checked="checked"' : '') . '><div class="itxeb-help">' . $this->esc($help) . '</div></td></tr>';
     }
 
     private function statusBadgeClass(string $status): string
     {
-        if ($status === 'sent') {
-            return 'itxeb-badge-sent';
-        }
-        if ($status === 'failed') {
-            return 'itxeb-badge-failed';
-        }
-        if ($status === 'sending') {
-            return 'itxeb-badge-admin';
-        }
-
-        return 'itxeb-badge-xapi';
+        if ($status === 'sent') { return 'itxeb-badge-ok'; }
+        if ($status === 'failed') { return 'itxeb-badge-error'; }
+        if ($status === 'sending') { return 'itxeb-badge-warn'; }
+        return 'itxeb-badge-muted';
     }
 
-    private function formatPayload(string $payload): string
+    private function formatPayload(string $json): string
     {
-        $payload = trim($payload);
-        if ($payload === '') {
-            return '';
+        $decoded = json_decode($json, true);
+        if (is_array($decoded)) {
+            $pretty = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            if (is_string($pretty)) { return $pretty; }
         }
-
-        $decoded = json_decode($payload, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            $pretty = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            if (is_string($pretty)) {
-                $payload = $pretty;
-            }
-        }
-
-        if (strlen($payload) > 8000) {
-            $payload = substr($payload, 0, 8000) . "\n...<truncated for display>";
-        }
-
-        return $payload;
+        return $json;
     }
 
     private function postString(string $key): string
     {
-        if (isset($_POST[$key]) && is_scalar($_POST[$key])) {
-            return trim((string) $_POST[$key]);
-        }
-
+        if (isset($_POST[$key]) && is_scalar($_POST[$key])) { return trim((string) $_POST[$key]); }
         return '';
-    }
-
-    private function renderInlineStyles(): string
-    {
-        return '<style>
-.itxeb-page { max-width: 100%; }
-.itxeb-state { margin-bottom: 18px; }
-.itxeb-state-table { width: auto; min-width: 520px; }
-.itxeb-form-table { width: 100%; max-width: 1120px; }
-.itxeb-form-table td { vertical-align: top; padding: 8px; }
-.itxeb-form-table td:first-child { width: 260px; font-weight: 700; }
-.itxeb-input { width: 100%; max-width: 760px; }
-.itxeb-help { color: #666; font-size: 12px; margin-top: 4px; }
-.itxeb-actions { margin: 8px 0 18px 0; }
-.itxeb-inline-form { display: inline; }
-.itxeb-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px 0; }
-.itxeb-summary span { display: inline-block; border: 1px solid #cfd7e2; background: #f7f9fb; padding: 6px 10px; border-radius: 4px; }
-.itxeb-table-wrapper { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid #d5d5d5; margin-bottom: 26px; }
-table.itxeb-events { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; line-height: 1.35; }
-table.itxeb-events th, table.itxeb-events td { vertical-align: top; padding: 8px 8px; border-bottom: 1px solid #e2e2e2; overflow-wrap: anywhere; word-break: break-word; }
-table.itxeb-events th { position: sticky; top: 0; z-index: 1; background: #eef2f6; font-weight: 700; }
-table.itxeb-events tr:nth-child(even) td { background: #fafafa; }
-.itxeb-col-id { width: 105px; }
-.itxeb-col-analysis { width: 170px; }
-.itxeb-col-event { width: 220px; }
-.itxeb-col-object { width: 125px; }
-.itxeb-col-payload { width: 330px; }
-.itxeb-col-statement { width: 600px; }
-.itxeb-col-uri { width: 360px; }
-.itxeb-id { font-weight: 700; font-size: 13px; }
-.itxeb-date { white-space: normal; color: #555; margin-top: 4px; }
-.itxeb-component { color: #555; margin-bottom: 4px; }
-.itxeb-event-name { font-weight: 700; font-size: 13px; }
-.itxeb-param-keys { font-family: monospace; font-size: 12px; margin-bottom: 5px; }
-.itxeb-details summary { cursor: pointer; font-weight: 600; }
-.itxeb-details pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 280px; overflow: auto; background: #f4f4f4; border: 1px solid #d6d6d6; padding: 8px; margin: 6px 0 0 0; font-size: 12px; }
-.itxeb-uri { font-family: monospace; font-size: 12px; max-height: 120px; overflow: auto; background: #f8f8f8; border: 1px solid #e0e0e0; padding: 6px; }
-.itxeb-error { border-left: 4px solid #b95d5d; background: #fff0f0; padding: 6px 8px; margin-bottom: 6px; }
-.itxeb-badge { display: inline-block; padding: 4px 7px; border-radius: 4px; font-weight: 700; border: 1px solid #cfcfcf; background: #f5f5f5; }
-.itxeb-badge-xapi { border-color: #7c9b4d; background: #f2f8e8; }
-.itxeb-badge-sent { border-color: #3f7f3f; background: #eaf8ea; }
-.itxeb-badge-failed { border-color: #b95d5d; background: #fff0f0; }
-.itxeb-badge-admin { border-color: #c9a044; background: #fff7dc; }
-.itxeb-badge-index { border-color: #7a9ac2; background: #eef5ff; }
-.itxeb-badge-observation { border-color: #b8b8b8; background: #f6f6f6; }
-.itxeb-badge-ignored { border-color: #b95d5d; background: #fff0f0; }
-@media (max-width: 1200px) {
-    table.itxeb-events { min-width: 1280px; }
-}
-</style>';
-    }
-
-    private function setContent(string $html): void
-    {
-        if (is_object($this->tpl) && method_exists($this->tpl, 'setContent')) {
-            $this->tpl->setContent($html);
-            return;
-        }
-
-        echo $html;
     }
 
     private function esc(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private function setContent(string $html): void
+    {
+        if (is_object($this->tpl) && method_exists($this->tpl, 'setContent')) { $this->tpl->setContent($html); }
+    }
+
+    private function styles(): string
+    {
+        return '<style>.itxeb-page{max-width:1400px}.itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}.itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}.itxeb-table-wrapper{overflow:auto}.itxeb-input{max-width:760px}.itxeb-help,.itxeb-date{font-size:.9em;color:#666}.itxeb-uri{max-width:420px;overflow:auto;white-space:nowrap}.itxeb-badge{display:inline-block;padding:.15rem .4rem;border-radius:3px;background:#eee}.itxeb-badge-ok{background:#dff0d8}.itxeb-badge-warn{background:#fcf8e3}.itxeb-badge-error{background:#f2dede}.itxeb-badge-muted{background:#eee}.itxeb-error{color:#a94442;margin-bottom:.3rem}.itxeb-events pre{max-height:280px;overflow:auto;white-space:pre-wrap}</style>';
     }
 }
