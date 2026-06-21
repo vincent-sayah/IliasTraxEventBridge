@@ -1,0 +1,4 @@
+*.php text eol=lf
+*.md text eol=lf
+*.lang text eol=lf
+*.sh text eol=lf

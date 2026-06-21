@@ -1,118 +1,204 @@
-# IliasTraxEventBridge v0.3.1
+# IliasTraxEventBridge
 
-Plugin EventHook ILIAS 10 pour observer les événements ILIAS, générer des statements xAPI et les envoyer manuellement vers TRAX 3.
+**IliasTraxEventBridge** est un plugin **ILIAS 10 EventHook** qui transforme certains événements ILIAS en statements **xAPI** et les envoie vers **TRAX 3 LRS**.
 
-## Objectif V0.3.1
+La version actuelle du dépôt est **v0.3.1**.
 
-Cette version ajoute :
+## Fonctionnalités actuelles
 
-- configuration TRAX / xAPI depuis l'écran du plugin ;
-- test de connexion TRAX ;
-- client HTTP xAPI ;
-- envoi manuel des statements de l'outbox locale ;
-- statuts outbox : `generated`, `sending`, `sent`, `failed`.
+Le plugin permet actuellement de :
 
-Il n'y a pas encore de cron automatique en V0.3.
+- capter des événements ILIAS 10 via le slot `Services/EventHandling/EventHook` ;
+- journaliser les événements bruts dans une table de debug ;
+- générer localement des statements xAPI ;
+- exclure les événements d’administration qui ne doivent pas devenir des traces d’apprentissage ;
+- stocker les statements dans une outbox locale ;
+- configurer TRAX depuis l’interface d’administration du plugin ;
+- tester la connexion TRAX ;
+- envoyer manuellement les statements vers TRAX ;
+- suivre les statuts d’envoi : `generated`, `sending`, `sent`, `failed`.
 
-## Événements actuellement transformés
+## Événements métier couverts en v0.3.1
 
-- téléchargement de fichier :
-  `components/ILIAS/ILIASObject:update` avec `obj_type=file` et `cmd=sendfile`
-- début de test :
-  `components/ILIAS/Tracking:updateStatus` avec `cmd=startTest` -> `attempted`
-- fin de test réussie :
-  `components/ILIAS/Tracking:updateStatus` avec `status=2` ou `percentage=100` -> `passed`
-- fin de test échouée :
-  `components/ILIAS/Tracking:updateStatus` avec `status=3` -> `failed`
+| Action ILIAS | Événement détecté | Statement xAPI |
+|---|---|---|
+| Démarrage d’un test | `Tracking:updateStatus` + `cmd=startTest` | `attempted` |
+| Test réussi | `Tracking:updateStatus` + `status=2` ou `percentage=100` | `passed` |
+| Test échoué | `Tracking:updateStatus` + `status=3` | `failed` |
+| Téléchargement d’un fichier | `ILIASObject:update` + `obj_type=file` + `cmd=sendfile` | `experienced` |
 
-Les actions d'administration du test comme `delete_results` restent dans le journal debug mais ne sont pas générées dans l'outbox.
+Les actions d’administration comme la suppression des résultats d’un test restent visibles dans le journal brut, mais ne sont pas envoyées dans l’outbox xAPI.
 
-## Installation / mise à jour
+## Ce qui n’est pas encore couvert
 
-Copier le dossier dans :
+Les actions suivantes ne sont pas encore captées de manière fiable par EventHook seul :
 
-```bash
-public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+- simple entrée dans un cours ;
+- simple ouverture d’un objet sans changement de statut ;
+- simple consultation passive d’une ressource déjà validée ;
+- temps passé dans un objet.
+
+Ces cas demanderont probablement un mécanisme complémentaire : point d’entrée UI, observer applicatif, lecture de tracking ILIAS, ou instrumentation ciblée.
+
+## Architecture fonctionnelle
+
+```mermaid
+flowchart LR
+    U[Utilisateur ILIAS] --> A[Action dans ILIAS 10]
+
+    A --> E[EventHook ILIAS]
+    E --> P[IliasTraxEventBridge]
+
+    P --> L[(evnt_evhk_itxeb_log<br>journal brut)]
+    P --> M[Mapping ILIAS vers xAPI]
+    M --> O[(evnt_evhk_itxeb_out<br>outbox xAPI)]
+
+    O --> S{Envoi manuel}
+    S -->|POST xAPI /statements| T[TRAX 3 LRS]
+
+    T --> R[Statements consultables dans TRAX]
 ```
 
-Puis exécuter depuis la racine ILIAS :
+## Cycle de vie d’un statement
+
+```mermaid
+stateDiagram-v2
+    [*] --> generated: statement créé localement
+    generated --> sending: envoi manuel
+    failed --> sending: nouvel essai manuel
+    sending --> sent: HTTP 2xx
+    sending --> failed: erreur réseau / HTTP 4xx / HTTP 5xx
+    sent --> [*]
+```
+
+## Séquence : tentative de test
+
+```mermaid
+sequenceDiagram
+    participant Learner as Apprenant
+    participant ILIAS as ILIAS 10
+    participant Plugin as IliasTraxEventBridge
+    participant DB as Outbox locale
+    participant TRAX as TRAX 3
+
+    Learner->>ILIAS: Démarre le test
+    ILIAS->>Plugin: Tracking:updateStatus cmd=startTest
+    Plugin->>DB: statement attempted, status=generated
+
+    Learner->>ILIAS: Termine le test
+    ILIAS->>Plugin: Tracking:updateStatus cmd=finishTest
+    Plugin->>DB: statement passed/failed, status=generated
+
+    Plugin->>TRAX: Envoi manuel POST /statements
+    TRAX-->>Plugin: HTTP 2xx
+    Plugin->>DB: status=sent
+```
+
+## Tables utilisées
+
+```mermaid
+erDiagram
+    evnt_evhk_itxeb_log {
+        int id PK
+        string component
+        string event_name
+        int user_id
+        int ref_id
+        int obj_id
+        string obj_type
+        text param_keys
+        text payload_json
+        text request_uri
+        string http_method
+        string created_at
+        int created_ts
+    }
+
+    evnt_evhk_itxeb_out {
+        int id PK
+        int event_log_id
+        string statement_uuid
+        string event_type
+        string verb_id
+        int user_id
+        int ref_id
+        int obj_id
+        string obj_type
+        text statement_json
+        string status
+        string created_at
+        int created_ts
+        string sent_at
+        text last_error
+    }
+
+    evnt_evhk_itxeb_log ||--o{ evnt_evhk_itxeb_out : "event_log_id"
+```
+
+## Installation dans ILIAS 10
+
+Depuis la racine ILIAS :
 
 ```bash
+mkdir -p public/Customizing/global/plugins/Services/EventHandling/EventHook
+
+git clone https://github.com/<organisation>/IliasTraxEventBridge.git \
+public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+cd /var/www/ilias
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Ensuite dans ILIAS :
+Puis dans ILIAS :
 
 ```text
-Administration > Plugins > Update
+Administration > Plugins > Update > Activate > Configure
+```
+
+Selon l’installation, le chemin peut être sans `public/` :
+
+```bash
+Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 ```
 
 ## Configuration TRAX
 
-Dans la configuration du plugin, renseigner :
+Dans l’écran de configuration du plugin :
 
-- Endpoint xAPI TRAX ;
-- Identifiant client TRAX ;
-- Secret client TRAX ;
-- Version xAPI, par défaut `1.0.3` ;
-- Timeout HTTP ;
-- Taille du batch manuel.
+| Champ | Description |
+|---|---|
+| Endpoint xAPI TRAX | Endpoint xAPI racine ou endpoint complet `/statements` |
+| Identifiant client TRAX | Client xAPI TRAX, pas forcément un utilisateur humain |
+| Secret client TRAX | Secret associé au client xAPI |
+| Version xAPI | Recommandé : `1.0.3` |
+| Timeout HTTP | Timeout d’appel HTTP |
+| Taille batch manuel | Nombre maximum de statements envoyés par clic |
+| Base URL ILIAS forcée | Utilisée pour les IRIs xAPI et `actor.account.homePage` |
 
-L'endpoint peut être :
+Le plugin ajoute automatiquement `/statements` si l’endpoint fourni ne se termine pas déjà par `/statements`.
 
-```text
-https://trax.example.com/.../xapi
+## Vérifications SQL utiles
+
+Voir les événements ILIAS bruts :
+
+```sql
+SELECT id, created_at, component, event_name, user_id, ref_id, obj_id, obj_type, request_uri
+FROM evnt_evhk_itxeb_log
+ORDER BY id DESC
+LIMIT 30;
 ```
 
-ou directement :
-
-```text
-https://trax.example.com/.../xapi/statements
-```
-
-Le plugin ajoute `/statements` si nécessaire.
-
-## Vérification SQL
+Voir l’outbox xAPI :
 
 ```sql
 SELECT id, created_at, event_log_id, event_type, verb_id, user_id, ref_id, obj_id, obj_type, status, sent_at, last_error
 FROM evnt_evhk_itxeb_out
-ORDER BY id DESC;
-```
-
-Voir le dernier statement :
-
-```sql
-SELECT statement_json
-FROM evnt_evhk_itxeb_out
 ORDER BY id DESC
-LIMIT 1;
+LIMIT 30;
 ```
 
-## Envoi manuel
-
-Depuis l'écran de configuration :
-
-```text
-Envoyer les statements générés vers TRAX
-```
-
-Le plugin envoie les statements au statut :
-
-```text
-generated
-failed
-```
-
-Les statements `sent` ne sont pas renvoyés.
-
-
-## Correctif 0.3.1
-
-Le bouton **Tester connexion TRAX** enregistre désormais systématiquement son résultat dans les settings du plugin et l'écran affiche un bloc **Derniers diagnostics TRAX**.
-
-Vérification SQL :
+Voir les diagnostics TRAX :
 
 ```sql
 SELECT keyword, value
@@ -121,3 +207,41 @@ WHERE module = 'itxeb'
 AND keyword LIKE 'last_trax_%'
 ORDER BY keyword;
 ```
+
+## Branches et versions
+
+Le dépôt contient une branche par version :
+
+```text
+v0.1.0
+v0.1.1
+v0.1.2
+v0.1.3
+v0.1.4
+v0.1.5
+v0.2.0
+v0.2.1
+v0.3.0
+v0.3.1
+```
+
+La branche `main` pointe sur la dernière version documentée.
+
+## Roadmap courte
+
+Prochaine étape prévue : **v0.4**.
+
+Objectifs :
+
+- automatiser l’envoi via cron ILIAS ;
+- ajouter `retry_count` et `max_retry` ;
+- garder l’envoi manuel comme secours ;
+- ajouter un bouton de réinitialisation des `failed` ;
+- ajouter un diagnostic d’exploitation plus complet.
+
+## Documentation complémentaire
+
+- [README technique](README_TECHNIQUE.md)
+- [Changelog](CHANGELOG.md)
+- [Guide d’import GitHub](GITHUB_IMPORT.md)
+- [Plan de validation](docs/VALIDATION.md)
