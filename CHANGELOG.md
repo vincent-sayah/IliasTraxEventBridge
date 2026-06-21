@@ -2,6 +2,19 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.5.1 — développement
+
+### Corrigé
+
+- Détection renforcée du type d'objet ILIAS lorsque `obj_type` est vide dans l'événement reçu : le routeur utilise maintenant le `ref_id` ou l'`obj_id` via `ilObject::_lookupType()`.
+- Ajout des mappings de classes GUI pour les objets blog, lien web et mediacast.
+- Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
+- Classification outbox des nouveaux statements avec le type `repository_object_update`.
+
+### Note de test
+
+- La table outbox réelle est `evnt_evhk_itxeb_out`.
+
 ## v0.5.0 — développement
 
 ### Ajouté
@@ -118,17 +131,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Tableau de configuration plus lisible.
 - Colonnes regroupées.
 - Retour à la ligne dans les cellules.
-- URI dans bloc scrollable.
-- Payload JSON formaté et dépliable.
-- Compteurs d’affichage : total, affichés, limite.
-
-## v0.1.4
-
-### Ajouté
-
-- Affichage du payload JSON dans la configuration.
-- Pré-classification des événements candidats xAPI.
-- Récupération du `ref_id` depuis l’URI si absent du payload.
-- Détection indicative du type d’objet via `cmdClass`.
-
-## v0.1.3
