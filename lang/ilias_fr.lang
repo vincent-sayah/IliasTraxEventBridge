@@ -1,0 +1,5 @@
+evnt_evhk_itxeb_plugin_title#:#Ilias Trax Event Bridge
+evnt_evhk_itxeb_plugin_description#:#Journalisation debug des événements ILIAS avant envoi xAPI vers TRAX.
+evnt_evhk_itxeb_config_title#:#IliasTraxEventBridge — Debug événements ILIAS
+evnt_evhk_itxeb_enabled#:#Activer le plugin
+evnt_evhk_itxeb_debug_enabled#:#Mode debug événements

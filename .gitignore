@@ -1,0 +1,17 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Runtime / logs
+*.log
+*.tmp
+tmp/
+cache/
+
+# Local archives generated during packaging
+*.zip
+*.tar.gz
