@@ -41,13 +41,6 @@ class ilIliasTraxEventBridgeStatementFactory
             return $this->createFileDownloadStatement($record);
         }
 
-        if ($component === 'components/ILIAS/ILIASObject'
-            && $event === 'update'
-            && $this->isRepositoryObjectStatementSupported($type)
-        ) {
-            return $this->createRepositoryObjectStatement($record, 'repository_object_update');
-        }
-
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
             if ($this->isTestTrackingEvent($record)) {
                 $record['obj_type'] = 'tst';
@@ -59,6 +52,10 @@ class ilIliasTraxEventBridgeStatementFactory
             if ($type !== '') {
                 return $this->createTrackingStatement($record);
             }
+        }
+
+        if ($this->isRepositoryObjectEventSupported($event, $type)) {
+            return $this->createRepositoryObjectStatement($record, $this->repositorySourceEvent($event));
         }
 
         return null;
@@ -112,9 +109,30 @@ class ilIliasTraxEventBridgeStatementFactory
             || strpos($uri, 'cmd=finishTest') !== false;
     }
 
+    private function isRepositoryObjectEventSupported(string $event, string $type): bool
+    {
+        if (!$this->isRepositoryObjectStatementSupported($type)) {
+            return false;
+        }
+
+        // ILIAS object families do not all emit the same component name. For V0.5,
+        // accept the reliable high-level object lifecycle events once the router has
+        // already confirmed that the object is contained in a course.
+        return in_array($event, ['create', 'update'], true);
+    }
+
     private function isRepositoryObjectStatementSupported(string $type): bool
     {
         return in_array($type, ['blog', 'webr', 'mcst', 'frm', 'wiki', 'htlm', 'lm', 'sahs'], true);
+    }
+
+    private function repositorySourceEvent(string $event): string
+    {
+        if ($event === 'create') {
+            return 'repository_object_create';
+        }
+
+        return 'repository_object_update';
     }
 
     /**
@@ -167,7 +185,6 @@ class ilIliasTraxEventBridgeStatementFactory
         $userId = (int) ($record['user_id'] ?? 0);
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
-        $baseUrl = $this->config->getIliasBaseUrl();
 
         return [
             'id' => $this->uuid4(),
