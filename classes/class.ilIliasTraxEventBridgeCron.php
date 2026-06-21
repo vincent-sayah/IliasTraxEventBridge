@@ -1,5 +1,7 @@
 <?php
 
+use ILIAS\Cron\Schedule\CronJobScheduleType;
+
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
@@ -26,9 +28,9 @@ class ilIliasTraxEventBridgeCron extends ilCronJob
         return 'Envoie automatiquement les statements xAPI generated/failed vers TRAX, dans la limite max_retry.';
     }
 
-    public function getDefaultScheduleType(): int
+    public function getDefaultScheduleType(): CronJobScheduleType
     {
-        return self::SCHEDULE_TYPE_IN_MINUTES;
+        return CronJobScheduleType::SCHEDULE_TYPE_IN_MINUTES;
     }
 
     public function getDefaultScheduleValue(): int
