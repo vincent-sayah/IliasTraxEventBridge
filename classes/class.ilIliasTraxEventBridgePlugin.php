@@ -1,5 +1,7 @@
 <?php
 
+use ILIAS\Cron\Job\JobProvider;
+
 /**
  * ILIAS 10 EventHook plugin.
  *
@@ -10,7 +12,7 @@
  * - send the outbox manually or automatically through ILIAS cron;
  * - never block or break ILIAS user navigation.
  */
-class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
+class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements JobProvider
 {
     public const PLUGIN_NAME = 'IliasTraxEventBridge';
 
@@ -46,20 +48,24 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
         }
     }
 
-    /** @return array<int,ilCronJob> */
+    /** @return array<int, ilCronJob> */
     public function getCronJobInstances(): array
     {
         require_once __DIR__ . '/class.ilIliasTraxEventBridgeCron.php';
         return [new ilIliasTraxEventBridgeCron()];
     }
 
-    public function getCronJobInstance(string $a_job_id): ?ilCronJob
+    /**
+     * @throws OutOfBoundsException if the requested cron job does not exist.
+     */
+    public function getCronJobInstance(string $a_job_id): ilCronJob
     {
         require_once __DIR__ . '/class.ilIliasTraxEventBridgeCron.php';
         if ($a_job_id === ilIliasTraxEventBridgeCron::JOB_ID) {
             return new ilIliasTraxEventBridgeCron();
         }
-        return null;
+
+        throw new OutOfBoundsException('Unknown IliasTraxEventBridge cron job: ' . $a_job_id);
     }
 
     protected function afterUninstall(): void
