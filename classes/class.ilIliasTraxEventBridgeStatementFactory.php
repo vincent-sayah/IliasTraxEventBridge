@@ -41,6 +41,13 @@ class ilIliasTraxEventBridgeStatementFactory
             return $this->createFileDownloadStatement($record);
         }
 
+        if ($component === 'components/ILIAS/ILIASObject'
+            && $event === 'update'
+            && $this->isRepositoryObjectStatementSupported($type)
+        ) {
+            return $this->createRepositoryObjectStatement($record, 'repository_object_update');
+        }
+
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
             if ($this->isTestTrackingEvent($record)) {
                 $record['obj_type'] = 'tst';
@@ -105,6 +112,11 @@ class ilIliasTraxEventBridgeStatementFactory
             || strpos($uri, 'cmd=finishTest') !== false;
     }
 
+    private function isRepositoryObjectStatementSupported(string $type): bool
+    {
+        return in_array($type, ['blog', 'webr', 'mcst', 'frm', 'wiki', 'htlm', 'lm', 'sahs'], true);
+    }
+
     /**
      * @param array<string,mixed> $record
      * @return array<string,mixed>
@@ -140,6 +152,46 @@ class ilIliasTraxEventBridgeStatementFactory
             'context' => [
                 'platform' => 'ILIAS 10',
                 'extensions' => $this->contextExtensions($record, 'file_downloaded', 'file')
+            ],
+            'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,mixed>
+     */
+    private function createRepositoryObjectStatement(array $record, string $sourceEvent): array
+    {
+        $objType = (string) ($record['obj_type'] ?? 'object');
+        $userId = (int) ($record['user_id'] ?? 0);
+        $refId = (int) ($record['ref_id'] ?? 0);
+        $objId = (int) ($record['obj_id'] ?? 0);
+        $baseUrl = $this->config->getIliasBaseUrl();
+
+        return [
+            'id' => $this->uuid4(),
+            'actor' => $this->actor($userId),
+            'verb' => [
+                'id' => 'http://adlnet.gov/expapi/verbs/interacted',
+                'display' => [
+                    'fr-FR' => 'a interagi avec',
+                    'en-US' => 'interacted'
+                ]
+            ],
+            'object' => [
+                'id' => $this->activityId($objType !== '' ? $objType : 'object', $refId, $objId),
+                'objectType' => 'Activity',
+                'definition' => [
+                    'type' => $this->repositoryActivityType($objType),
+                    'name' => [
+                        'fr-FR' => $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+                    ]
+                ]
+            ],
+            'context' => [
+                'platform' => 'ILIAS 10',
+                'extensions' => $this->contextExtensions($record, $sourceEvent, $objType)
             ],
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
@@ -289,6 +341,39 @@ class ilIliasTraxEventBridgeStatementFactory
                 'en-US' => 'progressed'
             ]
         ];
+    }
+
+    private function repositoryActivityType(string $objType): string
+    {
+        $baseUrl = $this->config->getIliasBaseUrl();
+        $map = [
+            'blog' => $baseUrl . '/xapi/activity-type/ilias-blog',
+            'webr' => $baseUrl . '/xapi/activity-type/ilias-web-link',
+            'mcst' => $baseUrl . '/xapi/activity-type/ilias-mediacast',
+            'frm' => $baseUrl . '/xapi/activity-type/ilias-forum',
+            'wiki' => $baseUrl . '/xapi/activity-type/ilias-wiki',
+            'htlm' => $baseUrl . '/xapi/activity-type/ilias-html-learning-module',
+            'lm' => $baseUrl . '/xapi/activity-type/ilias-learning-module',
+            'sahs' => $baseUrl . '/xapi/activity-type/ilias-scorm-module',
+        ];
+
+        return $map[$objType] ?? $baseUrl . '/xapi/activity-type/ilias-repository-object';
+    }
+
+    private function repositoryObjectLabel(string $objType): string
+    {
+        $map = [
+            'blog' => 'Blog ILIAS',
+            'webr' => 'Lien web ILIAS',
+            'mcst' => 'Mediacast ILIAS',
+            'frm' => 'Forum ILIAS',
+            'wiki' => 'Wiki ILIAS',
+            'htlm' => 'Module HTML ILIAS',
+            'lm' => 'Module web ILIAS',
+            'sahs' => 'Module SCORM ILIAS',
+        ];
+
+        return $map[$objType] ?? 'Objet ILIAS';
     }
 
     /**
