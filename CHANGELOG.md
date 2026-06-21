@@ -2,6 +2,13 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.4.2
+
+### Corrigé
+
+- Compatibilité ILIAS 10 : utilisation de l’interface globale `ilCronJobProvider` au lieu de `ILIAS\Cron\Job\JobProvider`, non disponible sur certaines installations ILIAS 10.
+- Le plugin EventHook peut maintenant être reconnu par le dépôt cron ILIAS 10 via `instanceof ilCronJobProvider`.
+
 ## v0.4.1
 
 ### Corrigé
@@ -98,32 +105,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Détection indicative du type d’objet via `cmdClass`.
 
 ## v0.1.3
-
-### Corrigé
-
-- Remplacement de `includeClass()` par `require_once`.
-- Correction de l’erreur ILIAS 10 : `Call to undefined method ilIliasTraxEventBridgePlugin::includeClass()`.
-
-## v0.1.2
-
-### Corrigé
-
-- Correction de l’écran de configuration du plugin.
-- Ajout de la directive ilCtrl : `@ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI`.
-- Utilisation correcte de `ilPluginConfigGUI`.
-
-## v0.1.1
-
-### Corrigé
-
-- Signature ILIAS 10 de `handleEvent`.
-
-## v0.1.0
-
-### Ajouté
-
-- Squelette initial du plugin.
-- Installation EventHook.
-- Table debug `evnt_evhk_itxeb_log`.
-- Journalisation des événements ILIAS.
-- Écran minimal de configuration.
