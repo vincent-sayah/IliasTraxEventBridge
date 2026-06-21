@@ -22,9 +22,9 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
      *
      * @param string $a_component Example: "components/ILIAS/User" or legacy "Services/User".
      * @param string $a_event     Example: "afterUpdate".
-     * @param array  $a_params    Event-specific payload.
+     * @param array  $a_parameter Event-specific payload.
      */
-    public function handleEvent($a_component, $a_event, $a_params): bool
+    public function handleEvent(string $a_component, string $a_event, array $a_parameter): void
     {
         try {
             $this->includeClass('class.ilIliasTraxEventBridgeConfig.php');
@@ -34,7 +34,7 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
             $config = new ilIliasTraxEventBridgeConfig();
 
             if (!$config->isEnabled() || !$config->isDebugEnabled()) {
-                return true;
+                return;
             }
 
             $router = new ilIliasTraxEventBridgeEventRouter(
@@ -43,7 +43,7 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
                 $this
             );
 
-            $router->handle((string) $a_component, (string) $a_event, is_array($a_params) ? $a_params : []);
+            $router->handle($a_component, $a_event, $a_parameter);
         } catch (Throwable $e) {
             // Critical rule: this plugin must never interrupt normal ILIAS execution.
             if (class_exists('ilLoggerFactory')) {
@@ -57,7 +57,6 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
             }
         }
 
-        return true;
     }
 
     /**
