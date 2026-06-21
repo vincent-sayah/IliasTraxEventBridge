@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.4.3 — stable
+
+### Stabilisé
+
+- Validation fonctionnelle de la V0.4 après tests serveur : génération outbox, envoi manuel, envoi automatique par cron ILIAS, retry, reset des `failed` et diagnostics.
+- Version stable recommandée avant ouverture de la V0.5.
+
+### Corrigé
+
+- Amélioration de l’affichage des tableaux dans la configuration du plugin.
+- Colonne **Verb** élargie afin d’afficher les verbes xAPI en entier.
+- Colonne **URI** replacée avant le payload dans le journal des événements et élargie pour une lecture plus confortable.
+- Payloads conservés dans des blocs repliables afin d’éviter de repousser les colonnes importantes hors écran.
+
 ## v0.4.2
 
 ### Corrigé
