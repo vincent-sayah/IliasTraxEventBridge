@@ -2,6 +2,19 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.5.0 — développement
+
+### Ajouté
+
+- Nouveau filtre métier : seuls les objets contenus dans un objet **cours** peuvent générer un statement xAPI.
+- Nouveau service `ilIliasTraxEventBridgeCourseContextResolver` pour retrouver le cours parent à partir du `ref_id` ou, en secours, des références de l'`obj_id`.
+- Ajout des extensions xAPI `course_ref_id` et `course_obj_id` dans les statements générés.
+
+### Changé
+
+- Les événements bruts restent journalisés dans `evnt_evhk_itxeb_log`, mais les objets hors cours ne sont plus ajoutés à l'outbox xAPI.
+- Le routeur enrichit le record avec le contexte cours avant d'appeler la factory xAPI.
+
 ## v0.4.3 — stable
 
 ### Stabilisé
