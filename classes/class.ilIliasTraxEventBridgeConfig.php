@@ -186,6 +186,73 @@ class ilIliasTraxEventBridgeConfig
         return rtrim($endpoint, '/') . '/statements';
     }
 
+
+    public function setLastTraxTestResult(bool $success, int $httpStatus, string $message): void
+    {
+        $this->set('last_trax_test_at', date('Y-m-d H:i:s'));
+        $this->set('last_trax_test_success', $success ? '1' : '0');
+        $this->set('last_trax_test_http_status', (string) $httpStatus);
+        $this->set('last_trax_test_message', substr($message, 0, 2000));
+    }
+
+    public function getLastTraxTestAt(): string
+    {
+        return $this->get('last_trax_test_at', '');
+    }
+
+    public function getLastTraxTestSuccess(): string
+    {
+        $value = $this->get('last_trax_test_success', '');
+        if ($value === '') {
+            return '';
+        }
+
+        return $value === '1' ? 'oui' : 'non';
+    }
+
+    public function getLastTraxTestHttpStatus(): string
+    {
+        return $this->get('last_trax_test_http_status', '');
+    }
+
+    public function getLastTraxTestMessage(): string
+    {
+        return $this->get('last_trax_test_message', '');
+    }
+
+    public function setLastTraxSendResult(bool $success, int $httpStatus, string $message): void
+    {
+        $this->set('last_trax_send_at', date('Y-m-d H:i:s'));
+        $this->set('last_trax_send_success', $success ? '1' : '0');
+        $this->set('last_trax_send_http_status', (string) $httpStatus);
+        $this->set('last_trax_send_message', substr($message, 0, 2000));
+    }
+
+    public function getLastTraxSendAt(): string
+    {
+        return $this->get('last_trax_send_at', '');
+    }
+
+    public function getLastTraxSendSuccess(): string
+    {
+        $value = $this->get('last_trax_send_success', '');
+        if ($value === '') {
+            return '';
+        }
+
+        return $value === '1' ? 'oui' : 'non';
+    }
+
+    public function getLastTraxSendHttpStatus(): string
+    {
+        return $this->get('last_trax_send_http_status', '');
+    }
+
+    public function getLastTraxSendMessage(): string
+    {
+        return $this->get('last_trax_send_message', '');
+    }
+
     private function get(string $key, string $default): string
     {
         if ($this->settings === null) {

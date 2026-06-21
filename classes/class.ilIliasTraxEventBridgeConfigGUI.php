@@ -93,7 +93,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= $this->renderInlineStyles();
         $html .= '<div class="itxeb-page">';
         $html .= '<h1>IliasTraxEventBridge — Debug événements, xAPI locale et envoi TRAX</h1>';
-        $html .= '<p><strong>Version 0.3.0 :</strong> configuration TRAX, test de connexion et envoi manuel des statements générés.</p>';
+        $html .= '<p><strong>Version 0.3.1 :</strong> test de connexion TRAX visible et diagnostic persistant dans l’écran de configuration.</p>';
         $html .= '<p>Cette version n’a pas encore de cron automatique. L’envoi vers TRAX est déclenché manuellement depuis cet écran.</p>';
 
         $html .= $this->renderState();
@@ -118,12 +118,47 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= '<tr><td>Endpoint xAPI statements</td><td><code>' . $this->esc($this->config->getStatementsEndpoint()) . '</code></td></tr>';
         $html .= '</table>';
 
+        $html .= $this->renderTraxDiagnostics();
+
         $html .= '<p class="itxeb-actions">';
         $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearLog')) . '">Vider le journal debug</a> ';
         $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'clearOutbox')) . '">Vider l’outbox xAPI locale</a>';
         $html .= '</p>';
         $html .= '</div>';
 
+        return $html;
+    }
+
+    private function renderTraxDiagnostics(): string
+    {
+        $html = '<h3>Derniers diagnostics TRAX</h3>';
+        $html .= '<table class="std itxeb-state-table">';
+
+        $lastTestAt = $this->config->getLastTraxTestAt();
+        if ($lastTestAt === '') {
+            $html .= '<tr><td>Dernier test connexion</td><td><em>Aucun test lancé depuis le plugin.</em></td></tr>';
+        } else {
+            $html .= '<tr><td>Dernier test connexion</td><td>'
+                . '<strong>date :</strong> ' . $this->esc($lastTestAt)
+                . '<br><strong>succès :</strong> ' . $this->esc($this->config->getLastTraxTestSuccess())
+                . '<br><strong>HTTP :</strong> ' . $this->esc($this->config->getLastTraxTestHttpStatus())
+                . '<br><strong>message :</strong> ' . $this->esc($this->config->getLastTraxTestMessage())
+                . '</td></tr>';
+        }
+
+        $lastSendAt = $this->config->getLastTraxSendAt();
+        if ($lastSendAt === '') {
+            $html .= '<tr><td>Dernier envoi manuel</td><td><em>Aucun envoi manuel lancé depuis le plugin.</em></td></tr>';
+        } else {
+            $html .= '<tr><td>Dernier envoi manuel</td><td>'
+                . '<strong>date :</strong> ' . $this->esc($lastSendAt)
+                . '<br><strong>succès :</strong> ' . $this->esc($this->config->getLastTraxSendSuccess())
+                . '<br><strong>HTTP :</strong> ' . $this->esc($this->config->getLastTraxSendHttpStatus())
+                . '<br><strong>message :</strong> ' . $this->esc($this->config->getLastTraxSendMessage())
+                . '</td></tr>';
+        }
+
+        $html .= '</table>';
         return $html;
     }
 
@@ -145,9 +180,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= '<p class="itxeb-actions"><button class="btn btn-primary" type="submit">Enregistrer la configuration</button></p>';
         $html .= '</form>';
 
-        $html .= '<p class="itxeb-actions">';
-        $html .= '<a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')) . '">Tester connexion TRAX</a>';
-        $html .= '</p>';
+        $html .= '<form method="post" action="' . $this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')) . '" class="itxeb-inline-form">';
+        $html .= '<p class="itxeb-actions"><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p>';
+        $html .= '</form>';
 
         return $html;
     }
@@ -212,13 +247,16 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $client = new ilIliasTraxEventBridgeTraxClient($this->config);
         $result = $client->testConnection();
 
+        $message = $result->getShortMessage();
+        $this->config->setLastTraxTestResult($result->isSuccess(), $result->getHttpStatus(), $message);
+
         if ($result->isSuccess()) {
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-                ilUtil::sendSuccess('Connexion TRAX réussie : ' . $result->getShortMessage(), true);
+                ilUtil::sendSuccess('Connexion TRAX réussie : ' . $message, true);
             }
         } else {
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
-                ilUtil::sendFailure('Connexion TRAX échouée : ' . $result->getShortMessage(), true);
+                ilUtil::sendFailure('Connexion TRAX échouée : ' . $message, true);
             }
         }
 
@@ -230,6 +268,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $rows = $this->outbox->findSendable($this->config->getBatchSize());
 
         if (count($rows) === 0) {
+            $this->config->setLastTraxSendResult(true, 0, 'Aucun statement generated/failed à envoyer.');
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendInfo')) {
                 ilUtil::sendInfo('Aucun statement generated/failed à envoyer.', true);
             }
@@ -250,6 +289,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
         if (count($statements) === 0) {
             $this->outbox->markFailed($ids, 'Aucun statement JSON valide dans le batch.');
+            $this->config->setLastTraxSendResult(false, 0, 'Aucun statement JSON valide dans le batch.');
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
                 ilUtil::sendFailure('Aucun statement JSON valide dans le batch.', true);
             }
@@ -264,13 +304,17 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
         if ($result->isSuccess()) {
             $this->outbox->markSent($ids);
+            $message = count($ids) . ' statement(s) envoyé(s) vers TRAX. ' . $result->getShortMessage();
+            $this->config->setLastTraxSendResult(true, $result->getHttpStatus(), $message);
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) {
-                ilUtil::sendSuccess(count($ids) . ' statement(s) envoyé(s) vers TRAX. ' . $result->getShortMessage(), true);
+                ilUtil::sendSuccess($message, true);
             }
         } else {
+            $message = 'Envoi TRAX échoué : ' . $result->getShortMessage();
             $this->outbox->markFailed($ids, $result->getShortMessage());
+            $this->config->setLastTraxSendResult(false, $result->getHttpStatus(), $message);
             if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) {
-                ilUtil::sendFailure('Envoi TRAX échoué : ' . $result->getShortMessage(), true);
+                ilUtil::sendFailure($message, true);
             }
         }
 
@@ -554,6 +598,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 .itxeb-input { width: 100%; max-width: 760px; }
 .itxeb-help { color: #666; font-size: 12px; margin-top: 4px; }
 .itxeb-actions { margin: 8px 0 18px 0; }
+.itxeb-inline-form { display: inline; }
 .itxeb-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px 0; }
 .itxeb-summary span { display: inline-block; border: 1px solid #cfd7e2; background: #f7f9fb; padding: 6px 10px; border-radius: 4px; }
 .itxeb-table-wrapper { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid #d5d5d5; margin-bottom: 26px; }

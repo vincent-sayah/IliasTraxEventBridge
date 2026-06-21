@@ -1,8 +1,8 @@
-# IliasTraxEventBridge v0.3.0
+# IliasTraxEventBridge v0.3.1
 
 Plugin EventHook ILIAS 10 pour observer les événements ILIAS, générer des statements xAPI et les envoyer manuellement vers TRAX 3.
 
-## Objectif V0.3
+## Objectif V0.3.1
 
 Cette version ajoute :
 
@@ -106,3 +106,18 @@ failed
 ```
 
 Les statements `sent` ne sont pas renvoyés.
+
+
+## Correctif 0.3.1
+
+Le bouton **Tester connexion TRAX** enregistre désormais systématiquement son résultat dans les settings du plugin et l'écran affiche un bloc **Derniers diagnostics TRAX**.
+
+Vérification SQL :
+
+```sql
+SELECT keyword, value
+FROM settings
+WHERE module = 'itxeb'
+AND keyword LIKE 'last_trax_%'
+ORDER BY keyword;
+```
