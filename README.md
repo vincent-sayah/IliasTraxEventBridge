@@ -1,17 +1,24 @@
-# IliasTraxEventBridge v0.1.5
+# IliasTraxEventBridge v0.2.0
 
-Version de debug pour ILIAS 10.
+Plugin EventHook ILIAS 10 pour observer les événements ILIAS et générer localement des statements xAPI.
 
-Objectif : rendre le plugin visible/activable et journaliser les événements ILIAS reçus via le slot EventHook.
+## Objectif V0.2
 
-## Correction v0.1.5
+Cette version ne contacte pas encore TRAX.
 
-- `ilIliasTraxEventBridgeConfigGUI` étend maintenant `ilPluginConfigGUI`.
-- Ajout de la directive ilCtrl obligatoire pour les écrans de configuration des plugins ILIAS 8+ :
-  `@ilCtrl_IsCalledBy ilIliasTraxEventBridgeConfigGUI: ilObjComponentSettingsGUI`
-- Suppression de la dépendance au formulaire legacy `ilPropertyFormGUI` dans l'écran de configuration.
+Elle ajoute une table outbox locale contenant les statements xAPI générés à partir des événements ILIAS fiables déjà observés :
 
-## Installation
+- téléchargement de fichier :
+  `components/ILIAS/ILIASObject:update` avec `obj_type=file` et `cmd=sendfile`
+- progression / test :
+  `components/ILIAS/Tracking:updateStatus`
+
+## Tables
+
+- `evnt_evhk_itxeb_log` : journal brut des événements ILIAS reçus.
+- `evnt_evhk_itxeb_out` : outbox locale des statements xAPI générés.
+
+## Installation / mise à jour
 
 Copier le dossier dans :
 
@@ -26,23 +33,48 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Ensuite : Administration > Extending ILIAS > Plugins > Update / Activate.
+Ensuite dans ILIAS :
 
+```text
+Administration > Plugins > Update
+```
 
-## Changements 0.1.5
+L'étape SQL #2 crée la table `evnt_evhk_itxeb_out`.
 
-- Affichage du `payload_json` dans l'écran Configure.
-- Pré-classification des événements candidats xAPI.
-- Détection de `ref_id` depuis l'URL quand l'événement ne le transmet pas dans ses paramètres.
-- Détection indicative du type d'objet depuis `cmdClass` pour certains écrans ILIAS.
+## Vérification SQL
 
+```sql
+SELECT id, created_at, component, event_name, user_id, ref_id, obj_id, obj_type
+FROM evnt_evhk_itxeb_log
+ORDER BY id DESC
+LIMIT 20;
+```
 
-## 0.1.5
+```sql
+SELECT id, created_at, event_log_id, event_type, verb_id, user_id, ref_id, obj_id, obj_type, status
+FROM evnt_evhk_itxeb_out
+ORDER BY id DESC
+LIMIT 20;
+```
 
-Amélioration de l'écran de configuration :
-- tableau lisible avec retour à la ligne dans les cellules ;
-- colonnes regroupées pour éviter l'étirement horizontal ;
-- résumé du nombre total d'événements journalisés ;
-- affichage explicite du nombre d'événements affichés sur la limite de 100 ;
-- payload JSON formaté dans un bloc dépliable ;
-- URI affichée dans un bloc scrollable.
+Pour voir un statement :
+
+```sql
+SELECT statement_json
+FROM evnt_evhk_itxeb_out
+ORDER BY id DESC
+LIMIT 1;
+```
+
+## Notes de mapping V0.2
+
+- `file_downloaded` génère un statement `experienced`.
+- `test_tracking_status` génère :
+  - `passed` si `status = 2` ou `percentage >= 100`,
+  - `failed` si `status = 3`,
+  - `attempted` sinon.
+- `learning_tracking_status` génère :
+  - `completed` si `status = 2` ou `percentage >= 100`,
+  - `progressed` sinon.
+
+Ces règles sont volontairement simples et devront être confirmées sur tes données ILIAS 10 avant l'envoi vers TRAX.

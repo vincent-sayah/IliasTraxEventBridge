@@ -24,10 +24,10 @@ class ilIliasTraxEventBridgeEventDebugRepository
     /**
      * @param array<string,mixed> $record
      */
-    public function insert(array $record): void
+    public function insert(array $record): int
     {
         if (!$this->tableExists()) {
-            return;
+            return 0;
         }
 
         $id = (int) $this->db->nextId(self::TABLE_NAME);
@@ -47,6 +47,8 @@ class ilIliasTraxEventBridgeEventDebugRepository
             'created_at' => ['text', (string) $record['created_at']],
             'created_ts' => ['integer', (int) $record['created_ts']],
         ]);
+
+        return $id;
     }
 
     /**
@@ -64,7 +66,6 @@ class ilIliasTraxEventBridgeEventDebugRepository
         $query = 'SELECT id, component, event_name, user_id, ref_id, obj_id, obj_type, param_keys, payload_json, request_uri, http_method, created_at '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
 
-        // Portable ILIAS limit. If unavailable, the PHP loop below still caps the display.
         if (method_exists($this->db, 'setLimit')) {
             $this->db->setLimit($limit);
         }

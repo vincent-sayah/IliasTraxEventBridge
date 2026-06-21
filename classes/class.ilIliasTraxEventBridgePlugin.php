@@ -1,11 +1,12 @@
 <?php
 
 /**
- * ILIAS 10 EventHook plugin skeleton.
+ * ILIAS 10 EventHook plugin.
  *
- * V0.1 objective:
+ * V0.2 objective:
  * - listen to active ILIAS events through EventHook;
- * - persist a compact debug record into evnt_evhk_itxeb_log;
+ * - persist compact debug records into evnt_evhk_itxeb_log;
+ * - generate local xAPI statements for confirmed events into evnt_evhk_itxeb_out;
  * - never block or break ILIAS user navigation.
  */
 class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
@@ -20,8 +21,8 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
     /**
      * Called by ILIAS for events received by active EventHook plugins.
      *
-     * @param string $a_component Example: "components/ILIAS/User" or legacy "Services/User".
-     * @param string $a_event     Example: "afterUpdate".
+     * @param string $a_component Example: "components/ILIAS/Tracking".
+     * @param string $a_event     Example: "updateStatus".
      * @param array  $a_parameter Event-specific payload.
      */
     public function handleEvent(string $a_component, string $a_event, array $a_parameter): void
@@ -29,6 +30,8 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
         try {
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventRouter.php';
 
             $config = new ilIliasTraxEventBridgeConfig();
@@ -40,7 +43,9 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
             $router = new ilIliasTraxEventBridgeEventRouter(
                 $config,
                 new ilIliasTraxEventBridgeEventDebugRepository(),
-                $this
+                $this,
+                new ilIliasTraxEventBridgeStatementFactory($config),
+                new ilIliasTraxEventBridgeOutboxRepository()
             );
 
             $router->handle($a_component, $a_event, $a_parameter);
@@ -56,12 +61,11 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin
                 error_log('[IliasTraxEventBridge] ' . $e->getMessage());
             }
         }
-
     }
 
     /**
      * Called after uninstall. Removes plugin settings only.
-     * The debug table is removed by sql/dbupdate.php uninstall support in a later version.
+     * Debug/outbox tables are intentionally kept in V0.2.
      */
     protected function afterUninstall(): void
     {

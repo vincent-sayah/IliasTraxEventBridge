@@ -1,8 +1,10 @@
 <?php
 
 /**
- * Minimal configuration wrapper for V0.1.
- * Uses ilSetting to avoid a dedicated config table in the first debug version.
+ * Configuration wrapper.
+ *
+ * V0.2 keeps defaults enabled to simplify discovery and local xAPI generation.
+ * Later production versions should expose a real admin form and default debug to OFF.
  */
 class ilIliasTraxEventBridgeConfig
 {
@@ -18,7 +20,6 @@ class ilIliasTraxEventBridgeConfig
 
     public function isEnabled(): bool
     {
-        // Default ON for V0.1 so event discovery works immediately after activation.
         return $this->getBool('enabled', true);
     }
 
@@ -29,13 +30,22 @@ class ilIliasTraxEventBridgeConfig
 
     public function isDebugEnabled(): bool
     {
-        // Default ON for V0.1; later versions should default this to false in production.
         return $this->getBool('debug_enabled', true);
     }
 
     public function setDebugEnabled(bool $enabled): void
     {
         $this->setBool('debug_enabled', $enabled);
+    }
+
+    public function isLocalXapiGenerationEnabled(): bool
+    {
+        return $this->getBool('local_xapi_generation_enabled', true);
+    }
+
+    public function setLocalXapiGenerationEnabled(bool $enabled): void
+    {
+        $this->setBool('local_xapi_generation_enabled', $enabled);
     }
 
     public function getMaxPayloadChars(): int
@@ -56,6 +66,40 @@ class ilIliasTraxEventBridgeConfig
     public function setRetentionDays(int $days): void
     {
         $this->set('retention_days', (string) max(1, min(365, $days)));
+    }
+
+    public function getIliasBaseUrl(): string
+    {
+        $configured = trim($this->get('ilias_base_url', ''));
+        if ($configured !== '') {
+            return rtrim($configured, '/');
+        }
+
+        $scheme = 'http';
+        if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && $_SERVER['HTTPS'] !== 'off') {
+            $scheme = 'https';
+        }
+
+        if (isset($_SERVER['REQUEST_SCHEME']) && is_scalar($_SERVER['REQUEST_SCHEME'])) {
+            $candidate = strtolower((string) $_SERVER['REQUEST_SCHEME']);
+            if ($candidate === 'http' || $candidate === 'https') {
+                $scheme = $candidate;
+            }
+        }
+
+        $host = 'ilias.local';
+        if (isset($_SERVER['HTTP_HOST']) && is_scalar($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] !== '') {
+            $host = (string) $_SERVER['HTTP_HOST'];
+        } elseif (isset($_SERVER['SERVER_NAME']) && is_scalar($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== '') {
+            $host = (string) $_SERVER['SERVER_NAME'];
+        }
+
+        return rtrim($scheme . '://' . $host, '/');
+    }
+
+    public function getActorHomePage(): string
+    {
+        return $this->getIliasBaseUrl();
     }
 
     private function get(string $key, string $default): string

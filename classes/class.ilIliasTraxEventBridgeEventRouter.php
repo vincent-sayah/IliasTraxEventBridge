@@ -1,8 +1,9 @@
 <?php
 
 /**
- * V0.1 router: persist every received event in debug mode.
- * Mapping to xAPI will be introduced after observing real ILIAS 10 events.
+ * V0.2 router:
+ * - persists every received event in debug mode;
+ * - generates local xAPI statements for reliable events and stores them in the outbox.
  */
 class ilIliasTraxEventBridgeEventRouter
 {
@@ -15,14 +16,24 @@ class ilIliasTraxEventBridgeEventRouter
     /** @var ilIliasTraxEventBridgePlugin */
     private $plugin;
 
+    /** @var ilIliasTraxEventBridgeStatementFactory|null */
+    private $statementFactory;
+
+    /** @var ilIliasTraxEventBridgeOutboxRepository|null */
+    private $outboxRepository;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeEventDebugRepository $repository,
-        ilIliasTraxEventBridgePlugin $plugin
+        ilIliasTraxEventBridgePlugin $plugin,
+        ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
+        ?ilIliasTraxEventBridgeOutboxRepository $outboxRepository = null
     ) {
         $this->config = $config;
         $this->repository = $repository;
         $this->plugin = $plugin;
+        $this->statementFactory = $statementFactory;
+        $this->outboxRepository = $outboxRepository;
     }
 
     public function handle(string $component, string $event, array $params): void
@@ -42,12 +53,25 @@ class ilIliasTraxEventBridgeEventRouter
             'http_method' => $this->getServerValue('REQUEST_METHOD'),
         ];
 
-        $this->repository->insert($record);
+        $eventLogId = $this->repository->insert($record);
+
+        if (!$this->config->isLocalXapiGenerationEnabled()) {
+            return;
+        }
+
+        if ($this->statementFactory === null || $this->outboxRepository === null) {
+            return;
+        }
+
+        $statement = $this->statementFactory->createFromEventRecord($record);
+        if ($statement !== null) {
+            $this->outboxRepository->enqueue($record, $statement, $eventLogId);
+        }
     }
 
     private function detectCurrentUserId(array $params): int
     {
-        $fromParams = $this->detectInt($params, ['usr_id', 'user_id', 'userId', 'member_id', 'active_id']);
+        $fromParams = $this->detectInt($params, ['usr_id', 'user_id', 'userId', 'member_id']);
         if ($fromParams > 0) {
             return $fromParams;
         }
@@ -100,6 +124,7 @@ class ilIliasTraxEventBridgeEventRouter
             'ilTestPlayerFixedQuestionSetGUI' => 'tst',
             'ilTestPlayerDynamicQuestionSetGUI' => 'tst',
             'ilObjLearningModuleGUI' => 'lm',
+            'ilObjFileBasedLMGUI' => 'htlm',
             'ilObjWikiGUI' => 'wiki',
             'ilObjForumGUI' => 'frm',
             'ilObjExerciseGUI' => 'exc',
@@ -139,6 +164,10 @@ class ilIliasTraxEventBridgeEventRouter
 
         if (!is_string($json)) {
             $json = json_encode(['error' => 'json_encode_failed'], JSON_UNESCAPED_SLASHES);
+        }
+
+        if (!is_string($json)) {
+            return '{"error":"json_encode_failed"}';
         }
 
         if (strlen($json) > $maxChars) {
@@ -191,11 +220,6 @@ class ilIliasTraxEventBridgeEventRouter
         return gettype($value);
     }
 
-    /**
-     * Read integer values from GET first, then from REQUEST_URI.
-     * This is useful for events like Tracking/updateStatus where ILIAS gives obj_id
-     * in the event payload but keeps ref_id only in the current URL.
-     */
     private function detectRequestInt(array $keys): int
     {
         foreach ($keys as $key) {
@@ -244,7 +268,6 @@ class ilIliasTraxEventBridgeEventRouter
 
     private function getServerValue(string $key): string
     {
-        return isset($_SERVER[$key]) && is_scalar($_SERVER[$key]) ? substr((string) $_SERVER[$key], 0, 512) : '';
+        return isset($_SERVER[$key]) && is_scalar($_SERVER[$key]) ? substr((string) $_SERVER[$key], 0, 1024) : '';
     }
 }
-
