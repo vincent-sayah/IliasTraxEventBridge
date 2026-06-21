@@ -2,6 +2,14 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.5.3 — développement
+
+### Corrigé
+
+- Correction du contexte cours pour les événements de création d'objet dans un cours : ILIAS peut transmettre le `ref_id` du cours conteneur pendant `create`, `insertNode` ou `putObjectInTree`, et non le `ref_id` final de l'objet créé.
+- Le resolver accepte maintenant le cas où le `ref_id` reçu est lui-même un cours, et il tente aussi de retrouver les références de l'`obj_id` avant de se rabattre sur le `ref_id` de l'événement.
+- Cette correction cible notamment la création de blog, lien web et mediacast dans un cours, qui pouvait apparaître dans le journal brut sans générer de ligne outbox.
+
 ## v0.5.2 — développement
 
 ### Corrigé
