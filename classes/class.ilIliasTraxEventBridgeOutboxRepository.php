@@ -3,8 +3,7 @@
 /**
  * Local outbox for generated xAPI statements.
  *
- * V0.2 does not send statements to TRAX yet. It only stores them locally so the
- * mapping can be validated before HTTP transmission is introduced.
+ * V0.3 can send generated/failed statements manually to TRAX.
  */
 class ilIliasTraxEventBridgeOutboxRepository
 {
@@ -80,7 +79,7 @@ class ilIliasTraxEventBridgeOutboxRepository
             return $rows;
         }
 
-        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at '
+        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at, sent_at, last_error '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
 
         if (method_exists($this->db, 'setLimit')) {
@@ -98,20 +97,95 @@ class ilIliasTraxEventBridgeOutboxRepository
         return $rows;
     }
 
-    public function countAll(): int
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    public function findSendable(int $limit): array
+    {
+        $limit = max(1, min(100, $limit));
+        $rows = [];
+
+        if (!$this->tableExists()) {
+            return $rows;
+        }
+
+        $query = 'SELECT id, statement_json FROM ' . self::TABLE_NAME
+            . ' WHERE status IN (' . $this->db->quote('generated', 'text') . ', ' . $this->db->quote('failed', 'text') . ')'
+            . ' ORDER BY id ASC';
+
+        if (method_exists($this->db, 'setLimit')) {
+            $this->db->setLimit($limit);
+        }
+
+        $set = $this->db->query($query);
+
+        $count = 0;
+        while (($row = $this->db->fetchAssoc($set)) && $count < $limit) {
+            $rows[] = $row;
+            $count++;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int,int> $ids
+     */
+    public function markSending(array $ids): void
+    {
+        $this->updateStatusForIds($ids, 'sending', '');
+    }
+
+    /**
+     * @param array<int,int> $ids
+     */
+    public function markSent(array $ids): void
+    {
+        if (count($ids) === 0 || !$this->tableExists()) {
+            return;
+        }
+
+        $this->db->manipulate(
+            'UPDATE ' . self::TABLE_NAME
+            . ' SET status = ' . $this->db->quote('sent', 'text')
+            . ', sent_at = ' . $this->db->quote(date('Y-m-d H:i:s'), 'text')
+            . ', last_error = ' . $this->db->quote('', 'clob')
+            . ' WHERE id IN (' . implode(',', array_map('intval', $ids)) . ')'
+        );
+    }
+
+    /**
+     * @param array<int,int> $ids
+     */
+    public function markFailed(array $ids, string $error): void
+    {
+        $this->updateStatusForIds($ids, 'failed', substr($error, 0, 4000));
+    }
+
+    public function resetStuckSending(): int
     {
         if (!$this->tableExists()) {
             return 0;
         }
 
-        $set = $this->db->query('SELECT COUNT(*) cnt FROM ' . self::TABLE_NAME);
-        $row = $this->db->fetchAssoc($set);
+        $this->db->manipulate(
+            'UPDATE ' . self::TABLE_NAME
+            . ' SET status = ' . $this->db->quote('failed', 'text')
+            . ', last_error = ' . $this->db->quote('Réinitialisé depuis status=sending au chargement de la V0.3.', 'clob')
+            . ' WHERE status = ' . $this->db->quote('sending', 'text')
+        );
 
-        if (!is_array($row)) {
-            return 0;
-        }
+        return 0;
+    }
 
-        return (int) ($row['cnt'] ?? 0);
+    public function countAll(): int
+    {
+        return $this->countWhere('');
+    }
+
+    public function countByStatus(string $status): int
+    {
+        return $this->countWhere(' WHERE status = ' . $this->db->quote($status, 'text'));
     }
 
     public function clear(): void
@@ -126,6 +200,39 @@ class ilIliasTraxEventBridgeOutboxRepository
     private function tableExists(): bool
     {
         return method_exists($this->db, 'tableExists') && $this->db->tableExists(self::TABLE_NAME);
+    }
+
+    /**
+     * @param array<int,int> $ids
+     */
+    private function updateStatusForIds(array $ids, string $status, string $error): void
+    {
+        if (count($ids) === 0 || !$this->tableExists()) {
+            return;
+        }
+
+        $this->db->manipulate(
+            'UPDATE ' . self::TABLE_NAME
+            . ' SET status = ' . $this->db->quote($status, 'text')
+            . ', last_error = ' . $this->db->quote($error, 'clob')
+            . ' WHERE id IN (' . implode(',', array_map('intval', $ids)) . ')'
+        );
+    }
+
+    private function countWhere(string $where): int
+    {
+        if (!$this->tableExists()) {
+            return 0;
+        }
+
+        $set = $this->db->query('SELECT COUNT(*) cnt FROM ' . self::TABLE_NAME . $where);
+        $row = $this->db->fetchAssoc($set);
+
+        if (!is_array($row)) {
+            return 0;
+        }
+
+        return (int) ($row['cnt'] ?? 0);
     }
 
     /**

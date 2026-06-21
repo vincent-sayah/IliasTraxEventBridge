@@ -3,8 +3,7 @@
 /**
  * Configuration wrapper.
  *
- * V0.2 keeps defaults enabled to simplify discovery and local xAPI generation.
- * Later production versions should expose a real admin form and default debug to OFF.
+ * V0.3 adds TRAX/xAPI connection settings.
  */
 class ilIliasTraxEventBridgeConfig
 {
@@ -97,9 +96,94 @@ class ilIliasTraxEventBridgeConfig
         return rtrim($scheme . '://' . $host, '/');
     }
 
+    public function setIliasBaseUrl(string $url): void
+    {
+        $this->set('ilias_base_url', rtrim(trim($url), '/'));
+    }
+
     public function getActorHomePage(): string
     {
         return $this->getIliasBaseUrl();
+    }
+
+    public function getTraxEndpoint(): string
+    {
+        return rtrim(trim($this->get('trax_endpoint', '')), '/');
+    }
+
+    public function setTraxEndpoint(string $endpoint): void
+    {
+        $this->set('trax_endpoint', rtrim(trim($endpoint), '/'));
+    }
+
+    public function getTraxUsername(): string
+    {
+        return trim($this->get('trax_username', ''));
+    }
+
+    public function setTraxUsername(string $username): void
+    {
+        $this->set('trax_username', trim($username));
+    }
+
+    public function getTraxPassword(): string
+    {
+        return (string) $this->get('trax_password', '');
+    }
+
+    public function setTraxPassword(string $password): void
+    {
+        $this->set('trax_password', $password);
+    }
+
+    public function getXapiVersion(): string
+    {
+        $version = trim($this->get('xapi_version', '1.0.3'));
+        return $version !== '' ? $version : '1.0.3';
+    }
+
+    public function setXapiVersion(string $version): void
+    {
+        $this->set('xapi_version', trim($version) !== '' ? trim($version) : '1.0.3');
+    }
+
+    public function getHttpTimeout(): int
+    {
+        return max(2, min(120, (int) $this->get('http_timeout', '15')));
+    }
+
+    public function setHttpTimeout(int $timeout): void
+    {
+        $this->set('http_timeout', (string) max(2, min(120, $timeout)));
+    }
+
+    public function getBatchSize(): int
+    {
+        return max(1, min(100, (int) $this->get('batch_size', '25')));
+    }
+
+    public function setBatchSize(int $batchSize): void
+    {
+        $this->set('batch_size', (string) max(1, min(100, $batchSize)));
+    }
+
+    public function isTraxConfigured(): bool
+    {
+        return $this->getTraxEndpoint() !== '' && $this->getTraxUsername() !== '' && $this->getTraxPassword() !== '';
+    }
+
+    public function getStatementsEndpoint(): string
+    {
+        $endpoint = $this->getTraxEndpoint();
+        if ($endpoint === '') {
+            return '';
+        }
+
+        if (preg_match('~/statements$~', $endpoint)) {
+            return $endpoint;
+        }
+
+        return rtrim($endpoint, '/') . '/statements';
     }
 
     private function get(string $key, string $default): string

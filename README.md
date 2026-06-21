@@ -1,22 +1,31 @@
-# IliasTraxEventBridge v0.2.1
+# IliasTraxEventBridge v0.3.0
 
-Plugin EventHook ILIAS 10 pour observer les événements ILIAS et générer localement des statements xAPI.
+Plugin EventHook ILIAS 10 pour observer les événements ILIAS, générer des statements xAPI et les envoyer manuellement vers TRAX 3.
 
-## Objectif V0.2.1
+## Objectif V0.3
 
-Cette version ne contacte pas encore TRAX.
+Cette version ajoute :
 
-Elle ajoute une table outbox locale contenant les statements xAPI générés à partir des événements ILIAS fiables déjà observés :
+- configuration TRAX / xAPI depuis l'écran du plugin ;
+- test de connexion TRAX ;
+- client HTTP xAPI ;
+- envoi manuel des statements de l'outbox locale ;
+- statuts outbox : `generated`, `sending`, `sent`, `failed`.
+
+Il n'y a pas encore de cron automatique en V0.3.
+
+## Événements actuellement transformés
 
 - téléchargement de fichier :
   `components/ILIAS/ILIASObject:update` avec `obj_type=file` et `cmd=sendfile`
-- progression / test :
-  `components/ILIAS/Tracking:updateStatus`
+- début de test :
+  `components/ILIAS/Tracking:updateStatus` avec `cmd=startTest` -> `attempted`
+- fin de test réussie :
+  `components/ILIAS/Tracking:updateStatus` avec `status=2` ou `percentage=100` -> `passed`
+- fin de test échouée :
+  `components/ILIAS/Tracking:updateStatus` avec `status=3` -> `failed`
 
-## Tables
-
-- `evnt_evhk_itxeb_log` : journal brut des événements ILIAS reçus.
-- `evnt_evhk_itxeb_out` : outbox locale des statements xAPI générés.
+Les actions d'administration du test comme `delete_results` restent dans le journal debug mais ne sont pas générées dans l'outbox.
 
 ## Installation / mise à jour
 
@@ -39,25 +48,40 @@ Ensuite dans ILIAS :
 Administration > Plugins > Update
 ```
 
-L'étape SQL #2 crée la table `evnt_evhk_itxeb_out`.
+## Configuration TRAX
+
+Dans la configuration du plugin, renseigner :
+
+- Endpoint xAPI TRAX ;
+- Identifiant client TRAX ;
+- Secret client TRAX ;
+- Version xAPI, par défaut `1.0.3` ;
+- Timeout HTTP ;
+- Taille du batch manuel.
+
+L'endpoint peut être :
+
+```text
+https://trax.example.com/.../xapi
+```
+
+ou directement :
+
+```text
+https://trax.example.com/.../xapi/statements
+```
+
+Le plugin ajoute `/statements` si nécessaire.
 
 ## Vérification SQL
 
 ```sql
-SELECT id, created_at, component, event_name, user_id, ref_id, obj_id, obj_type
-FROM evnt_evhk_itxeb_log
-ORDER BY id DESC
-LIMIT 20;
-```
-
-```sql
-SELECT id, created_at, event_log_id, event_type, verb_id, user_id, ref_id, obj_id, obj_type, status
+SELECT id, created_at, event_log_id, event_type, verb_id, user_id, ref_id, obj_id, obj_type, status, sent_at, last_error
 FROM evnt_evhk_itxeb_out
-ORDER BY id DESC
-LIMIT 20;
+ORDER BY id DESC;
 ```
 
-Pour voir un statement :
+Voir le dernier statement :
 
 ```sql
 SELECT statement_json
@@ -66,50 +90,19 @@ ORDER BY id DESC
 LIMIT 1;
 ```
 
-## Notes de mapping V0.2.1
+## Envoi manuel
 
-- `file_downloaded` génère un statement `experienced`.
-- `test_tracking_status` génère :
-  - `passed` si `status = 2` ou `percentage >= 100`,
-  - `failed` si `status = 3`,
-  - `attempted` sinon.
-- `learning_tracking_status` génère :
-  - `completed` si `status = 2` ou `percentage >= 100`,
-  - `progressed` sinon.
+Depuis l'écran de configuration :
 
-Ces règles sont volontairement simples et devront être confirmées sur tes données ILIAS 10 avant l'envoi vers TRAX.
-
-
-## Correctifs 0.2.1
-
-Cette version nettoie le mapping xAPI local :
-
-- ignore les actions d’administration de test :
-  - `cmdClass=ilTestParticipantsGUI`
-  - `pt_action=delete_results`
-  - `cmd=executeTableAction`
-- conserve ces événements dans `evnt_evhk_itxeb_log` pour diagnostic ;
-- ne les ajoute plus dans `evnt_evhk_itxeb_out` ;
-- force `obj_type=tst` pour les vrais événements du player de test si l’URI montre `cmd=startTest` ou `cmd=finishTest` ;
-- ignore les événements `Tracking/updateStatus` ambigus avec `obj_type` vide s’ils ne viennent pas clairement du player de test.
-
-## Test de non-régression recommandé
-
-```sql
-DELETE FROM evnt_evhk_itxeb_log;
-DELETE FROM evnt_evhk_itxeb_out;
+```text
+Envoyer les statements générés vers TRAX
 ```
 
-Puis dans ILIAS :
+Le plugin envoie les statements au statut :
 
-1. supprimer les résultats d’un participant depuis l’administration du test ;
-2. faire passer réellement un test à un apprenant ;
-3. télécharger un fichier.
+```text
+generated
+failed
+```
 
-Résultat attendu :
-
-- les suppressions de résultats apparaissent dans `evnt_evhk_itxeb_log` ;
-- elles n’apparaissent pas dans `evnt_evhk_itxeb_out` ;
-- `startTest` produit `attempted` ;
-- `finishTest` produit `passed` ou `failed` ;
-- `sendfile` produit `experienced`.
+Les statements `sent` ne sont pas renvoyés.
