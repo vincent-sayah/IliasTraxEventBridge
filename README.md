@@ -119,6 +119,30 @@ Dans l’écran de configuration du plugin :
 
 Le plugin ajoute automatiquement `/statements` si l’endpoint fourni ne se termine pas déjà par `/statements`.
 
+### Activation du cron ILIAS
+
+L’option **Activer le cron plugin** n’active pas à elle seule l’exécution planifiée. Elle autorise seulement le plugin à travailler lorsqu’ILIAS exécute son job cron.
+
+Il faut aussi activer et exécuter le job dans ILIAS :
+
+```text
+Administration > Paramètres système et maintenance > Tâches cron
+```
+
+Chercher le job :
+
+```text
+IliasTraxEventBridge — envoi outbox vers TRAX
+```
+
+ou l’identifiant technique :
+
+```text
+itxeb_send_outbox_to_trax
+```
+
+Le cron doit être actif dans ILIAS et le cron système/CLI d’ILIAS doit tourner régulièrement sur le serveur. Sans cela, les statements restent en `generated` jusqu’à un clic manuel sur **Envoyer maintenant**.
+
 ## Vérifications SQL utiles
 
 Voir l’outbox xAPI avec les retries :
