@@ -77,6 +77,14 @@ class ilIliasTraxEventBridgeEventRouter
         if ((int) $record['ref_id'] <= 0 && (int) $courseContext['ref_id'] > 0) {
             $record['ref_id'] = (int) $courseContext['ref_id'];
         }
+
+        if ((string) $record['obj_type'] === '') {
+            $repoType = $this->detectObjTypeFromRepository($record);
+            if ($repoType !== '') {
+                $record['obj_type'] = $repoType;
+            }
+        }
+
         $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
         $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
 
@@ -147,9 +155,47 @@ class ilIliasTraxEventBridgeEventRouter
             'ilObjExerciseGUI' => 'exc',
             'ilObjSCORM2004LearningModuleGUI' => 'sahs',
             'ilObjSAHSLearningModuleGUI' => 'sahs',
+            'ilObjBlogGUI' => 'blog',
+            'ilObjLinkResourceGUI' => 'webr',
+            'ilLinkResourceHandlerGUI' => 'webr',
+            'ilObjMediaCastGUI' => 'mcst',
+            'ilMediaCastHandlerGUI' => 'mcst',
         ];
 
         return $map[$cmdClass] ?? '';
+    }
+
+    private function detectObjTypeFromRepository(array $record): string
+    {
+        if (!class_exists('ilObject') || !method_exists('ilObject', '_lookupType')) {
+            return '';
+        }
+
+        $refId = (int) ($record['ref_id'] ?? 0);
+        if ($refId > 0) {
+            try {
+                $type = ilObject::_lookupType($refId, true);
+                if (is_scalar($type) && (string) $type !== '') {
+                    return (string) $type;
+                }
+            } catch (Throwable $ignored) {
+                // Try obj_id below.
+            }
+        }
+
+        $objId = (int) ($record['obj_id'] ?? 0);
+        if ($objId > 0) {
+            try {
+                $type = ilObject::_lookupType($objId);
+                if (is_scalar($type) && (string) $type !== '') {
+                    return (string) $type;
+                }
+            } catch (Throwable $ignored) {
+                return '';
+            }
+        }
+
+        return '';
     }
 
     private function detectInt(array $params, array $keys): int
