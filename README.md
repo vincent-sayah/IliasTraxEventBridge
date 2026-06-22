@@ -2,7 +2,7 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS.
 
-Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.5**.
+Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.5.5**.
 
 ## Fonctionnalités v0.4.3
 
@@ -17,7 +17,7 @@ Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.
 - Diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron.
 - Affichage amélioré des tableaux de configuration, notamment pour les colonnes Verb et URI.
 
-## Premier chantier v0.5
+## Chantier v0.5
 
 La branche **v0.5** introduit le filtre métier suivant : un statement xAPI n'est généré que si l'objet ILIAS concerné est contenu dans un objet **cours**.
 
@@ -28,14 +28,26 @@ Comportement :
 - les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours sont exclus de l'outbox xAPI ;
 - quand le cours parent est identifié, les extensions xAPI contiennent `course_ref_id` et `course_obj_id`.
 
-## Objets couverts en v0.4.3 / début v0.5
+Depuis **v0.5.4**, l'exploitation réelle des objets de dépôt est suivie via la table ILIAS `read_event`, avec une table anti-doublon locale `evnt_evhk_itxeb_read`.
 
-| Action ILIAS | Statement xAPI |
-|---|---|
-| Démarrage d'un test dans un cours | `attempted` |
-| Test réussi dans un cours | `passed` |
-| Test échoué dans un cours | `failed` |
-| Téléchargement d'un fichier dans un cours | `experienced` |
+Depuis **v0.5.5**, les événements génériques `Tracking:updateStatus` non-test, notamment sur `crs` ou `root`, ne génèrent plus de statements xAPI. Les consultations utiles passent par `repository_object_access`.
+
+## Objets couverts en v0.5.5
+
+| Action ILIAS | Source | Statement xAPI |
+|---|---|---|
+| Démarrage d'un test dans un cours | `Tracking:updateStatus` test | `attempted` |
+| Test réussi dans un cours | `Tracking:updateStatus` test | `passed` |
+| Test échoué dans un cours | `Tracking:updateStatus` test | `failed` |
+| Téléchargement d'un fichier dans un cours | EventHook `sendfile` | `experienced` |
+| Consultation blog dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation forum dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation lien web dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation mediacast dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation wiki dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module HTML dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module web dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module SCORM dans un cours | `read_event` | `repository_object_access` / `experienced` |
 
 Les actions d'administration comme la suppression des résultats de test sont journalisées mais ne sont pas envoyées dans l'outbox xAPI.
 
@@ -71,9 +83,10 @@ Objectifs :
 
 - [x] n'envoyer des traces xAPI que pour les objets contenus dans un objet **cours** ;
 - [x] exclure les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
+- [x] tracer l'exploitation réelle des objets de dépôt via `read_event` ;
+- [x] étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module web et module SCORM ;
 - [ ] permettre à l'administrateur du cours d'activer ou désactiver l'envoi xAPI vers TRAX dans les paramètres du cours ;
-- [ ] permettre à l'administrateur du cours de choisir les types d'objets traçables ;
-- [ ] étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module web et module SCORM.
+- [ ] permettre à l'administrateur du cours de choisir les types d'objets traçables.
 
 ### Cible v0.6
 
