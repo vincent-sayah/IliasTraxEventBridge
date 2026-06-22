@@ -16,26 +16,21 @@ Fonctionnalités validées :
 - stockage dans une outbox locale ;
 - envoi manuel vers TRAX ;
 - envoi automatique par tâche cron ILIAS ;
-- retry configurable avec `retry_count`, `max_retry` et `last_attempt_at` ;
-- réinitialisation manuelle des statements `failed` ;
-- diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron ;
 - filtre métier : seuls les objets contenus dans un **cours** peuvent générer des statements xAPI ;
-- exclusion des objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
 - suivi de l'exploitation réelle des objets de dépôt via `read_event` ;
 - table anti-doublon locale `evnt_evhk_itxeb_read` ;
 - suppression des traces parasites `Tracking:updateStatus` génériques sur `crs` ou `root`.
 
+## Installation
+
+La procédure d'installation complète est disponible dans :
+
+- [README principal](../README.md#installation-dans-ilias-10)
+- [README technique](../README_TECHNIQUE.md#installation-technique)
+
 ## Cron ILIAS
 
-L'option **Activer le cron plugin** dans la configuration du plugin autorise le plugin à envoyer l'outbox, mais elle ne suffit pas à planifier l'exécution.
-
-Il faut aussi activer le job cron dans ILIAS :
-
-```text
-Administration > Paramètres système et maintenance > Tâches cron
-```
-
-Job à activer :
+Le job cron ILIAS à activer est :
 
 ```text
 IliasTraxEventBridge — envoi outbox vers TRAX
@@ -45,6 +40,12 @@ Identifiant technique :
 
 ```text
 itxeb_send_outbox_to_trax
+```
+
+Chemin ILIAS :
+
+```text
+Administration > Paramètres système et maintenance > Tâches cron
 ```
 
 ## Objets couverts en v0.5.5
@@ -64,13 +65,14 @@ itxeb_send_outbox_to_trax
 | Consultation module web dans un cours | `read_event` | `repository_object_access` / `experienced` |
 | Consultation module SCORM dans un cours | `read_event` | `repository_object_access` / `experienced` |
 
-Les actions d'administration restent journalisées mais ne doivent pas être envoyées comme traces xAPI d'apprentissage.
-
-## Roadmap
+## Documents utiles
 
 - [Roadmap V0.5 / V0.6](ROADMAP.md)
-- [Plan V0.5](V0.5_PLAN.md)
+- [Bilan V0.5](V0.5_PLAN.md)
 - [Plan V0.6](V0.6_PLAN.md)
+- [Guide d'import GitHub](../GITHUB_IMPORT.md)
+- [Plan de validation](../docs/VALIDATION.md)
+- [Changelog](../CHANGELOG.md)
 
 ## Remarque sur les dossiers `doc` et `docs`
 
