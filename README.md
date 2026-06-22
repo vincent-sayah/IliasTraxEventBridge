@@ -56,9 +56,121 @@ Depuis **v0.5.5**, les événements génériques `Tracking:updateStatus` non-tes
 
 Les actions d'administration comme la suppression des résultats de test sont journalisées mais ne sont pas envoyées dans l'outbox xAPI.
 
+## Installation dans ILIAS 10
+
+### Prérequis
+
+- ILIAS 10 déjà installé et fonctionnel.
+- Accès shell au serveur ILIAS.
+- Git installé sur le serveur.
+- Accès à la base ILIAS pour vérifier les tables si nécessaire.
+- Utilisateur web ILIAS habituel : `apache` sur AlmaLinux/RHEL, à adapter si votre serveur utilise `www-data`.
+
+### Installation depuis GitHub
+
+Exemple avec une racine ILIAS située dans `/var/www/ilias` :
+
+```bash
+sudo -i
+
+export ILIAS_ROOT="/var/www/ilias"
+export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
+export PLUGIN_NAME="IliasTraxEventBridge"
+
+mkdir -p "$EVENTHOOK_DIR"
+cd "$EVENTHOOK_DIR"
+
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+
+cd "$PLUGIN_NAME"
+grep -n '\$version' plugin.php
+
+chown -R apache:apache "$EVENTHOOK_DIR/$PLUGIN_NAME"
+find "$EVENTHOOK_DIR/$PLUGIN_NAME" -type d -exec chmod 755 {} \;
+find "$EVENTHOOK_DIR/$PLUGIN_NAME" -type f -exec chmod 644 {} \;
+
+find "$EVENTHOOK_DIR/$PLUGIN_NAME" -name "*.php" -print0 | xargs -0 -n1 php -l
+
+cd "$ILIAS_ROOT"
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
+```
+
+Résultat attendu :
+
+```text
+$version = "0.5.5";
+```
+
+Puis dans ILIAS :
+
+```text
+Administration > Plugins > EventHook > IliasTraxEventBridge > Mettre à jour / Installer > Activer > Configurer
+```
+
+### Mise à jour d'une installation existante
+
+Depuis le serveur ILIAS :
+
+```bash
+sudo -i
+
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+
+grep -n '\$version' plugin.php
+
+cd /var/www/ilias
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
+```
+
+Puis dans ILIAS :
+
+```text
+Administration > Plugins > EventHook > IliasTraxEventBridge > Mettre à jour
+```
+
+### Attention aux sauvegardes locales
+
+Ne laissez pas de dossiers de sauvegarde du plugin dans le dossier `EventHook`, par exemple `IliasTraxEventBridge.bak.*`. ILIAS tente de scanner tous les sous-dossiers de plugins, ce qui peut casser le build.
+
+Déplacer les sauvegardes hors de `EventHook` :
+
+```bash
+sudo -i
+
+export EVENTHOOK_DIR="/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook"
+mkdir -p /root/ilias-plugin-backups
+mv "$EVENTHOOK_DIR"/IliasTraxEventBridge.bak.* /root/ilias-plugin-backups/ 2>/dev/null || true
+```
+
+## Configuration TRAX
+
+Dans l'écran de configuration du plugin :
+
+| Champ | Description |
+|---|---|
+| Activer génération xAPI locale | Autorise la création de statements dans l'outbox. |
+| Activer envoi manuel | Autorise le bouton d'envoi manuel. |
+| Activer le cron plugin | Autorise le job cron du plugin à générer les consultations `read_event` et à envoyer l'outbox. |
+| Endpoint xAPI TRAX | Endpoint xAPI racine ou endpoint complet `/statements`. |
+| Identifiant client TRAX | Client xAPI TRAX. |
+| Secret client TRAX | Secret associé au client xAPI. |
+| Version xAPI | Recommandé : `1.0.3`. |
+| Timeout HTTP | Timeout d'appel HTTP. |
+| Taille batch | Nombre maximum de statements envoyés par batch manuel ou cron. |
+| Max retry | Nombre maximum de tentatives par statement. |
+| Base URL ILIAS forcée | Utilisée pour les IRIs xAPI et `actor.account.homePage`. |
+
+Le plugin ajoute automatiquement `/statements` si l'endpoint fourni ne se termine pas déjà par `/statements`.
+
 ## Cron ILIAS
 
-L'option **Activer le cron plugin** autorise le plugin à envoyer l'outbox, mais elle ne suffit pas à planifier l'exécution.
+L'option **Activer le cron plugin** autorise le plugin à travailler lorsque le cron ILIAS s'exécute, mais elle ne planifie pas l'exécution à elle seule.
 
 Il faut aussi activer le job dans ILIAS :
 
@@ -76,6 +188,40 @@ Identifiant technique :
 
 ```text
 itxeb_send_outbox_to_trax
+```
+
+Le cron doit être actif dans ILIAS et le cron système/CLI d'ILIAS doit tourner régulièrement sur le serveur. Sans cela, les consultations détectées dans `read_event` ne sont transformées en statements xAPI qu'au prochain passage du cron.
+
+## Vérifications SQL utiles
+
+Outbox xAPI :
+
+```sql
+SELECT id, event_log_id, event_type, obj_type, ref_id, obj_id,
+       user_id, status, retry_count, created_at, sent_at, last_error
+FROM evnt_evhk_itxeb_out
+ORDER BY id DESC
+LIMIT 20;
+```
+
+Table anti-doublon `read_event` :
+
+```sql
+SELECT *
+FROM evnt_evhk_itxeb_read
+ORDER BY processed_at DESC
+LIMIT 20;
+```
+
+Vérifier qu'aucun statement parasite `root` ou `crs` n'est créé :
+
+```sql
+SELECT id, event_log_id, event_type, obj_type, ref_id, obj_id,
+       user_id, status, created_at, sent_at
+FROM evnt_evhk_itxeb_out
+WHERE obj_type IN ('root', 'crs')
+ORDER BY id DESC
+LIMIT 20;
 ```
 
 ## Roadmap
@@ -111,3 +257,5 @@ Objectifs :
 - [Changelog](CHANGELOG.md)
 - [Guide d'import GitHub](GITHUB_IMPORT.md)
 - [Plan de validation](docs/VALIDATION.md)
+- [Documentation centrale](doc/README.md)
+- [Roadmap](doc/ROADMAP.md)
