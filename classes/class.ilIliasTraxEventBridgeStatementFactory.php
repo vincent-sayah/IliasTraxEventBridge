@@ -47,11 +47,9 @@ class ilIliasTraxEventBridgeStatementFactory
                 return $this->createTrackingStatement($record);
             }
 
-            // Avoid false learning traces caused by admin maintenance actions or unknown empty types.
-            // Non-test learning tracking is kept only when ILIAS gives us a concrete object type.
-            if ($type !== '') {
-                return $this->createTrackingStatement($record);
-            }
+            // V0.5.5: do not generate generic learning-progress statements for course/root updates.
+            // Consultations of repository objects are now tracked through read_event instead.
+            return null;
         }
 
         if ($this->isRepositoryObjectAccessEvent($component, $event, $type)) {
