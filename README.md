@@ -2,12 +2,12 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS.
 
-Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.5.5**.
+Version stable actuelle : **v0.5.5**. Branche de développement en cours : **aucune**. Prochaine cible : **v0.6**.
 
-## Fonctionnalités v0.4.3
+## Fonctionnalités v0.5.5 stable
 
 - Captation d'événements ILIAS via EventHook.
-- Journal brut des événements reçus.
+- Journal brut des événements reçus dans `evnt_evhk_itxeb_log`.
 - Génération locale de statements xAPI.
 - Outbox locale avec statuts `generated`, `sending`, `sent`, `failed`.
 - Envoi manuel vers TRAX.
@@ -15,18 +15,23 @@ Version stable actuelle : **v0.4.3**. Branche de développement en cours : **v0.
 - Retry configurable avec `retry_count`, `max_retry` et `last_attempt_at`.
 - Bouton de réinitialisation des statements en échec.
 - Diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron.
-- Affichage amélioré des tableaux de configuration, notamment pour les colonnes Verb et URI.
+- Filtre métier : seuls les objets contenus dans un **cours** peuvent générer des statements xAPI.
+- Exclusion des objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours.
+- Suivi de l'exploitation réelle des objets de dépôt via la table ILIAS `read_event`.
+- Table anti-doublon locale `evnt_evhk_itxeb_read` pour éviter de renvoyer plusieurs fois les mêmes consultations.
+- Suppression des traces parasites `Tracking:updateStatus` génériques sur `crs` ou `root`.
 
-## Chantier v0.5
+## Périmètre stable v0.5.5
 
-La branche **v0.5** introduit le filtre métier suivant : un statement xAPI n'est généré que si l'objet ILIAS concerné est contenu dans un objet **cours**.
+La version **v0.5.5** stabilise le filtre métier suivant : un statement xAPI n'est généré que si l'objet ILIAS concerné est contenu dans un objet **cours**.
 
 Comportement :
 
 - l'événement brut reste journalisé dans `evnt_evhk_itxeb_log` ;
 - si aucun cours parent n'est trouvé, aucun statement n'est ajouté dans `evnt_evhk_itxeb_out` ;
 - les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours sont exclus de l'outbox xAPI ;
-- quand le cours parent est identifié, les extensions xAPI contiennent `course_ref_id` et `course_obj_id`.
+- quand le cours parent est identifié, les extensions xAPI contiennent `course_ref_id` et `course_obj_id` ;
+- l'exploitation réelle des objets de dépôt est suivie via `read_event` et produit des statements `repository_object_access`.
 
 Depuis **v0.5.4**, l'exploitation réelle des objets de dépôt est suivie via la table ILIAS `read_event`, avec une table anti-doublon locale `evnt_evhk_itxeb_read`.
 
@@ -75,18 +80,17 @@ itxeb_send_outbox_to_trax
 
 ## Roadmap
 
-### Cible v0.5
+### V0.5 — stabilisée
 
-La V0.5 doit limiter le périmètre métier aux objets contenus dans un objet cours et donner le contrôle à l'administrateur du cours.
+La V0.5 limite le périmètre métier aux objets contenus dans un objet cours et trace l'exploitation réelle des objets de dépôt via `read_event`.
 
-Objectifs :
+Objectifs réalisés :
 
 - [x] n'envoyer des traces xAPI que pour les objets contenus dans un objet **cours** ;
 - [x] exclure les objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
 - [x] tracer l'exploitation réelle des objets de dépôt via `read_event` ;
-- [x] étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module web et module SCORM ;
-- [ ] permettre à l'administrateur du cours d'activer ou désactiver l'envoi xAPI vers TRAX dans les paramètres du cours ;
-- [ ] permettre à l'administrateur du cours de choisir les types d'objets traçables.
+- [x] étendre la couverture aux objets suivants : blog, forum, lien web, mediacast, wiki, module HTML, module web et module SCORM ;
+- [x] supprimer les statements parasites `crs` / `root` issus de `Tracking:updateStatus` génériques.
 
 ### Cible v0.6
 
@@ -98,7 +102,8 @@ Objectifs :
 - générer des statements plus riches pour cours, tests, fichiers, modules CMI/xAPI et autres objets couverts ;
 - ajouter des filtres dans la configuration globale du plugin ;
 - ajouter une page de diagnostic TRAX ;
-- ajouter une purge configurable des anciens événements et de l'outbox.
+- ajouter une purge configurable des anciens événements et de l'outbox ;
+- étudier l'activation/désactivation par cours et par type d'objet.
 
 ## Documentation complémentaire
 
