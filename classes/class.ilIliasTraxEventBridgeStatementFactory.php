@@ -54,8 +54,8 @@ class ilIliasTraxEventBridgeStatementFactory
             }
         }
 
-        if ($this->isRepositoryObjectEventSupported($event, $type)) {
-            return $this->createRepositoryObjectStatement($record, $this->repositorySourceEvent($event));
+        if ($this->isRepositoryObjectAccessEvent($component, $event, $type)) {
+            return $this->createRepositoryObjectAccessStatement($record);
         }
 
         return null;
@@ -109,30 +109,16 @@ class ilIliasTraxEventBridgeStatementFactory
             || strpos($uri, 'cmd=finishTest') !== false;
     }
 
-    private function isRepositoryObjectEventSupported(string $event, string $type): bool
+    private function isRepositoryObjectAccessEvent(string $component, string $event, string $type): bool
     {
-        if (!$this->isRepositoryObjectStatementSupported($type)) {
-            return false;
-        }
-
-        // ILIAS object families do not all emit the same component name. For V0.5,
-        // accept the reliable high-level object lifecycle events once the router has
-        // already confirmed that the object is contained in a course.
-        return in_array($event, ['create', 'update'], true);
+        return $component === 'components/ILIAS/ReadEvent'
+            && $event === 'access'
+            && $this->isRepositoryObjectStatementSupported($type);
     }
 
     private function isRepositoryObjectStatementSupported(string $type): bool
     {
         return in_array($type, ['blog', 'webr', 'mcst', 'frm', 'wiki', 'htlm', 'lm', 'sahs'], true);
-    }
-
-    private function repositorySourceEvent(string $event): string
-    {
-        if ($event === 'create') {
-            return 'repository_object_create';
-        }
-
-        return 'repository_object_update';
     }
 
     /**
@@ -179,21 +165,23 @@ class ilIliasTraxEventBridgeStatementFactory
      * @param array<string,mixed> $record
      * @return array<string,mixed>
      */
-    private function createRepositoryObjectStatement(array $record, string $sourceEvent): array
+    private function createRepositoryObjectAccessStatement(array $record): array
     {
         $objType = (string) ($record['obj_type'] ?? 'object');
         $userId = (int) ($record['user_id'] ?? 0);
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
+        $baseUrl = $this->config->getIliasBaseUrl();
+        $objectTitle = trim((string) ($record['object_title'] ?? ''));
 
         return [
             'id' => $this->uuid4(),
             'actor' => $this->actor($userId),
             'verb' => [
-                'id' => 'http://adlnet.gov/expapi/verbs/interacted',
+                'id' => 'http://adlnet.gov/expapi/verbs/experienced',
                 'display' => [
-                    'fr-FR' => 'a interagi avec',
-                    'en-US' => 'interacted'
+                    'fr-FR' => 'a consulté',
+                    'en-US' => 'experienced'
                 ]
             ],
             'object' => [
@@ -202,13 +190,22 @@ class ilIliasTraxEventBridgeStatementFactory
                 'definition' => [
                     'type' => $this->repositoryActivityType($objType),
                     'name' => [
-                        'fr-FR' => $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+                        'fr-FR' => $objectTitle !== ''
+                            ? $objectTitle
+                            : $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
                     ]
+                ]
+            ],
+            'result' => [
+                'extensions' => [
+                    $baseUrl . '/xapi/extensions/read_count' => (int) ($record['read_count'] ?? 0),
+                    $baseUrl . '/xapi/extensions/spent_seconds' => (int) ($record['spent_seconds'] ?? 0),
+                    $baseUrl . '/xapi/extensions/read_event_last_access' => (int) ($record['read_event_last_access'] ?? 0),
                 ]
             ],
             'context' => [
                 'platform' => 'ILIAS 10',
-                'extensions' => $this->contextExtensions($record, $sourceEvent, $objType)
+                'extensions' => $this->contextExtensions($record, 'repository_object_access', $objType)
             ],
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
@@ -292,8 +289,7 @@ class ilIliasTraxEventBridgeStatementFactory
     private function contextExtensions(array $record, string $sourceEvent, string $objType): array
     {
         $baseUrl = $this->config->getIliasBaseUrl();
-
-        return [
+        $extensions = [
             $baseUrl . '/xapi/extensions/source_event' => $sourceEvent,
             $baseUrl . '/xapi/extensions/component' => (string) ($record['component'] ?? ''),
             $baseUrl . '/xapi/extensions/event_name' => (string) ($record['event_name'] ?? ''),
@@ -304,6 +300,18 @@ class ilIliasTraxEventBridgeStatementFactory
             $baseUrl . '/xapi/extensions/course_obj_id' => (int) ($record['course_obj_id'] ?? 0),
             $baseUrl . '/xapi/extensions/request_uri' => (string) ($record['request_uri'] ?? '')
         ];
+
+        if (isset($record['read_count'])) {
+            $extensions[$baseUrl . '/xapi/extensions/read_count'] = (int) $record['read_count'];
+        }
+        if (isset($record['spent_seconds'])) {
+            $extensions[$baseUrl . '/xapi/extensions/spent_seconds'] = (int) $record['spent_seconds'];
+        }
+        if (isset($record['read_event_last_access'])) {
+            $extensions[$baseUrl . '/xapi/extensions/read_event_last_access'] = (int) $record['read_event_last_access'];
+        }
+
+        return $extensions;
     }
 
     /**
