@@ -216,8 +216,8 @@ class ilIliasTraxEventBridgeOutboxRepository
         if ($component === 'components/ILIAS/ILIASObject' && $event === 'update' && $type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
             return 'file_downloaded';
         }
-        if ($component === 'components/ILIAS/ILIASObject' && $event === 'update' && $this->isRepositoryObjectStatementSupported($type)) {
-            return 'repository_object_update';
+        if ($component === 'components/ILIAS/ReadEvent' && $event === 'access' && $this->isRepositoryObjectStatementSupported($type)) {
+            return 'repository_object_access';
         }
         if ($component === 'components/ILIAS/Tracking' && $event === 'updateStatus') {
             if ($type === 'tst' || strpos($uri, 'cmdClass=ilTestPlayerFixedQuestionSetGUI') !== false || strpos($uri, 'cmdClass=ilTestPlayerDynamicQuestionSetGUI') !== false || strpos($uri, 'cmd=startTest') !== false || strpos($uri, 'cmd=finishTest') !== false) {
