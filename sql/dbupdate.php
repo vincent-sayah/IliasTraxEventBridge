@@ -78,3 +78,19 @@ if ($ilDB->tableExists('evnt_evhk_itxeb_out')) {
     $ilDB->manipulate('UPDATE evnt_evhk_itxeb_out SET max_retry = 5 WHERE max_retry = 0');
 }
 ?>
+<#4>
+<?php
+/** @var ilDBInterface $ilDB */
+if (!$ilDB->tableExists('evnt_evhk_itxeb_read')) {
+    $ilDB->createTable('evnt_evhk_itxeb_read', [
+        'obj_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'usr_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'last_access' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'read_count' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'processed_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+    ]);
+    $ilDB->addPrimaryKey('evnt_evhk_itxeb_read', ['obj_id', 'usr_id']);
+    $ilDB->addIndex('evnt_evhk_itxeb_read', ['last_access'], 'i1');
+    $ilDB->addIndex('evnt_evhk_itxeb_read', ['usr_id'], 'i2');
+}
+?>
