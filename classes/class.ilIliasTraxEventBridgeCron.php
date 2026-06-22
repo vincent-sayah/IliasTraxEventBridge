@@ -5,6 +5,9 @@ use ILIAS\Cron\Schedule\CronJobScheduleType;
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseContextResolver.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeReadEventTracker.php';
 
 /**
  * ILIAS cron job for automatic TRAX delivery.
@@ -25,7 +28,7 @@ class ilIliasTraxEventBridgeCron extends ilCronJob
 
     public function getDescription(): string
     {
-        return 'Envoie automatiquement les statements xAPI generated/failed vers TRAX, dans la limite max_retry.';
+        return 'Génère les traces de consultation read_event, puis envoie automatiquement les statements xAPI generated/failed vers TRAX.';
     }
 
     public function getDefaultScheduleType(): CronJobScheduleType
@@ -64,10 +67,19 @@ class ilIliasTraxEventBridgeCron extends ilCronJob
         try {
             $outbox = new ilIliasTraxEventBridgeOutboxRepository();
             $outbox->resetStuckSending();
+
+            $readGenerated = (new ilIliasTraxEventBridgeReadEventTracker(
+                $config,
+                $outbox,
+                new ilIliasTraxEventBridgeStatementFactory($config),
+                new ilIliasTraxEventBridgeCourseContextResolver()
+            ))->scanAndEnqueue(100);
+
             $sendResult = (new ilIliasTraxEventBridgeOutboxSender($config, $outbox))->sendBatch();
-            $config->setLastCronResult((bool) $sendResult['success'], (int) $sendResult['http_status'], (string) $sendResult['message']);
+            $message = 'read_event générés: ' . $readGenerated . ' ; ' . (string) $sendResult['message'];
+            $config->setLastCronResult((bool) $sendResult['success'], (int) $sendResult['http_status'], $message);
             $result->setStatus($sendResult['success'] ? ilCronJobResult::STATUS_OK : ilCronJobResult::STATUS_FAIL);
-            $result->setMessage((string) $sendResult['message']);
+            $result->setMessage($message);
         } catch (Throwable $e) {
             $config->setLastCronResult(false, 0, $e->getMessage());
             $result->setStatus(ilCronJobResult::STATUS_FAIL);
