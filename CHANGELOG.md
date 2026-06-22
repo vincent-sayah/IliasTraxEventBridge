@@ -4,76 +4,60 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 ## v0.5.5 — stable
 
+### Statut
+
+- Version stable actuelle du dépôt.
+- Branche `main` alignée sur la série stable V0.5.
+- Branche `v0.5` conservée comme branche stable V0.5.
+- Prochaine cible de développement : `v0.6`.
+
 ### Changé
 
 - Nettoyage du périmètre xAPI V0.5 : les événements `Tracking:updateStatus` génériques non-test ne génèrent plus de statements xAPI.
 - Les traces d'exploitation des objets de dépôt restent générées via `read_event` avec `event_type = repository_object_access`.
 - Les traces de progression de test restent conservées via `Tracking:updateStatus` lorsqu'elles concernent réellement un test.
+- Documentation stabilisée : README, README technique, guide d'import GitHub, plan de validation, dossiers `doc/` et `docs/`.
+- Ajout d'une procédure d'installation et de mise à jour directement dans le README principal.
 
 ### Corrigé
 
 - Suppression de la pollution outbox par des statements `learning_tracking_status` sur des objets de type `crs` ou `root`.
 - Le tracking utile est recentré sur les consultations réelles d'objets contenus dans un cours : blog, forum, lien web, mediacast, wiki, module HTML, module web et SCORM.
+- Les documents ne présentent plus `v0.4.3` comme version stable courante ; `v0.4.3` est conservée uniquement comme archive de la série V0.4.
 
 ## v0.5.4 — développement
-
-### Ajouté
 
 - Ajout d'un tracker d'exploitation basé sur la table ILIAS `read_event`.
 - Ajout de la table anti-doublon `evnt_evhk_itxeb_read` pour mémoriser le dernier `last_access` et le dernier `read_count` traités par couple `obj_id` / `usr_id`.
 - Génération de statements xAPI `repository_object_access` avec le verbe `experienced` / `a consulté` pour les objets de dépôt contenus dans un cours.
-
-### Couverture
-
-- Blog : `blog`.
-- Lien web : `webr`.
-- Mediacast : `mcst`.
-- Forum : `frm`.
-- Wiki : `wiki`.
-- Module HTML : `htlm`.
-- Module web : `lm`.
-- Module SCORM : `sahs`.
+- Couverture : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
 
 ## v0.5.3 — développement
 
-### Corrigé
-
 - Correction du contexte cours pour les événements de création d'objet dans un cours : ILIAS peut transmettre le `ref_id` du cours conteneur pendant `create`, `insertNode` ou `putObjectInTree`, et non le `ref_id` final de l'objet créé.
 - Le resolver accepte maintenant le cas où le `ref_id` reçu est lui-même un cours, et il tente aussi de retrouver les références de l'`obj_id` avant de se rabattre sur le `ref_id` de l'événement.
-- Cette correction cible notamment la création de blog, lien web et mediacast dans un cours, qui pouvait apparaître dans le journal brut sans générer de ligne outbox.
 
 ## v0.5.2 — développement
-
-### Corrigé
 
 - Assouplissement de la génération xAPI pour les objets de dépôt contenus dans un cours : les événements `create` et `update` des types supportés sont acceptés quel que soit le composant ILIAS émetteur.
 - Conservation prioritaire du traitement spécifique `Tracking:updateStatus` afin de ne pas remplacer les traces de progression par des interactions génériques.
 
-### Note de test
-
-- Cette correction cible notamment blog, lien web et mediacast lorsque ILIAS les journalise avec un composant différent de `components/ILIAS/ILIASObject`.
-- La table outbox réelle est `evnt_evhk_itxeb_out`.
-
 ## v0.5.1 — développement
 
-### Corrigé
-
-- Détection renforcée du type d'objet ILIAS lorsque `obj_type` est vide dans l'événement reçu : le routeur utilise maintenant le `ref_id` ou l'`obj_id` via `ilObject::_lookupType()`.
+- Détection renforcée du type d'objet ILIAS lorsque `obj_type` est vide dans l'événement reçu.
 - Ajout des mappings de classes GUI pour les objets blog, lien web et mediacast.
 - Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
-- Classification outbox des nouveaux statements avec le type `repository_object_update`.
 
 ## v0.5.0 — développement
 
-### Ajouté
-
 - Nouveau filtre métier : seuls les objets contenus dans un objet **cours** peuvent générer un statement xAPI.
-- Nouveau service `ilIliasTraxEventBridgeCourseContextResolver` pour retrouver le cours parent à partir du `ref_id` ou, en secours, des références de l'`obj_id`.
+- Nouveau service `ilIliasTraxEventBridgeCourseContextResolver` pour retrouver le cours parent.
 - Ajout des extensions xAPI `course_ref_id` et `course_obj_id` dans les statements générés.
 
-### Changé
+## v0.4.3 — stable archivée
 
-- Les événements bruts restent journalisés dans `evnt_evhk_itxeb_log`, mais les objets hors cours ne sont plus ajoutés à l'outbox xAPI.
-- Le routeur enrichit le record avec le contexte cours avant d'appeler la factory xAPI.
-
-## v0.4.3 — stable
+- Version stable de clôture de la série V0.4.
+- Envoi manuel et cron vers TRAX.
+- Retry avec `retry_count` et `max_retry`.
+- Diagnostics du dernier cron.
+- Tableaux d'administration améliorés.
