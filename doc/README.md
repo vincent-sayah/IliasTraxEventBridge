@@ -2,11 +2,11 @@
 
 Cette page centralise la documentation à jour du plugin **IliasTraxEventBridge**.
 
-Version stable actuelle : **v0.4.3**.
+Version stable actuelle : **v0.5.5**.
 
-## État stable v0.4.3
+## État stable v0.5.5
 
-La version **v0.4.3** clôture la série V0.4.
+La version **v0.5.5** clôture la série V0.5 et devient la version stable courante.
 
 Fonctionnalités validées :
 
@@ -19,7 +19,11 @@ Fonctionnalités validées :
 - retry configurable avec `retry_count`, `max_retry` et `last_attempt_at` ;
 - réinitialisation manuelle des statements `failed` ;
 - diagnostics du dernier test TRAX, du dernier envoi manuel et du dernier cron ;
-- affichage amélioré des tableaux de configuration, notamment les colonnes **Verb** et **URI**.
+- filtre métier : seuls les objets contenus dans un **cours** peuvent générer des statements xAPI ;
+- exclusion des objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours ;
+- suivi de l'exploitation réelle des objets de dépôt via `read_event` ;
+- table anti-doublon locale `evnt_evhk_itxeb_read` ;
+- suppression des traces parasites `Tracking:updateStatus` génériques sur `crs` ou `root`.
 
 ## Cron ILIAS
 
@@ -43,14 +47,22 @@ Identifiant technique :
 itxeb_send_outbox_to_trax
 ```
 
-## Objets couverts en v0.4.3
+## Objets couverts en v0.5.5
 
-| Action ILIAS | Statement xAPI |
-|---|---|
-| Démarrage d'un test | `attempted` |
-| Test réussi | `passed` |
-| Test échoué | `failed` |
-| Téléchargement d'un fichier | `experienced` |
+| Action ILIAS | Source | Statement xAPI |
+|---|---|---|
+| Démarrage d'un test dans un cours | `Tracking:updateStatus` test | `attempted` |
+| Test réussi dans un cours | `Tracking:updateStatus` test | `passed` |
+| Test échoué dans un cours | `Tracking:updateStatus` test | `failed` |
+| Téléchargement d'un fichier dans un cours | EventHook `sendfile` | `experienced` |
+| Consultation blog dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation forum dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation lien web dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation mediacast dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation wiki dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module HTML dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module web dans un cours | `read_event` | `repository_object_access` / `experienced` |
+| Consultation module SCORM dans un cours | `read_event` | `repository_object_access` / `experienced` |
 
 Les actions d'administration restent journalisées mais ne doivent pas être envoyées comme traces xAPI d'apprentissage.
 
