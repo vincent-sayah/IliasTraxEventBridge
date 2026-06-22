@@ -2,6 +2,38 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.5.5 — développement
+
+### Changé
+
+- Nettoyage du périmètre xAPI V0.5 : les événements `Tracking:updateStatus` génériques non-test ne génèrent plus de statements xAPI.
+- Les traces d'exploitation des objets de dépôt restent générées via `read_event` avec `event_type = repository_object_access`.
+- Les traces de progression de test restent conservées via `Tracking:updateStatus` lorsqu'elles concernent réellement un test.
+
+### Corrigé
+
+- Suppression de la pollution outbox par des statements `learning_tracking_status` sur des objets de type `crs` ou `root`.
+- Le tracking utile est recentré sur les consultations réelles d'objets contenus dans un cours : blog, forum, lien web, mediacast, wiki, module HTML, module web et SCORM.
+
+## v0.5.4 — développement
+
+### Ajouté
+
+- Ajout d'un tracker d'exploitation basé sur la table ILIAS `read_event`.
+- Ajout de la table anti-doublon `evnt_evhk_itxeb_read` pour mémoriser le dernier `last_access` et le dernier `read_count` traités par couple `obj_id` / `usr_id`.
+- Génération de statements xAPI `repository_object_access` avec le verbe `experienced` / `a consulté` pour les objets de dépôt contenus dans un cours.
+
+### Couverture
+
+- Blog : `blog`.
+- Lien web : `webr`.
+- Mediacast : `mcst`.
+- Forum : `frm`.
+- Wiki : `wiki`.
+- Module HTML : `htlm`.
+- Module web : `lm`.
+- Module SCORM : `sahs`.
+
 ## v0.5.3 — développement
 
 ### Corrigé
