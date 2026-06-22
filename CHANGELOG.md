@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.5.5 — développement
+## v0.5.5 — stable
 
 ### Changé
 
@@ -77,51 +77,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Le routeur enrichit le record avec le contexte cours avant d'appeler la factory xAPI.
 
 ## v0.4.3 — stable
-
-### Stabilisé
-
-- Validation fonctionnelle de la V0.4 après tests serveur : génération outbox, envoi manuel, envoi automatique par cron ILIAS, retry, reset des `failed` et diagnostics.
-- Version stable recommandée avant ouverture de la V0.5.
-
-### Corrigé
-
-- Amélioration de l’affichage des tableaux dans la configuration du plugin.
-- Colonne **Verb** élargie afin d’afficher les verbes xAPI en entier.
-- Colonne **URI** replacée avant le payload dans le journal des événements et élargie pour une lecture plus confortable.
-- Payloads conservés dans des blocs repliables afin d’éviter de repousser les colonnes importantes hors écran.
-
-## v0.4.2
-
-### Corrigé
-
-- Compatibilité ILIAS 10 : utilisation de l’interface globale `ilCronJobProvider` au lieu de `ILIAS\Cron\Job\JobProvider`, non disponible sur certaines installations ILIAS 10.
-- Le plugin EventHook peut maintenant être reconnu par le dépôt cron ILIAS 10 via `instanceof ilCronJobProvider`.
-
-## v0.4.1
-
-### Corrigé
-
-- Déclaration explicite du plugin comme fournisseur de jobs cron ILIAS via `ILIAS\Cron\Job\JobProvider`.
-- Correction de la méthode `getCronJobInstance()` pour respecter le comportement attendu par ILIAS : retour du job connu ou exception `OutOfBoundsException`.
-- Le job `itxeb_send_outbox_to_trax` peut maintenant apparaître dans la liste des tâches cron ILIAS.
-
-## v0.4.0
-
-### Ajouté
-
-- Envoi automatique des statements xAPI vers TRAX via un job cron ILIAS.
-- Nouveau service partagé `ilIliasTraxEventBridgeOutboxSender` utilisé par l’envoi manuel et le cron.
-- Paramètre d’administration **Activer le cron plugin**.
-- Paramètre **Max retry** pour limiter les tentatives d’envoi.
-- Colonnes outbox : `retry_count`, `max_retry`, `last_attempt_at`.
-- Bouton **Réinitialiser les failed** pour remettre les statements en échec au statut `generated` avec `retry_count = 0`.
-- Diagnostic persistant du dernier passage cron : date, succès, HTTP, message.
-- Compteur des statements dont le retry est épuisé.
-
-### Changé
-
-- L’envoi manuel et l’envoi cron utilisent la même logique de batch.
-- Les statements `failed` ne sont retentés que si `retry_count < max_retry`.
-- Les statements JSON invalides sont marqués en erreur sans bloquer tout le batch.
-
-## v0.3.1
