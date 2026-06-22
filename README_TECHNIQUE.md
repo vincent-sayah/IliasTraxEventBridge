@@ -1,5 +1,7 @@
 # README technique — IliasTraxEventBridge
 
+Version stable actuelle : **v0.5.5**.
+
 ## Type de plugin
 
 Le plugin est un plugin ILIAS de type :
@@ -39,11 +41,12 @@ public function handleEvent(string $a_component, string $a_event, array $a_param
 | `ilIliasTraxEventBridgeStatementFactory` | Mapping événement ILIAS vers statement xAPI |
 | `ilIliasTraxEventBridgeOutboxRepository` | Stockage et statut d’envoi des statements |
 | `ilIliasTraxEventBridgeOutboxSender` | Service d’envoi partagé par action manuelle et cron |
-| `ilIliasTraxEventBridgeCron` | Job cron ILIAS d’envoi outbox vers TRAX |
+| `ilIliasTraxEventBridgeCron` | Job cron ILIAS d’envoi outbox vers TRAX et génération des consultations `read_event` |
+| `ilIliasTraxEventBridgeReadEventTracker` | Détection des consultations réelles d’objets via la table ILIAS `read_event` |
 | `ilIliasTraxEventBridgeTraxClient` | Client HTTP xAPI/TRAX |
 | `ilIliasTraxEventBridgeHttpResult` | Objet résultat HTTP |
 
-## Flux interne v0.5
+## Flux interne v0.5.5
 
 ```mermaid
 flowchart TD
@@ -62,9 +65,15 @@ flowchart TD
     F -->|événement ignoré| END
     F -->|statement généré| O[OutboxRepository.enqueue]
     O --> DB[(evnt_evhk_itxeb_out)]
+
+    CRON[Cron ILIAS] --> READ[ReadEventTracker]
+    READ --> READDB[(read_event)]
+    READ --> OUT[Statements repository_object_access]
+    OUT --> DB
+    CRON --> SEND[OutboxSender]
 ```
 
-Le point important de la V0.5 est que le journal brut reste alimenté, même si l’objet n’est pas dans un cours. Le filtre agit uniquement avant la génération xAPI et l’ajout dans l’outbox.
+Le point important de la V0.5.5 est que le journal brut reste alimenté, même si l’objet n’est pas dans un cours. Le filtre agit uniquement avant la génération xAPI et l’ajout dans l’outbox.
 
 ## Filtre “objet contenu dans un cours uniquement”
 
@@ -118,219 +127,3 @@ obj_type  = file
 URI       contient cmd=sendfile
 cours parent trouvé
 ```
-
-Statement :
-
-```text
-verb = http://adlnet.gov/expapi/verbs/experienced
-event_type = file_downloaded
-```
-
-### Début de test
-
-Condition :
-
-```text
-component = components/ILIAS/Tracking
-event     = updateStatus
-URI       contient cmd=startTest
-cours parent trouvé
-```
-
-Statement :
-
-```text
-verb = http://adlnet.gov/expapi/verbs/attempted
-event_type = test_tracking_status
-```
-
-### Fin de test réussie
-
-Condition :
-
-```text
-status = 2
-ou percentage = 100
-cours parent trouvé
-```
-
-Statement :
-
-```text
-verb = http://adlnet.gov/expapi/verbs/passed
-result.success = true
-result.completion = true
-```
-
-### Fin de test échouée
-
-Condition :
-
-```text
-status = 3
-cours parent trouvé
-```
-
-Statement :
-
-```text
-verb = http://adlnet.gov/expapi/verbs/failed
-result.success = false
-```
-
-## Événements ignorés pour l’outbox
-
-Ces événements restent dans `evnt_evhk_itxeb_log`, mais ne produisent pas de statement xAPI :
-
-```text
-cmdClass=ilTestParticipantsGUI
-pt_action=delete_results
-cmd=executeTableAction
-objet sans cours parent confirmé
-```
-
-Objectif : éviter d’envoyer vers TRAX des actions d’administration ou des traces hors périmètre cours comme des traces d’apprentissage.
-
-## Structure d’un statement généré
-
-Exemple simplifié :
-
-```json
-{
-  "id": "uuid",
-  "actor": {
-    "objectType": "Agent",
-    "account": {
-      "homePage": "http://ilias.example.local",
-      "name": "ilias-user-328"
-    }
-  },
-  "verb": {
-    "id": "http://adlnet.gov/expapi/verbs/passed",
-    "display": {
-      "fr-FR": "a réussi",
-      "en-US": "passed"
-    }
-  },
-  "object": {
-    "id": "http://ilias.example.local/xapi/activity/tst/ref/137",
-    "objectType": "Activity"
-  },
-  "context": {
-    "platform": "ILIAS 10",
-    "extensions": {
-      "http://ilias.example.local/xapi/extensions/course_ref_id": 42,
-      "http://ilias.example.local/xapi/extensions/course_obj_id": 1234
-    }
-  }
-}
-```
-
-## Tables SQL
-
-Les tables sont créées par :
-
-```text
-sql/dbupdate.php
-```
-
-### `evnt_evhk_itxeb_log`
-
-Journal de diagnostic des événements reçus.
-
-Cette table sert à comprendre ce qu’ILIAS émet réellement. En V0.5, elle reste alimentée y compris pour les objets hors cours.
-
-### `evnt_evhk_itxeb_out`
-
-Outbox xAPI.
-
-Statuts possibles :
-
-```text
-generated
-sending
-sent
-failed
-```
-
-Le filtre cours n’ajoute pas de colonne SQL : le contexte cours est porté dans le JSON xAPI sous forme d’extensions.
-
-## Configuration stockée dans `settings`
-
-Module :
-
-```text
-itxeb
-```
-
-Paramètres principaux :
-
-| Clé | Rôle |
-|---|---|
-| `trax_endpoint` | Endpoint xAPI TRAX |
-| `trax_username` | Identifiant client xAPI |
-| `trax_password` | Secret client xAPI |
-| `xapi_version` | Version xAPI |
-| `http_timeout` | Timeout HTTP |
-| `batch_size` | Taille d’un envoi manuel ou cron |
-| `max_retry` | Nombre maximum de tentatives d’envoi |
-| `cron_enabled` | Autorisation plugin du cron d’envoi |
-| `ilias_base_url` | Base URL utilisée dans les IRIs |
-| `last_trax_test_*` | Dernier diagnostic test connexion |
-| `last_trax_send_*` | Dernier diagnostic envoi manuel |
-| `last_cron_*` | Dernier diagnostic cron |
-
-## Client HTTP TRAX
-
-Classe :
-
-```text
-ilIliasTraxEventBridgeTraxClient
-```
-
-Méthodes :
-
-```php
-testConnection()
-sendStatements(array $statements)
-```
-
-Requête d’envoi :
-
-```http
-POST <endpoint>/statements
-Authorization: Basic <client:secret>
-Content-Type: application/json
-Accept: application/json
-X-Experience-API-Version: 1.0.3
-```
-
-Payload :
-
-```json
-[
-  {
-    "actor": {},
-    "verb": {},
-    "object": {}
-  }
-]
-```
-
-## Recommandations avant production
-
-- Ne pas envoyer prénom, nom, e-mail ou login par défaut.
-- Utiliser `actor.account.name = ilias-user-<usr_id>` ou un hash.
-- Utiliser HTTPS vers TRAX.
-- Limiter les droits du client TRAX à l’écriture xAPI nécessaire.
-- Valider le filtre cours sur des objets placés dans un cours, dans une catégorie et dans un dossier hors cours.
-- Activer un cron uniquement après validation manuelle.
-- Nettoyer périodiquement les tables debug en production.
-- Ajouter une gestion de rétention de l’outbox.
-
-## Roadmap technique v0.5
-
-- ajouter les paramètres de cours permettant à l’administrateur du cours d’activer ou désactiver l’envoi xAPI ;
-- ajouter le choix des types d’objets traçables au niveau du cours ;
-- étendre la couverture à blog, forum, lien web, mediacast, wiki, module web et module SCORM ;
-- améliorer les diagnostics du filtre cours dans l’interface d’administration.
