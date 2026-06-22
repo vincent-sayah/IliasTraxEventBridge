@@ -2,20 +2,23 @@
 
 ## Version stable actuelle
 
-La version stable actuelle est **v0.4.3**.
+La version stable actuelle est **v0.5.5**.
 
-La V0.4.3 clôture la série V0.4 avec :
+La V0.5.5 clôture la série V0.5 avec :
 
 - envoi manuel vers TRAX ;
 - envoi automatique par job cron ILIAS ;
 - retry configurable ;
 - reset des statements en échec ;
 - diagnostics TRAX, envoi manuel et cron ;
-- affichage amélioré des tableaux d'administration.
+- affichage amélioré des tableaux d'administration ;
+- filtre cours pour éviter l'envoi de traces hors contexte cours ;
+- consultations d'objets suivies via `read_event` ;
+- nettoyage des traces génériques `crs` et `root`.
 
 ## Cible v0.5 — périmètre cours et activation par cours
 
-La V0.5 doit empêcher l'envoi de traces hors contexte cours et donner le contrôle à l'administrateur du cours.
+La V0.5 empêche l'envoi de traces hors contexte cours et prépare le contrôle à l'administrateur du cours.
 
 ### Règle de périmètre
 
@@ -30,17 +33,15 @@ Conséquences attendues :
 
 ### Activation par administrateur du cours
 
-La V0.5 doit ajouter des paramètres au niveau du cours :
+Ce point est reporté après la stabilisation V0.5.5 :
 
-- activer ou désactiver l'envoi xAPI vers TRAX pour ce cours ;
+- activer ou désactiver l'envoi xAPI vers TRAX pour un cours ;
 - choisir les types d'objets autorisés pour l'envoi de traces ;
 - appliquer ces choix avant la création du statement dans l'outbox.
 
-### Types d'objets visés
+### Types d'objets couverts
 
-La V0.4 couvre déjà les tests et les fichiers.
-
-La V0.5 doit étendre la couverture aux objets suivants :
+La V0.5.5 couvre les tests, les fichiers et les consultations d'objets via `read_event` :
 
 - blog ;
 - forum ;
