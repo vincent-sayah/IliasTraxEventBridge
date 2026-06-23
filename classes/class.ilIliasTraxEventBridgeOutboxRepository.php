@@ -34,6 +34,7 @@ class ilIliasTraxEventBridgeOutboxRepository
         }
 
         $id = (int) $this->db->nextId(self::TABLE_NAME);
+        $statement = $this->addOutboxDiagnosticExtensions($statement, $eventRecord, $eventLogId, $id);
         $statementJson = json_encode($statement, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if (!is_string($statementJson)) {
             $statementJson = '{}';
@@ -181,6 +182,121 @@ class ilIliasTraxEventBridgeOutboxRepository
     private function tableExists(): bool
     {
         return method_exists($this->db, 'tableExists') && $this->db->tableExists(self::TABLE_NAME);
+    }
+
+    /**
+     * @param array<string,mixed> $statement
+     * @param array<string,mixed> $eventRecord
+     * @return array<string,mixed>
+     */
+    private function addOutboxDiagnosticExtensions(array $statement, array $eventRecord, int $eventLogId, int $outboxId): array
+    {
+        if (!isset($statement['context']) || !is_array($statement['context'])) {
+            $statement['context'] = [];
+        }
+
+        if (!isset($statement['context']['extensions']) || !is_array($statement['context']['extensions'])) {
+            $statement['context']['extensions'] = [];
+        }
+
+        $prefix = $this->extensionPrefix($statement);
+        $statement['context']['extensions'][$prefix . 'outbox_id'] = $outboxId;
+        $statement['context']['extensions'][$prefix . 'outbox_table'] = self::TABLE_NAME;
+        $statement['context']['extensions'][$prefix . 'event_log_id'] = $eventLogId;
+        $statement['context']['extensions'][$prefix . 'statement_uuid'] = (string) ($statement['id'] ?? '');
+        $statement['context']['extensions'][$prefix . 'event_record_source'] = $this->eventRecordSource($eventRecord, $eventLogId);
+        $statement['context']['extensions'][$prefix . 'source_table'] = $this->sourceTable($eventRecord, $eventLogId);
+        $statement['context']['extensions'][$prefix . 'deduplication_key'] = $this->deduplicationKey($eventRecord, $eventLogId);
+
+        return $statement;
+    }
+
+    /**
+     * @param array<string,mixed> $statement
+     */
+    private function extensionPrefix(array $statement): string
+    {
+        $extensions = $statement['context']['extensions'] ?? [];
+        if (is_array($extensions)) {
+            foreach (array_keys($extensions) as $key) {
+                if (!is_string($key)) {
+                    continue;
+                }
+
+                $needle = '/xapi/extensions/';
+                $pos = strpos($key, $needle);
+                if ($pos !== false) {
+                    return substr($key, 0, $pos + strlen($needle));
+                }
+            }
+        }
+
+        $homePage = $statement['actor']['account']['homePage'] ?? '';
+        if (is_scalar($homePage) && trim((string) $homePage) !== '') {
+            return rtrim((string) $homePage, '/') . '/xapi/extensions/';
+        }
+
+        return 'http://ilias.local/xapi/extensions/';
+    }
+
+    /** @param array<string,mixed> $eventRecord */
+    private function eventRecordSource(array $eventRecord, int $eventLogId): string
+    {
+        $component = (string) ($eventRecord['component'] ?? '');
+        if ($component === 'components/ILIAS/ReadEvent') {
+            return 'read_event_tracker';
+        }
+
+        if ($eventLogId > 0) {
+            return 'event_hook_log';
+        }
+
+        return 'synthetic';
+    }
+
+    /** @param array<string,mixed> $eventRecord */
+    private function sourceTable(array $eventRecord, int $eventLogId): string
+    {
+        $component = (string) ($eventRecord['component'] ?? '');
+        if ($component === 'components/ILIAS/ReadEvent') {
+            return 'read_event';
+        }
+
+        if ($eventLogId > 0) {
+            return 'evnt_evhk_itxeb_log';
+        }
+
+        return '';
+    }
+
+    /** @param array<string,mixed> $eventRecord */
+    private function deduplicationKey(array $eventRecord, int $eventLogId): string
+    {
+        $component = (string) ($eventRecord['component'] ?? '');
+        if ($component === 'components/ILIAS/ReadEvent') {
+            return implode(':', [
+                'read_event',
+                (int) ($eventRecord['obj_id'] ?? 0),
+                (int) ($eventRecord['user_id'] ?? 0),
+                (int) ($eventRecord['read_event_last_access'] ?? 0),
+                (int) ($eventRecord['read_count'] ?? 0),
+            ]);
+        }
+
+        if ($eventLogId > 0) {
+            return 'event_log:' . $eventLogId;
+        }
+
+        return implode(':', [
+            'event',
+            $component,
+            (string) ($eventRecord['event_name'] ?? ''),
+            (int) ($eventRecord['user_id'] ?? 0),
+            (int) ($eventRecord['ref_id'] ?? 0),
+            (int) ($eventRecord['obj_id'] ?? 0),
+            (string) ($eventRecord['obj_type'] ?? ''),
+            (int) ($eventRecord['created_ts'] ?? 0),
+        ]);
     }
 
     /** @param array<int,int> $ids */
