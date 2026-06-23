@@ -3,10 +3,10 @@
 /**
  * Builds local xAPI statements from reliable ILIAS 10 events.
  *
- * V0.5 cleanup:
- * - ignores test administration events such as deleting participant results;
- * - generates statements only after the router has confirmed a course context;
- * - adds course identifiers to xAPI context extensions when available.
+ * V0.6 enrichment:
+ * - enriches activities with object/course titles when ILIAS lookups are available;
+ * - adds object/course URLs and parent course contextActivities;
+ * - exposes read_event metrics in result/context extensions for TRAX analysis.
  */
 class ilIliasTraxEventBridgeStatementFactory
 {
@@ -130,6 +130,10 @@ class ilIliasTraxEventBridgeStatementFactory
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
         $baseUrl = $this->config->getIliasBaseUrl();
+        $objectTitle = $this->resolveObjectTitle(
+            $record,
+            'Fichier ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+        );
 
         return [
             'id' => $statementId,
@@ -144,17 +148,13 @@ class ilIliasTraxEventBridgeStatementFactory
             'object' => [
                 'id' => $this->activityId('file', $refId, $objId),
                 'objectType' => 'Activity',
-                'definition' => [
-                    'type' => $baseUrl . '/xapi/activity-type/ilias-file',
-                    'name' => [
-                        'fr-FR' => 'Fichier ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
-                    ]
-                ]
+                'definition' => $this->activityDefinition(
+                    $baseUrl . '/xapi/activity-type/ilias-file',
+                    $objectTitle,
+                    $this->objectUrl('file', $refId)
+                )
             ],
-            'context' => [
-                'platform' => 'ILIAS 10',
-                'extensions' => $this->contextExtensions($record, 'file_downloaded', 'file')
-            ],
+            'context' => $this->context($record, 'file_downloaded', 'file'),
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
     }
@@ -170,7 +170,19 @@ class ilIliasTraxEventBridgeStatementFactory
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
         $baseUrl = $this->config->getIliasBaseUrl();
-        $objectTitle = trim((string) ($record['object_title'] ?? ''));
+        $objectTitle = $this->resolveObjectTitle(
+            $record,
+            $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+        );
+        $resultExtensions = [
+            $baseUrl . '/xapi/extensions/read_count' => (int) ($record['read_count'] ?? 0),
+            $baseUrl . '/xapi/extensions/spent_seconds' => (int) ($record['spent_seconds'] ?? 0),
+            $baseUrl . '/xapi/extensions/read_event_last_access' => (int) ($record['read_event_last_access'] ?? 0),
+        ];
+
+        if (isset($record['read_event_first_access'])) {
+            $resultExtensions[$baseUrl . '/xapi/extensions/read_event_first_access'] = (string) $record['read_event_first_access'];
+        }
 
         return [
             'id' => $this->uuid4(),
@@ -185,26 +197,16 @@ class ilIliasTraxEventBridgeStatementFactory
             'object' => [
                 'id' => $this->activityId($objType !== '' ? $objType : 'object', $refId, $objId),
                 'objectType' => 'Activity',
-                'definition' => [
-                    'type' => $this->repositoryActivityType($objType),
-                    'name' => [
-                        'fr-FR' => $objectTitle !== ''
-                            ? $objectTitle
-                            : $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
-                    ]
-                ]
+                'definition' => $this->activityDefinition(
+                    $this->repositoryActivityType($objType),
+                    $objectTitle,
+                    $this->objectUrl($objType, $refId)
+                )
             ],
             'result' => [
-                'extensions' => [
-                    $baseUrl . '/xapi/extensions/read_count' => (int) ($record['read_count'] ?? 0),
-                    $baseUrl . '/xapi/extensions/spent_seconds' => (int) ($record['spent_seconds'] ?? 0),
-                    $baseUrl . '/xapi/extensions/read_event_last_access' => (int) ($record['read_event_last_access'] ?? 0),
-                ]
+                'extensions' => $resultExtensions
             ],
-            'context' => [
-                'platform' => 'ILIAS 10',
-                'extensions' => $this->contextExtensions($record, 'repository_object_access', $objType)
-            ],
+            'context' => $this->context($record, 'repository_object_access', $objType),
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
     }
@@ -232,6 +234,13 @@ class ilIliasTraxEventBridgeStatementFactory
             ? 'http://adlnet.gov/expapi/activities/assessment'
             : $baseUrl . '/xapi/activity-type/ilias-learning-progress';
 
+        $objectTitle = $this->resolveObjectTitle(
+            $record,
+            $objType === 'tst'
+                ? 'Test ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+                : 'Objet ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
+        );
+
         $statement = [
             'id' => $this->uuid4(),
             'actor' => $this->actor($userId),
@@ -239,14 +248,11 @@ class ilIliasTraxEventBridgeStatementFactory
             'object' => [
                 'id' => $this->activityId($objType !== '' ? $objType : 'object', $refId, $objId),
                 'objectType' => 'Activity',
-                'definition' => [
-                    'type' => $definitionType,
-                    'name' => [
-                        'fr-FR' => $objType === 'tst'
-                            ? 'Test ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
-                            : 'Objet ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
-                    ]
-                ]
+                'definition' => $this->activityDefinition(
+                    $definitionType,
+                    $objectTitle,
+                    $this->objectUrl($objType, $refId)
+                )
             ],
             'result' => [
                 'completion' => $status === 2 || $percentage >= 100,
@@ -262,10 +268,7 @@ class ilIliasTraxEventBridgeStatementFactory
                     $baseUrl . '/xapi/extensions/ilias_percentage' => $percentage
                 ]
             ],
-            'context' => [
-                'platform' => 'ILIAS 10',
-                'extensions' => $this->contextExtensions($record, 'tracking_update_status', $objType)
-            ],
+            'context' => $this->context($record, 'tracking_update_status', $objType),
             'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
         ];
 
@@ -284,20 +287,64 @@ class ilIliasTraxEventBridgeStatementFactory
      * @param array<string,mixed> $record
      * @return array<string,mixed>
      */
+    private function context(array $record, string $sourceEvent, string $objType): array
+    {
+        $context = [
+            'platform' => 'ILIAS 10',
+            'extensions' => $this->contextExtensions($record, $sourceEvent, $objType)
+        ];
+
+        $courseActivity = $this->courseActivity($record);
+        if ($courseActivity !== null) {
+            $context['contextActivities'] = [
+                'parent' => [$courseActivity]
+            ];
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,mixed>
+     */
     private function contextExtensions(array $record, string $sourceEvent, string $objType): array
     {
         $baseUrl = $this->config->getIliasBaseUrl();
+        $refId = (int) ($record['ref_id'] ?? 0);
+        $courseRefId = (int) ($record['course_ref_id'] ?? 0);
+
         $extensions = [
             $baseUrl . '/xapi/extensions/source_event' => $sourceEvent,
             $baseUrl . '/xapi/extensions/component' => (string) ($record['component'] ?? ''),
             $baseUrl . '/xapi/extensions/event_name' => (string) ($record['event_name'] ?? ''),
-            $baseUrl . '/xapi/extensions/ref_id' => (int) ($record['ref_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/ref_id' => $refId,
             $baseUrl . '/xapi/extensions/obj_id' => (int) ($record['obj_id'] ?? 0),
             $baseUrl . '/xapi/extensions/obj_type' => $objType,
-            $baseUrl . '/xapi/extensions/course_ref_id' => (int) ($record['course_ref_id'] ?? 0),
+            $baseUrl . '/xapi/extensions/course_ref_id' => $courseRefId,
             $baseUrl . '/xapi/extensions/course_obj_id' => (int) ($record['course_obj_id'] ?? 0),
             $baseUrl . '/xapi/extensions/request_uri' => (string) ($record['request_uri'] ?? '')
         ];
+
+        $objectTitle = $this->resolveObjectTitle($record, '');
+        if ($objectTitle !== '') {
+            $extensions[$baseUrl . '/xapi/extensions/object_title'] = $objectTitle;
+        }
+
+        $objectUrl = $this->objectUrl($objType, $refId);
+        if ($objectUrl !== '') {
+            $extensions[$baseUrl . '/xapi/extensions/object_url'] = $objectUrl;
+        }
+
+        $courseTitle = $this->resolveCourseTitle($record);
+        if ($courseTitle !== '') {
+            $extensions[$baseUrl . '/xapi/extensions/course_title'] = $courseTitle;
+        }
+
+        $courseUrl = $this->courseUrl($courseRefId);
+        if ($courseUrl !== '') {
+            $extensions[$baseUrl . '/xapi/extensions/course_url'] = $courseUrl;
+        }
 
         if (isset($record['read_count'])) {
             $extensions[$baseUrl . '/xapi/extensions/read_count'] = (int) $record['read_count'];
@@ -307,6 +354,9 @@ class ilIliasTraxEventBridgeStatementFactory
         }
         if (isset($record['read_event_last_access'])) {
             $extensions[$baseUrl . '/xapi/extensions/read_event_last_access'] = (int) $record['read_event_last_access'];
+        }
+        if (isset($record['read_event_first_access'])) {
+            $extensions[$baseUrl . '/xapi/extensions/read_event_first_access'] = (string) $record['read_event_first_access'];
         }
 
         return $extensions;
@@ -425,6 +475,148 @@ class ilIliasTraxEventBridgeStatementFactory
         }
 
         return $this->config->getIliasBaseUrl() . '/xapi/activity/' . $safeType . '/obj/' . max(0, $objId);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function activityDefinition(string $type, string $name, string $moreInfo = ''): array
+    {
+        $definition = [
+            'type' => $type,
+            'name' => [
+                'fr-FR' => $name
+            ]
+        ];
+
+        if ($moreInfo !== '') {
+            $definition['moreInfo'] = $moreInfo;
+        }
+
+        return $definition;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,mixed>|null
+     */
+    private function courseActivity(array $record): ?array
+    {
+        $courseRefId = (int) ($record['course_ref_id'] ?? 0);
+        $courseObjId = (int) ($record['course_obj_id'] ?? 0);
+
+        if ($courseRefId <= 0 && $courseObjId <= 0) {
+            return null;
+        }
+
+        return [
+            'id' => $this->activityId('course', $courseRefId, $courseObjId),
+            'objectType' => 'Activity',
+            'definition' => $this->activityDefinition(
+                $this->config->getIliasBaseUrl() . '/xapi/activity-type/ilias-course',
+                $this->resolveCourseTitle($record),
+                $this->courseUrl($courseRefId)
+            )
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     */
+    private function resolveObjectTitle(array $record, string $fallback): string
+    {
+        $title = trim((string) ($record['object_title'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
+        $objId = (int) ($record['obj_id'] ?? 0);
+        $title = $this->lookupTitleByObjId($objId);
+        if ($title !== '') {
+            return $title;
+        }
+
+        $refId = (int) ($record['ref_id'] ?? 0);
+        if ($refId > 0) {
+            $title = $this->lookupTitleByObjId($this->lookupObjectIdByRefId($refId));
+            if ($title !== '') {
+                return $title;
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     */
+    private function resolveCourseTitle(array $record): string
+    {
+        $title = trim((string) ($record['course_title'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
+        $courseObjId = (int) ($record['course_obj_id'] ?? 0);
+        $title = $this->lookupTitleByObjId($courseObjId);
+        if ($title !== '') {
+            return $title;
+        }
+
+        $courseRefId = (int) ($record['course_ref_id'] ?? 0);
+        if ($courseRefId > 0) {
+            $title = $this->lookupTitleByObjId($this->lookupObjectIdByRefId($courseRefId));
+            if ($title !== '') {
+                return $title;
+            }
+        }
+
+        return $courseRefId > 0 ? 'Cours ILIAS ref_id ' . $courseRefId : 'Cours ILIAS';
+    }
+
+    private function objectUrl(string $objType, int $refId): string
+    {
+        if ($refId <= 0 || $objType === '') {
+            return '';
+        }
+
+        return $this->config->getIliasBaseUrl() . '/goto.php?target=' . rawurlencode($objType . '_' . $refId);
+    }
+
+    private function courseUrl(int $courseRefId): string
+    {
+        if ($courseRefId <= 0) {
+            return '';
+        }
+
+        return $this->config->getIliasBaseUrl() . '/goto.php?target=' . rawurlencode('crs_' . $courseRefId);
+    }
+
+    private function lookupTitleByObjId(int $objId): string
+    {
+        if ($objId <= 0 || !class_exists('ilObject') || !method_exists('ilObject', '_lookupTitle')) {
+            return '';
+        }
+
+        try {
+            $title = ilObject::_lookupTitle($objId);
+            return is_scalar($title) ? trim((string) $title) : '';
+        } catch (Throwable $ignored) {
+            return '';
+        }
+    }
+
+    private function lookupObjectIdByRefId(int $refId): int
+    {
+        if ($refId <= 0 || !class_exists('ilObject') || !method_exists('ilObject', '_lookupObjectId')) {
+            return 0;
+        }
+
+        try {
+            return (int) ilObject::_lookupObjectId($refId);
+        } catch (Throwable $ignored) {
+            return 0;
+        }
     }
 
     /**
