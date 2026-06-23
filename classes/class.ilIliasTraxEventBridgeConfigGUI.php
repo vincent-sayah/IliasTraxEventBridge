@@ -43,9 +43,15 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
     private function configure(): void
     {
-        $html = $this->styles() . '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.4.2</h1>'
-            . '<p><strong>V0.4 :</strong> cron ILIAS, retry_count/max_retry, reset des failed et diagnostics cron.</p>'
-            . $this->renderState() . $this->renderConfigForm() . $this->renderSendActions() . $this->renderOutbox() . $this->renderRecentEvents() . '</div>';
+        $html = $this->styles() . '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.6</h1>'
+            . '<p><strong>V0.6 :</strong> enrichissement xAPI, familles de statements, diagnostics outbox, wording bilingue et supervision admin.</p>'
+            . $this->renderState()
+            . $this->renderConfigForm()
+            . $this->renderSendActions()
+            . $this->renderAdminDashboard()
+            . $this->renderOutbox()
+            . $this->renderRecentEvents()
+            . '</div>';
         $this->setContent($html);
     }
 
@@ -84,6 +90,116 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html = '<section class="itxeb-section"><h2>Envoi vers TRAX</h2><div class="itxeb-summary">';
         foreach (['generated'=>$this->outbox->countByStatus('generated'),'failed'=>$this->outbox->countByStatus('failed'),'retry épuisé'=>$this->outbox->countRetryExhausted($this->config->getMaxRetry()),'sent'=>$this->outbox->countByStatus('sent'),'batch'=>$this->config->getBatchSize(),'max_retry'=>$this->config->getMaxRetry()] as $k=>$v) { $html .= '<span><strong>'.$this->esc((string)$k).' :</strong> '.$this->esc((string)$v).'</span>'; }
         return $html . '</div><p>L’envoi manuel et le cron traitent les statements <code>generated</code> ou <code>failed</code> lorsque <code>retry_count &lt; max_retry</code>. Pour l’envoi automatique, le job cron ILIAS doit être activé et exécuté.</p><p class="itxeb-actions"><a class="btn btn-primary" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'sendGenerated')) . '">Envoyer maintenant</a> <a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'resetFailed')) . '">Réinitialiser les failed</a></p></section>';
+    }
+
+    private function renderAdminDashboard(): string
+    {
+        $rows = $this->outbox->findRecent(200);
+        $html = '<section class="itxeb-section"><h2>Supervision V0.6</h2>';
+        if (count($rows) === 0) {
+            return $html . '<p><em>Aucune donnée outbox disponible pour la supervision.</em></p></section>';
+        }
+
+        $status = [];
+        $eventTypes = [];
+        $objTypes = [];
+        $families = [];
+        $interactions = [];
+        $sources = [];
+        $recentFailures = [];
+        $recentDiagnostics = [];
+
+        foreach ($rows as $r) {
+            $this->countValue($status, (string) ($r['status'] ?? ''));
+            $this->countValue($eventTypes, (string) ($r['event_type'] ?? ''));
+            $this->countValue($objTypes, (string) ($r['obj_type'] ?? ''));
+
+            $extensions = $this->statementExtensions((string) ($r['statement_json'] ?? ''));
+            $family = $this->extensionValue($extensions, 'statement_family');
+            $interaction = $this->extensionValue($extensions, 'interaction_type');
+            $source = $this->extensionValue($extensions, 'source_table');
+            $recordSource = $this->extensionValue($extensions, 'event_record_source');
+            $deduplicationKey = $this->extensionValue($extensions, 'deduplication_key');
+
+            $this->countValue($families, $family);
+            $this->countValue($interactions, $interaction);
+            $this->countValue($sources, $source !== '' ? $source : $recordSource);
+
+            if ((string) ($r['status'] ?? '') === 'failed' || trim((string) ($r['last_error'] ?? '')) !== '') {
+                $recentFailures[] = $r;
+            }
+
+            if (count($recentDiagnostics) < 12) {
+                $recentDiagnostics[] = [
+                    'id' => (string) ($r['id'] ?? ''),
+                    'status' => (string) ($r['status'] ?? ''),
+                    'event_type' => (string) ($r['event_type'] ?? ''),
+                    'obj_type' => (string) ($r['obj_type'] ?? ''),
+                    'family' => $family,
+                    'source' => $source !== '' ? $source : $recordSource,
+                    'deduplication_key' => $deduplicationKey,
+                ];
+            }
+        }
+
+        $html .= '<p>Vue synthétique calculée sur les 200 dernières lignes outbox. Elle sert à contrôler rapidement les volumes, familles xAPI, sources et clés de déduplication sans lancer de requêtes SQL.</p>';
+        $html .= $this->renderCounterBlock('Statuts', $status)
+            . $this->renderCounterBlock('Types d’événements SQL', $eventTypes)
+            . $this->renderCounterBlock('Types objets ILIAS', $objTypes)
+            . $this->renderCounterBlock('Familles xAPI', $families)
+            . $this->renderCounterBlock('Types d’interaction', $interactions)
+            . $this->renderCounterBlock('Sources techniques', $sources);
+        $html .= $this->renderDiagnosticRows($recentDiagnostics);
+        $html .= $this->renderFailureRows(array_slice($recentFailures, 0, 5));
+
+        return $html . '</section>';
+    }
+
+    private function renderCounterBlock(string $title, array $counts): string
+    {
+        arsort($counts);
+        $html = '<div class="itxeb-dashboard-block"><h3>' . $this->esc($title) . '</h3><div class="itxeb-summary">';
+        if (count($counts) === 0) {
+            return $html . '<span><em>Aucune donnée.</em></span></div></div>';
+        }
+        foreach ($counts as $label => $count) {
+            $html .= '<span><strong>' . $this->esc((string) $label) . ' :</strong> ' . $this->esc((string) $count) . '</span>';
+        }
+        return $html . '</div></div>';
+    }
+
+    private function renderDiagnosticRows(array $rows): string
+    {
+        $html = '<div class="itxeb-dashboard-block"><h3>Dernières clés de diagnostic</h3>';
+        if (count($rows) === 0) {
+            return $html . '<p><em>Aucune clé de diagnostic disponible.</em></p></div>';
+        }
+        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events itxeb-diagnostic-table"><thead><tr><th>ID</th><th>Statut</th><th>Événement</th><th>Famille</th><th>Source</th><th>Déduplication</th></tr></thead><tbody>';
+        foreach ($rows as $r) {
+            $html .= '<tr><td class="itxeb-nowrap">#' . $this->esc($r['id']) . '</td>'
+                . '<td><span class="itxeb-badge ' . $this->statusBadgeClass($r['status']) . '">' . $this->esc($r['status']) . '</span></td>'
+                . '<td>' . $this->esc($r['event_type']) . '<br><span class="itxeb-date">' . $this->esc($r['obj_type']) . '</span></td>'
+                . '<td>' . $this->esc($r['family']) . '</td>'
+                . '<td>' . $this->esc($r['source']) . '</td>'
+                . '<td><code class="itxeb-code-inline">' . $this->esc($r['deduplication_key']) . '</code></td></tr>';
+        }
+        return $html . '</tbody></table></div></div>';
+    }
+
+    private function renderFailureRows(array $rows): string
+    {
+        $html = '<div class="itxeb-dashboard-block"><h3>Dernières erreurs</h3>';
+        if (count($rows) === 0) {
+            return $html . '<p><em>Aucune erreur récente dans l’outbox.</em></p></div>';
+        }
+        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events itxeb-failure-table"><thead><tr><th>ID</th><th>Statut</th><th>Retry</th><th>Erreur</th></tr></thead><tbody>';
+        foreach ($rows as $r) {
+            $html .= '<tr><td class="itxeb-nowrap">#' . $this->esc((string) ($r['id'] ?? '')) . '</td>'
+                . '<td><span class="itxeb-badge ' . $this->statusBadgeClass((string) ($r['status'] ?? '')) . '">' . $this->esc((string) ($r['status'] ?? '')) . '</span></td>'
+                . '<td>' . $this->esc((string) ($r['retry_count'] ?? '0')) . ' / ' . $this->esc((string) ($r['max_retry'] ?? $this->config->getMaxRetry())) . '</td>'
+                . '<td class="itxeb-error">' . $this->esc((string) ($r['last_error'] ?? '')) . '</td></tr>';
+        }
+        return $html . '</tbody></table></div></div>';
     }
 
     private function saveConfig(): void
@@ -161,16 +277,48 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function success(string $m): void { if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess($m, true); } }
     private function setContent(string $html): void { if (is_object($this->tpl) && method_exists($this->tpl, 'setContent')) { $this->tpl->setContent($html); } }
 
+    private function countValue(array &$counts, string $value): void
+    {
+        $value = trim($value);
+        if ($value === '') { return; }
+        if (!isset($counts[$value])) { $counts[$value] = 0; }
+        $counts[$value]++;
+    }
+
+    private function statementExtensions(string $statementJson): array
+    {
+        $decoded = json_decode($statementJson, true);
+        if (!is_array($decoded)) { return []; }
+        $context = $decoded['context'] ?? [];
+        if (!is_array($context)) { return []; }
+        $extensions = $context['extensions'] ?? [];
+        return is_array($extensions) ? $extensions : [];
+    }
+
+    private function extensionValue(array $extensions, string $name): string
+    {
+        $suffix = '/xapi/extensions/' . $name;
+        foreach ($extensions as $key => $value) {
+            if (!is_string($key)) { continue; }
+            if (substr($key, -strlen($suffix)) !== $suffix) { continue; }
+            if (is_scalar($value)) { return (string) $value; }
+            $encoded = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            return is_string($encoded) ? $encoded : '';
+        }
+        return '';
+    }
+
     private function styles(): string
     {
         return '<style>'
             . '.itxeb-page{max-width:none;width:100%;margin:0 0 4rem 0}.itxeb-section{margin-bottom:1.5rem}.itxeb-alert{max-width:980px;padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px;line-height:1.4}'
             . '.itxeb-page table.std{width:100%;border-collapse:collapse;background:#fff}.itxeb-page table.std th,.itxeb-page table.std td{padding:.6rem .75rem;vertical-align:top;line-height:1.35}.itxeb-page table.std th{white-space:nowrap;background:#f7f7f7}'
             . '.itxeb-state-table,.itxeb-form-table{max-width:980px}.itxeb-state-table td:first-child,.itxeb-form-table td:first-child{width:230px;min-width:230px;font-weight:600;white-space:nowrap}.itxeb-input{width:100%;max-width:780px;box-sizing:border-box}.itxeb-help,.itxeb-date{font-size:.9em;color:#666}.itxeb-code-inline{display:inline-block;max-width:100%;overflow:auto;white-space:nowrap}.itxeb-actions{margin:.8rem 0 1.2rem}'
-            . '.itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}.itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}.itxeb-table-wrapper{width:100%;max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:4px;background:#fff;margin:.4rem 0 1rem}.itxeb-events{width:100%;table-layout:fixed}.itxeb-events th,.itxeb-events td{border-bottom:1px solid #eee}'
+            . '.itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}.itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}.itxeb-dashboard-block{margin:.8rem 0 1.1rem}.itxeb-dashboard-block h3{margin:.4rem 0}.itxeb-table-wrapper{width:100%;max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:4px;background:#fff;margin:.4rem 0 1rem}.itxeb-events{width:100%;table-layout:fixed}.itxeb-events th,.itxeb-events td{border-bottom:1px solid #eee}'
             . '.itxeb-outbox-table{min-width:1500px}.itxeb-outbox-table th:nth-child(1),.itxeb-outbox-table td:nth-child(1){width:170px}.itxeb-outbox-table th:nth-child(2),.itxeb-outbox-table td:nth-child(2){width:110px}.itxeb-outbox-table th:nth-child(3),.itxeb-outbox-table td:nth-child(3){width:90px}.itxeb-outbox-table th:nth-child(4),.itxeb-outbox-table td:nth-child(4){width:430px}.itxeb-outbox-table th:nth-child(5),.itxeb-outbox-table td:nth-child(5){width:145px}'
             . '.itxeb-log-table{min-width:1550px}.itxeb-log-table th:nth-child(1),.itxeb-log-table td:nth-child(1){width:165px}.itxeb-log-table th:nth-child(2),.itxeb-log-table td:nth-child(2){width:290px}.itxeb-log-table th:nth-child(3),.itxeb-log-table td:nth-child(3){width:145px}.itxeb-log-table th:nth-child(4),.itxeb-log-table td:nth-child(4){width:560px}.itxeb-log-table th:nth-child(5),.itxeb-log-table td:nth-child(5){width:390px}'
+            . '.itxeb-diagnostic-table{min-width:1300px}.itxeb-diagnostic-table th:nth-child(1),.itxeb-diagnostic-table td:nth-child(1){width:90px}.itxeb-diagnostic-table th:nth-child(2),.itxeb-diagnostic-table td:nth-child(2){width:110px}.itxeb-diagnostic-table th:nth-child(3),.itxeb-diagnostic-table td:nth-child(3){width:230px}.itxeb-diagnostic-table th:nth-child(4),.itxeb-diagnostic-table td:nth-child(4){width:260px}.itxeb-diagnostic-table th:nth-child(5),.itxeb-diagnostic-table td:nth-child(5){width:170px}.itxeb-failure-table{min-width:900px}'
             . '.itxeb-nowrap,.itxeb-object{white-space:nowrap}.itxeb-wide{min-width:360px}.itxeb-verb,.itxeb-uri{max-width:100%;white-space:normal;word-break:break-word;overflow-wrap:anywhere;font-family:monospace;font-size:.92em;line-height:1.35;background:#f8f8f8;border:1px solid #eee;border-radius:3px;padding:.25rem .35rem}.itxeb-request-uri{max-height:9em;overflow:auto}.itxeb-text-block{max-width:100%;white-space:normal;word-break:break-word;overflow-wrap:anywhere}.itxeb-badge{display:inline-block;padding:.2rem .45rem;border-radius:3px;background:#eee;font-weight:600}.itxeb-badge-ok{background:#dff0d8}.itxeb-badge-warn{background:#fcf8e3}.itxeb-badge-error{background:#f2dede}.itxeb-badge-muted{background:#eee}.itxeb-error{color:#a94442;margin-bottom:.35rem;word-break:break-word;overflow-wrap:anywhere}.itxeb-events pre{max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;margin:.4rem 0 0}.itxeb-events details summary{cursor:pointer;font-weight:600}'
-            . '@media (max-width:900px){.itxeb-state-table td:first-child,.itxeb-form-table td:first-child{width:auto;min-width:0;white-space:normal}.itxeb-outbox-table{min-width:1250px}.itxeb-log-table{min-width:1250px}}</style>';
+            . '@media (max-width:900px){.itxeb-state-table td:first-child,.itxeb-form-table td:first-child{width:auto;min-width:0;white-space:normal}.itxeb-outbox-table{min-width:1250px}.itxeb-log-table{min-width:1250px}.itxeb-diagnostic-table{min-width:1100px}}</style>';
     }
 }
