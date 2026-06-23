@@ -7,7 +7,8 @@
  * - enriches activities with object/course titles when ILIAS lookups are available;
  * - adds object/course URLs and parent course contextActivities;
  * - exposes read_event metrics in result/context extensions for TRAX analysis;
- * - classifies statements by family and uses more specific verbs per object type.
+ * - classifies statements by family and uses more specific verbs per object type;
+ * - provides localized FR/EN activity descriptions for clearer LRS reporting.
  */
 class ilIliasTraxEventBridgeStatementFactory
 {
@@ -147,7 +148,8 @@ class ilIliasTraxEventBridgeStatementFactory
                     $baseUrl . '/xapi/activity-type/ilias-file',
                     $objectTitle,
                     $this->objectUrl('file', $refId),
-                    'Fichier téléchargé depuis ILIAS'
+                    'Fichier téléchargé depuis ILIAS',
+                    'File downloaded from ILIAS'
                 )
             ],
             'context' => $this->context($record, 'file_downloaded', 'file'),
@@ -165,20 +167,20 @@ class ilIliasTraxEventBridgeStatementFactory
         $userId = (int) ($record['user_id'] ?? 0);
         $refId = (int) ($record['ref_id'] ?? 0);
         $objId = (int) ($record['obj_id'] ?? 0);
-        $baseUrl = $this->config->getIliasBaseUrl();
         $objectTitle = $this->resolveObjectTitle(
             $record,
             $this->repositoryObjectLabel($objType) . ' ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId)
         );
+        $description = $this->repositoryObjectDescription($objType);
 
         $resultExtensions = [
-            $baseUrl . '/xapi/extensions/read_count' => (int) ($record['read_count'] ?? 0),
-            $baseUrl . '/xapi/extensions/spent_seconds' => (int) ($record['spent_seconds'] ?? 0),
-            $baseUrl . '/xapi/extensions/read_event_last_access' => (int) ($record['read_event_last_access'] ?? 0),
+            $this->extensionUri('read_count') => (int) ($record['read_count'] ?? 0),
+            $this->extensionUri('spent_seconds') => (int) ($record['spent_seconds'] ?? 0),
+            $this->extensionUri('read_event_last_access') => (int) ($record['read_event_last_access'] ?? 0),
         ];
 
         if (isset($record['read_event_first_access'])) {
-            $resultExtensions[$baseUrl . '/xapi/extensions/read_event_first_access'] = (string) $record['read_event_first_access'];
+            $resultExtensions[$this->extensionUri('read_event_first_access')] = (string) $record['read_event_first_access'];
         }
 
         $result = [
@@ -201,7 +203,8 @@ class ilIliasTraxEventBridgeStatementFactory
                     $this->repositoryActivityType($objType),
                     $objectTitle,
                     $this->objectUrl($objType, $refId),
-                    $this->repositoryObjectDescription($objType)
+                    $description['fr-FR'],
+                    $description['en-US']
                 )
             ],
             'result' => $result,
@@ -241,6 +244,8 @@ class ilIliasTraxEventBridgeStatementFactory
         );
 
         $sourceEvent = $objType === 'tst' ? 'test_tracking_status' : 'tracking_update_status';
+        $descriptionFr = $objType === 'tst' ? 'Test ILIAS suivi par le learning progress' : 'Progression ILIAS';
+        $descriptionEn = $objType === 'tst' ? 'ILIAS test tracked through learning progress' : 'ILIAS learning progress';
 
         $statement = [
             'id' => $this->uuid4(),
@@ -253,7 +258,8 @@ class ilIliasTraxEventBridgeStatementFactory
                     $definitionType,
                     $objectTitle,
                     $this->objectUrl($objType, $refId),
-                    $objType === 'tst' ? 'Test ILIAS suivi par le learning progress' : 'Progression ILIAS'
+                    $descriptionFr,
+                    $descriptionEn
                 )
             ],
             'result' => [
@@ -574,20 +580,28 @@ class ilIliasTraxEventBridgeStatementFactory
         return $map[$objType] ?? 'Objet ILIAS';
     }
 
-    private function repositoryObjectDescription(string $objType): string
+    /**
+     * @return array{fr-FR:string,en-US:string}
+     */
+    private function repositoryObjectDescription(string $objType): array
     {
         $map = [
-            'blog' => 'Consultation d’un blog ILIAS dans un cours',
-            'webr' => 'Ouverture d’un lien web ILIAS dans un cours',
-            'mcst' => 'Consultation d’un médiacast ILIAS dans un cours',
-            'frm' => 'Consultation ou interaction avec un forum ILIAS dans un cours',
-            'wiki' => 'Consultation d’un wiki ILIAS dans un cours',
-            'htlm' => 'Consultation d’un module HTML ILIAS dans un cours',
-            'lm' => 'Consultation d’un module web ILIAS dans un cours',
-            'sahs' => 'Lancement ou consultation d’un module SCORM ILIAS dans un cours',
+            'blog' => ['Consultation d’un blog ILIAS dans un cours', 'Consultation of an ILIAS blog in a course'],
+            'webr' => ['Ouverture d’un lien web ILIAS dans un cours', 'Opening an ILIAS web link in a course'],
+            'mcst' => ['Consultation d’un médiacast ILIAS dans un cours', 'Consultation of an ILIAS mediacast in a course'],
+            'frm' => ['Consultation ou interaction avec un forum ILIAS dans un cours', 'Consultation of or interaction with an ILIAS forum in a course'],
+            'wiki' => ['Consultation d’un wiki ILIAS dans un cours', 'Consultation of an ILIAS wiki in a course'],
+            'htlm' => ['Consultation d’un module HTML ILIAS dans un cours', 'Consultation of an ILIAS HTML learning module in a course'],
+            'lm' => ['Consultation d’un module web ILIAS dans un cours', 'Consultation of an ILIAS learning module in a course'],
+            'sahs' => ['Lancement ou consultation d’un module SCORM ILIAS dans un cours', 'Launch or consultation of an ILIAS SCORM module in a course'],
         ];
 
-        return $map[$objType] ?? 'Consultation d’un objet de dépôt ILIAS dans un cours';
+        $description = $map[$objType] ?? ['Consultation d’un objet de dépôt ILIAS dans un cours', 'Consultation of an ILIAS repository object in a course'];
+
+        return [
+            'fr-FR' => $description[0],
+            'en-US' => $description[1]
+        ];
     }
 
     /**
@@ -621,8 +635,13 @@ class ilIliasTraxEventBridgeStatementFactory
     /**
      * @return array<string,mixed>
      */
-    private function activityDefinition(string $type, string $name, string $moreInfo = '', string $description = ''): array
-    {
+    private function activityDefinition(
+        string $type,
+        string $name,
+        string $moreInfo = '',
+        string $descriptionFr = '',
+        string $descriptionEn = ''
+    ): array {
         $definition = [
             'type' => $type,
             'name' => [
@@ -631,10 +650,10 @@ class ilIliasTraxEventBridgeStatementFactory
             ]
         ];
 
-        if ($description !== '') {
+        if ($descriptionFr !== '') {
             $definition['description'] = [
-                'fr-FR' => $description,
-                'en-US' => $description
+                'fr-FR' => $descriptionFr,
+                'en-US' => $descriptionEn !== '' ? $descriptionEn : $descriptionFr
             ];
         }
 
@@ -665,7 +684,8 @@ class ilIliasTraxEventBridgeStatementFactory
                 $this->config->getIliasBaseUrl() . '/xapi/activity-type/ilias-course',
                 $this->resolveCourseTitle($record),
                 $this->courseUrl($courseRefId),
-                'Cours parent ILIAS'
+                'Cours parent ILIAS',
+                'Parent ILIAS course'
             )
         ];
     }
@@ -785,6 +805,11 @@ class ilIliasTraxEventBridgeStatementFactory
         }
 
         return 'PT' . $seconds . 'S';
+    }
+
+    private function extensionUri(string $extensionName): string
+    {
+        return $this->config->getIliasBaseUrl() . '/xapi/extensions/' . $extensionName;
     }
 
     private function isoTimestamp(string $createdAt): string
