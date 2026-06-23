@@ -2,6 +2,28 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.6.0 — développement
+
+### Statut
+
+- Branche de développement `v0.6` créée à partir de `main` / `v0.5.5` stable.
+- Version plugin portée à `0.6.0` pour ouvrir la série V0.6.
+- `main` et `v0.5` restent les références stables V0.5.5 tant que la V0.6 n'est pas validée.
+
+### Cible fonctionnelle
+
+- Enrichir les statements xAPI avec les titres ILIAS utiles : cours, objet et contexte.
+- Ajouter les URL ILIAS exploitables dans les statements et/ou extensions xAPI.
+- Exploiter plus explicitement `read_count`, `spent_seconds`, `first_access` et `last_access` issus de `read_event`.
+- Affiner les verbes, activity types et familles de statements selon les types d'objets : consultation, test, fichier, forum, wiki, module, SCORM.
+- Ajouter des extensions xAPI plus riches pour faciliter l'analyse dans TRAX.
+- Préparer les futurs filtres de configuration, diagnostics TRAX et purge configurable.
+
+### Premier jalon
+
+- Initialisation documentaire et technique de la branche V0.6.
+- Ajout d'un plan de reprise V0.6 dans `docs/V0.6_DEV_PLAN.md`.
+
 ## v0.5.5 — stable
 
 ### Statut
@@ -46,7 +68,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 - Détection renforcée du type d'objet ILIAS lorsque `obj_type` est vide dans l'événement reçu.
 - Ajout des mappings de classes GUI pour les objets blog, lien web et mediacast.
-- Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
+- Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, lien web, mediacast, wiki, module HTML, module web et module SCORM.
 
 ## v0.5.0 — développement
 
