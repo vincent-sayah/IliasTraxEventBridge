@@ -141,6 +141,7 @@ class ilIliasTraxEventBridgeReadEventTracker
         $lastAccess = (int) ($row['last_access'] ?? 0);
         $refId = $this->lookupPrimaryRefId($objId);
         $createdAt = $lastAccess > 0 ? date('Y-m-d H:i:s', $lastAccess) : date('Y-m-d H:i:s');
+        $firstAccess = (string) ($row['first_access'] ?? '');
 
         $payload = [
             'source' => 'read_event',
@@ -149,7 +150,7 @@ class ilIliasTraxEventBridgeReadEventTracker
             'last_access' => $lastAccess,
             'read_count' => (int) ($row['read_count'] ?? 0),
             'spent_seconds' => (int) ($row['spent_seconds'] ?? 0),
-            'first_access' => (string) ($row['first_access'] ?? ''),
+            'first_access' => $firstAccess,
         ];
 
         return [
@@ -169,6 +170,7 @@ class ilIliasTraxEventBridgeReadEventTracker
             'read_count' => (int) ($row['read_count'] ?? 0),
             'spent_seconds' => (int) ($row['spent_seconds'] ?? 0),
             'read_event_last_access' => $lastAccess,
+            'read_event_first_access' => $firstAccess,
         ];
     }
 
