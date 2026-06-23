@@ -10,6 +10,12 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Version plugin portée à `0.6.0` pour ouvrir la série V0.6.
 - `main` et `v0.5` restent les références stables V0.5.5 tant que la V0.6 n'est pas validée.
 
+### Ajouté
+
+- Enrichissement des statements xAPI avec `object_title`, `object_url`, `course_title` et `course_url` quand les informations ILIAS sont disponibles.
+- Ajout du cours parent dans `context.contextActivities.parent` pour relier les consultations, fichiers et tests au cours ILIAS.
+- Ajout de `read_event_first_access` dans les records xAPI issus de `read_event`, en complément de `read_count`, `spent_seconds` et `read_event_last_access`.
+
 ### Cible fonctionnelle
 
 - Enrichir les statements xAPI avec les titres ILIAS utiles : cours, objet et contexte.
@@ -68,7 +74,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 - Détection renforcée du type d'objet ILIAS lorsque `obj_type` est vide dans l'événement reçu.
 - Ajout des mappings de classes GUI pour les objets blog, lien web et mediacast.
-- Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, lien web, mediacast, wiki, module HTML, module web et module SCORM.
+- Génération de statements xAPI pour les objets de dépôt contenus dans un cours : blog, lien web, mediacast, forum, wiki, module HTML, module web et module SCORM.
 
 ## v0.5.0 — développement
 
