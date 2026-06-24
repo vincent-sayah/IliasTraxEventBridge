@@ -2,17 +2,15 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS via une outbox locale.
 
-Version stable actuelle : **v0.5.5**. Branche de développement avancée : **v0.6** avec plugin version **0.6.0** en pré-stabilisation.
+Version stable V0.6 actuelle : **v0.6.0**. Branche stable : **v0.6** avec plugin version **0.6.0**. La branche `main` reste encore alignée sur **v0.5.5** tant que sa promotion vers V0.6 n'est pas décidée.
 
 ## État des branches
 
 | Branche | Rôle | État |
 |---|---|---|
-| `main` | Stable publiée | Alignée sur la série v0.5.5 |
+| `main` | Stable publiée par défaut | Encore alignée sur la série v0.5.5 |
 | `v0.5` | Maintenance stable V0.5 | Stable v0.5.5 |
-| `v0.6` | Développement / pré-stabilisation | Enrichissement xAPI, diagnostics, supervision admin |
-
-La branche `v0.6` ne doit pas encore remplacer `main` tant que le dernier cycle de validation serveur n'est pas terminé.
+| `v0.6` | Stable V0.6 | Stable v0.6.0 taguée |
 
 ## Fonctionnalités stables v0.5.5
 
@@ -30,7 +28,7 @@ La branche `v0.6` ne doit pas encore remplacer `main` tant que le dernier cycle 
 - Table anti-doublon locale `evnt_evhk_itxeb_read`.
 - Suppression des traces parasites `Tracking:updateStatus` génériques sur `crs` ou `root`.
 
-## Apports V0.6 en pré-stabilisation
+## Apports stables v0.6.0
 
 La V0.6 conserve le périmètre métier de la V0.5.5 et enrichit les statements ainsi que l'exploitation opérationnelle.
 
@@ -68,7 +66,7 @@ Les actions d'administration, comme la suppression des résultats de test, sont 
 
 ## Installation stable depuis GitHub
 
-Exemple avec une racine ILIAS située dans `/var/www/ilias` :
+Tant que `main` n'est pas promue en V0.6, installer explicitement la branche stable V0.6 :
 
 ```bash
 sudo -i
@@ -80,7 +78,7 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+git clone -b v0.6 --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 
 cd "$PLUGIN_NAME"
 grep -n '\$version' plugin.php
@@ -95,15 +93,15 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Résultat attendu sur `main` tant que V0.6 n'est pas promue :
+Résultat attendu sur `v0.6` :
 
 ```text
-$version = "0.5.5";
+$version = "0.6.0";
 ```
 
-## Installation ou test de la branche V0.6
+## Installation par tag stable v0.6.0
 
-Pour installer explicitement la branche de développement V0.6 :
+Pour installer exactement le code stable tagué :
 
 ```bash
 sudo -i
@@ -112,22 +110,19 @@ export ILIAS_ROOT="/var/www/ilias"
 export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
 export PLUGIN_NAME="IliasTraxEventBridge"
 
+mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
-git clone -b v0.6 --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 
+git clone https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 cd "$PLUGIN_NAME"
+git checkout v0.6.0
+
 grep -n '\$version' plugin.php
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
 
 cd "$ILIAS_ROOT"
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
-```
-
-Résultat attendu sur `v0.6` :
-
-```text
-$version = "0.6.0";
 ```
 
 ## Mise à jour d'une installation existante vers V0.6
