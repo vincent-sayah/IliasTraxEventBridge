@@ -27,8 +27,9 @@ Toutes les évolutions notables du plugin sont listées ici.
 ### Jalon 2 — tables de configuration cours / ressources
 
 - Ajout de la migration SQL `#5` dans `sql/dbupdate.php`.
-- Création de la table `evnt_evhk_itxeb_crs_cfg` pour stocker l'activation xAPI par cours.
-- Création de la table `evnt_evhk_itxeb_res_cfg` pour stocker l'activation xAPI par ressource dans un cours.
+- Création de la table `evnt_evhk_itxeb_ccfg` pour stocker l'activation xAPI par cours.
+- Création de la table `evnt_evhk_itxeb_rcfg` pour stocker l'activation xAPI par ressource dans un cours.
+- Les noms de tables ont été raccourcis pour respecter la limite ILIAS de 22 caractères.
 - Ajout du repository `ilIliasTraxEventBridgeCourseTrackingRepository` pour lire et écrire ces configurations.
 - Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md` avec les requêtes de vérification et les tests SQL manuels.
 - Aucun filtrage xAPI n'est encore appliqué dans ce jalon : le comportement V0.6 reste inchangé jusqu'au lot de filtrage.
@@ -81,7 +82,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 - Le tag `v0.6.0` pointe sur le commit documentaire stable final de la branche `v0.6`.
 - `main` est promue vers V0.6.0.
-- Les développements suivants partent de la branche `v0.7`.
+- Les développements suivants doivent partir d'une nouvelle branche, par exemple `v0.7`.
 
 ## v0.5.5 — stable historique
 
@@ -92,7 +93,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - `main` a été promue vers V0.6.0 après stabilisation ; utiliser `v0.5` pour revenir à la série V0.5.5.
 
 ### Changé
-
-- Nettoyage du périmètre xAPI V0.5 : les événements `Tracking:updateStatus` génériques non-test ne génèrent plus de statements xAPI.
-- Les traces d'exploitation des objets de dépôt restent générées via `read_event` avec `event_type = repository_object_access`.
-- Les traces de progression de test restent conservées via `Tracking:updateStatus` lorsqu'elles concernent réellement un test.
