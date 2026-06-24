@@ -1,6 +1,6 @@
 # README technique — IliasTraxEventBridge
 
-Version stable actuelle : **v0.5.5**. Branche de développement en pré-stabilisation : **v0.6**, plugin version **0.6.0**.
+Version stable V0.6 actuelle : **v0.6.0**. Branche stable : **v0.6**, plugin version **0.6.0**. La branche `main` reste encore alignée sur **v0.5.5** tant que sa promotion vers V0.6 n'est pas décidée.
 
 ## Type de plugin
 
@@ -41,9 +41,9 @@ La V0.5.5 stabilise :
 - l'anti-doublon de consultation via `evnt_evhk_itxeb_read` ;
 - l'exclusion des statements parasites `root` et `crs` issus de `Tracking:updateStatus` génériques.
 
-### v0.6 en pré-stabilisation
+### v0.6.0 stable
 
-La V0.6 conserve le périmètre V0.5.5 et ajoute :
+La V0.6.0 conserve le périmètre V0.5.5 et ajoute :
 
 - enrichissement objet/cours : titres, URLs, activité parent cours ;
 - métriques `read_event` : `read_count`, `spent_seconds`, `first_access`, `last_access` ;
@@ -370,4 +370,4 @@ LIMIT 20;
 - `README.md` : présentation et installation.
 - `docs/VALIDATION.md` : plan de validation V0.6 complet.
 - `docs/OPERATIONS.md` : exploitation et maintenance.
-- `docs/V0.6_STABILISATION.md` : checklist de stabilisation avant tag.
+- `docs/V0.6_STABILISATION.md` : checklist de stabilisation V0.6.
