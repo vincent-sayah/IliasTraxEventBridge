@@ -44,7 +44,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function configure(): void
     {
         $html = $this->styles() . '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.6</h1>'
-            . '<p><strong>V0.6 :</strong> enrichissement xAPI, familles de statements, diagnostics outbox, wording bilingue et supervision admin.</p>'
+            . '<p><strong>V0.6 :</strong> enrichissement xAPI, familles de statements, diagnostics outbox, wording bilingue, supervision admin et exploitation.</p>'
             . $this->renderState()
             . $this->renderConfigForm()
             . $this->renderSendActions()
@@ -96,8 +96,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $rows = $this->outbox->findRecent(200);
         $html = '<section class="itxeb-section"><h2>Supervision V0.6</h2>';
+        $html .= $this->renderOperationsMetrics();
         if (count($rows) === 0) {
-            return $html . '<p><em>Aucune donnée outbox disponible pour la supervision.</em></p></section>';
+            return $html . '<p><em>Aucune donnée outbox disponible pour la supervision détaillée.</em></p></section>';
         }
 
         $status = [];
@@ -150,9 +151,36 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . $this->renderCounterBlock('Types d’interaction', $interactions)
             . $this->renderCounterBlock('Sources techniques', $sources);
         $html .= $this->renderDiagnosticRows($recentDiagnostics);
-        $html .= $this->renderFailureRows(array_slice($recentFailures, 0, 5));
+        $html .= $this->renderFailureRows(array_slice($recentFailures, 0, 8));
 
         return $html . '</section>';
+    }
+
+    private function renderOperationsMetrics(): string
+    {
+        $now = time();
+        $since24h = $now - 86400;
+        $since7d = $now - (7 * 86400);
+        $metrics = [
+            'Total outbox' => $this->outbox->countAll(),
+            'Créés 24h' => $this->outbox->countCreatedSince($since24h),
+            'Créés 7j' => $this->outbox->countCreatedSince($since7d),
+            'Sent total' => $this->outbox->countByStatus('sent'),
+            'Sent 24h' => $this->outbox->countByStatusSince('sent', $since24h),
+            'Generated total' => $this->outbox->countByStatus('generated'),
+            'Failed total' => $this->outbox->countByStatus('failed'),
+            'Failed 24h' => $this->outbox->countByStatusSince('failed', $since24h),
+            'Failed/erreurs à inspecter' => $this->outbox->countFailedWithError(),
+            'Retry épuisé' => $this->outbox->countRetryExhausted($this->config->getMaxRetry()),
+        ];
+
+        $html = '<div class="itxeb-dashboard-block itxeb-ops-block"><h3>Exploitation / maintenance</h3>';
+        $html .= '<p>Compteurs calculés directement sur l’outbox locale. Les périodes 24h et 7j s’appuient sur <code>created_ts</code>.</p><div class="itxeb-summary itxeb-ops-summary">';
+        foreach ($metrics as $label => $value) {
+            $html .= '<span><strong>' . $this->esc($label) . ' :</strong> ' . $this->esc((string) $value) . '</span>';
+        }
+        $html .= '</div><p class="itxeb-help">À surveiller : <code>generated</code> qui augmente sans envoi, <code>failed</code>, erreurs non vides et retry épuisé.</p></div>';
+        return $html;
     }
 
     private function renderCounterBlock(string $title, array $counts): string
@@ -192,10 +220,11 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         if (count($rows) === 0) {
             return $html . '<p><em>Aucune erreur récente dans l’outbox.</em></p></div>';
         }
-        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events itxeb-failure-table"><thead><tr><th>ID</th><th>Statut</th><th>Retry</th><th>Erreur</th></tr></thead><tbody>';
+        $html .= '<div class="itxeb-table-wrapper"><table class="std itxeb-events itxeb-failure-table"><thead><tr><th>ID</th><th>Statut</th><th>Événement</th><th>Retry</th><th>Erreur</th></tr></thead><tbody>';
         foreach ($rows as $r) {
             $html .= '<tr><td class="itxeb-nowrap">#' . $this->esc((string) ($r['id'] ?? '')) . '</td>'
                 . '<td><span class="itxeb-badge ' . $this->statusBadgeClass((string) ($r['status'] ?? '')) . '">' . $this->esc((string) ($r['status'] ?? '')) . '</span></td>'
+                . '<td>' . $this->esc((string) ($r['event_type'] ?? '')) . '<br><span class="itxeb-date">' . $this->esc((string) ($r['obj_type'] ?? '')) . '</span></td>'
                 . '<td>' . $this->esc((string) ($r['retry_count'] ?? '0')) . ' / ' . $this->esc((string) ($r['max_retry'] ?? $this->config->getMaxRetry())) . '</td>'
                 . '<td class="itxeb-error">' . $this->esc((string) ($r['last_error'] ?? '')) . '</td></tr>';
         }
@@ -314,10 +343,10 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . '.itxeb-page{max-width:none;width:100%;margin:0 0 4rem 0}.itxeb-section{margin-bottom:1.5rem}.itxeb-alert{max-width:980px;padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px;line-height:1.4}'
             . '.itxeb-page table.std{width:100%;border-collapse:collapse;background:#fff}.itxeb-page table.std th,.itxeb-page table.std td{padding:.6rem .75rem;vertical-align:top;line-height:1.35}.itxeb-page table.std th{white-space:nowrap;background:#f7f7f7}'
             . '.itxeb-state-table,.itxeb-form-table{max-width:980px}.itxeb-state-table td:first-child,.itxeb-form-table td:first-child{width:230px;min-width:230px;font-weight:600;white-space:nowrap}.itxeb-input{width:100%;max-width:780px;box-sizing:border-box}.itxeb-help,.itxeb-date{font-size:.9em;color:#666}.itxeb-code-inline{display:inline-block;max-width:100%;overflow:auto;white-space:nowrap}.itxeb-actions{margin:.8rem 0 1.2rem}'
-            . '.itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}.itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}.itxeb-dashboard-block{margin:.8rem 0 1.1rem}.itxeb-dashboard-block h3{margin:.4rem 0}.itxeb-table-wrapper{width:100%;max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:4px;background:#fff;margin:.4rem 0 1rem}.itxeb-events{width:100%;table-layout:fixed}.itxeb-events th,.itxeb-events td{border-bottom:1px solid #eee}'
+            . '.itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}.itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}.itxeb-ops-summary span{background:#eef8fc;border-color:#bce8f1}.itxeb-dashboard-block{margin:.8rem 0 1.1rem}.itxeb-dashboard-block h3{margin:.4rem 0}.itxeb-ops-block{max-width:1200px;padding:.65rem .8rem;border:1px solid #bce8f1;background:#fbfeff;border-radius:4px}.itxeb-table-wrapper{width:100%;max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:4px;background:#fff;margin:.4rem 0 1rem}.itxeb-events{width:100%;table-layout:fixed}.itxeb-events th,.itxeb-events td{border-bottom:1px solid #eee}'
             . '.itxeb-outbox-table{min-width:1500px}.itxeb-outbox-table th:nth-child(1),.itxeb-outbox-table td:nth-child(1){width:170px}.itxeb-outbox-table th:nth-child(2),.itxeb-outbox-table td:nth-child(2){width:110px}.itxeb-outbox-table th:nth-child(3),.itxeb-outbox-table td:nth-child(3){width:90px}.itxeb-outbox-table th:nth-child(4),.itxeb-outbox-table td:nth-child(4){width:430px}.itxeb-outbox-table th:nth-child(5),.itxeb-outbox-table td:nth-child(5){width:145px}'
             . '.itxeb-log-table{min-width:1550px}.itxeb-log-table th:nth-child(1),.itxeb-log-table td:nth-child(1){width:165px}.itxeb-log-table th:nth-child(2),.itxeb-log-table td:nth-child(2){width:290px}.itxeb-log-table th:nth-child(3),.itxeb-log-table td:nth-child(3){width:145px}.itxeb-log-table th:nth-child(4),.itxeb-log-table td:nth-child(4){width:560px}.itxeb-log-table th:nth-child(5),.itxeb-log-table td:nth-child(5){width:390px}'
-            . '.itxeb-diagnostic-table{min-width:1300px}.itxeb-diagnostic-table th:nth-child(1),.itxeb-diagnostic-table td:nth-child(1){width:90px}.itxeb-diagnostic-table th:nth-child(2),.itxeb-diagnostic-table td:nth-child(2){width:110px}.itxeb-diagnostic-table th:nth-child(3),.itxeb-diagnostic-table td:nth-child(3){width:230px}.itxeb-diagnostic-table th:nth-child(4),.itxeb-diagnostic-table td:nth-child(4){width:260px}.itxeb-diagnostic-table th:nth-child(5),.itxeb-diagnostic-table td:nth-child(5){width:170px}.itxeb-failure-table{min-width:900px}'
+            . '.itxeb-diagnostic-table{min-width:1300px}.itxeb-diagnostic-table th:nth-child(1),.itxeb-diagnostic-table td:nth-child(1){width:90px}.itxeb-diagnostic-table th:nth-child(2),.itxeb-diagnostic-table td:nth-child(2){width:110px}.itxeb-diagnostic-table th:nth-child(3),.itxeb-diagnostic-table td:nth-child(3){width:230px}.itxeb-diagnostic-table th:nth-child(4),.itxeb-diagnostic-table td:nth-child(4){width:260px}.itxeb-diagnostic-table th:nth-child(5),.itxeb-diagnostic-table td:nth-child(5){width:170px}.itxeb-failure-table{min-width:1050px}'
             . '.itxeb-nowrap,.itxeb-object{white-space:nowrap}.itxeb-wide{min-width:360px}.itxeb-verb,.itxeb-uri{max-width:100%;white-space:normal;word-break:break-word;overflow-wrap:anywhere;font-family:monospace;font-size:.92em;line-height:1.35;background:#f8f8f8;border:1px solid #eee;border-radius:3px;padding:.25rem .35rem}.itxeb-request-uri{max-height:9em;overflow:auto}.itxeb-text-block{max-width:100%;white-space:normal;word-break:break-word;overflow-wrap:anywhere}.itxeb-badge{display:inline-block;padding:.2rem .45rem;border-radius:3px;background:#eee;font-weight:600}.itxeb-badge-ok{background:#dff0d8}.itxeb-badge-warn{background:#fcf8e3}.itxeb-badge-error{background:#f2dede}.itxeb-badge-muted{background:#eee}.itxeb-error{color:#a94442;margin-bottom:.35rem;word-break:break-word;overflow-wrap:anywhere}.itxeb-events pre{max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;margin:.4rem 0 0}.itxeb-events details summary{cursor:pointer;font-weight:600}'
             . '@media (max-width:900px){.itxeb-state-table td:first-child,.itxeb-form-table td:first-child{width:auto;min-width:0;white-space:normal}.itxeb-outbox-table{min-width:1250px}.itxeb-log-table{min-width:1250px}.itxeb-diagnostic-table{min-width:1100px}}</style>';
     }
