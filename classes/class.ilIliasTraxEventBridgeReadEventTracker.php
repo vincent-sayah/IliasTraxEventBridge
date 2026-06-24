@@ -27,11 +27,15 @@ class ilIliasTraxEventBridgeReadEventTracker
     /** @var ilIliasTraxEventBridgeCourseContextResolver */
     private $courseContextResolver;
 
+    /** @var ilIliasTraxEventBridgeCourseTrackingRepository */
+    private $courseTrackingRepository;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeOutboxRepository $outboxRepository,
         ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
-        ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null
+        ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null,
+        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null
     ) {
         if (isset($GLOBALS['DIC']) && method_exists($GLOBALS['DIC'], 'database')) {
             $this->db = $GLOBALS['DIC']->database();
@@ -45,6 +49,7 @@ class ilIliasTraxEventBridgeReadEventTracker
         $this->outboxRepository = $outboxRepository;
         $this->statementFactory = $statementFactory ?: new ilIliasTraxEventBridgeStatementFactory($config);
         $this->courseContextResolver = $courseContextResolver ?: new ilIliasTraxEventBridgeCourseContextResolver();
+        $this->courseTrackingRepository = $courseTrackingRepository ?: new ilIliasTraxEventBridgeCourseTrackingRepository();
     }
 
     public function scanAndEnqueue(int $limit = 100): int
@@ -85,6 +90,11 @@ class ilIliasTraxEventBridgeReadEventTracker
             }
             $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
             $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
+
+            if (!$this->isTrackingAllowedForConfiguredCourse((int) $record['course_ref_id'], (int) $record['ref_id'])) {
+                $this->markProcessed($objId, $usrId, $lastAccess, $readCount);
+                continue;
+            }
 
             $statement = $this->statementFactory->createFromEventRecord($record);
             if ($statement !== null) {
@@ -276,6 +286,16 @@ class ilIliasTraxEventBridgeReadEventTracker
         }
 
         return array_values(array_unique($refIds));
+    }
+
+    private function isTrackingAllowedForConfiguredCourse(int $courseRefId, int $refId): bool
+    {
+        if ($courseRefId <= 0 || $refId <= 0) {
+            return false;
+        }
+
+        return $this->courseTrackingRepository->isCourseEnabled($courseRefId)
+            && $this->courseTrackingRepository->isResourceEnabled($courseRefId, $refId);
     }
 
     /** @return array<int,string> */
