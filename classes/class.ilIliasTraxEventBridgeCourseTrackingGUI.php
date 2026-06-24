@@ -2,7 +2,7 @@
 /**
  * V0.7 course-level TRAX/xAPI configuration UI.
  *
- * @ilCtrl_IsCalledBy ilIliasTraxEventBridgeCourseTrackingGUI: ilObjCourseGUI
+ * @ilCtrl_IsCalledBy ilIliasTraxEventBridgeCourseTrackingGUI: ilObjCourseGUI, ilIliasTraxEventBridgeConfigGUI
  */
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseResourceResolver.php';
@@ -15,18 +15,30 @@ class ilIliasTraxEventBridgeCourseTrackingGUI
     /** @var mixed */
     private $tpl;
 
+    /** @var mixed */
+    private $linkTarget;
+
+    /** @var array<string,string> */
+    private $commandMap;
+
     /** @var ilIliasTraxEventBridgeCourseTrackingRepository */
     private $repository;
 
     /** @var ilIliasTraxEventBridgeCourseResourceResolver */
     private $resolver;
 
-    public function __construct()
+    /**
+     * @param mixed|null $linkTarget Optional controller target used when this UI is embedded in another GUI.
+     * @param array<string,string> $commandMap Optional command aliases used by the embedding GUI.
+     */
+    public function __construct($linkTarget = null, array $commandMap = [])
     {
         global $DIC, $ilCtrl, $tpl;
 
         $this->ctrl = isset($DIC) && is_object($DIC) && method_exists($DIC, 'ctrl') ? $DIC->ctrl() : $ilCtrl;
         $this->tpl = isset($DIC) && (is_array($DIC) || $DIC instanceof ArrayAccess) && isset($DIC['tpl']) ? $DIC['tpl'] : $tpl;
+        $this->linkTarget = $linkTarget;
+        $this->commandMap = $commandMap;
         $this->repository = new ilIliasTraxEventBridgeCourseTrackingRepository();
         $this->resolver = new ilIliasTraxEventBridgeCourseResourceResolver($this->repository);
     }
@@ -280,7 +292,7 @@ class ilIliasTraxEventBridgeCourseTrackingGUI
     private function renderCourseRefForm(): string
     {
         return '<section class="itxeb-section"><h2>Ouvrir un cours</h2>'
-            . '<form method="get"><table class="std itxeb-summary-table"><tbody>'
+            . '<form method="get" action="' . $this->esc($this->link('show', 0)) . '"><table class="std itxeb-summary-table"><tbody>'
             . '<tr><td><label for="course_ref_id">course_ref_id</label></td><td><input class="form-control itxeb-input" id="course_ref_id" name="course_ref_id" type="number" min="1" value=""></td></tr>'
             . '</tbody></table><p class="itxeb-actions"><button class="btn btn-primary" type="submit">Ouvrir la configuration xAPI</button></p></form></section>';
     }
@@ -382,31 +394,41 @@ class ilIliasTraxEventBridgeCourseTrackingGUI
 
     private function link(string $cmd, int $courseRefId): string
     {
+        $target = is_object($this->linkTarget) ? $this->linkTarget : $this;
+        $mappedCmd = $this->commandMap[$cmd] ?? $cmd;
+
         if (is_object($this->ctrl)) {
             try {
-                if (method_exists($this->ctrl, 'setParameter')) {
-                    $this->ctrl->setParameter($this, 'course_ref_id', $courseRefId);
+                if ($courseRefId > 0 && method_exists($this->ctrl, 'setParameter')) {
+                    $this->ctrl->setParameter($target, 'course_ref_id', $courseRefId);
                 }
                 if (method_exists($this->ctrl, 'getLinkTarget')) {
-                    return (string) $this->ctrl->getLinkTarget($this, $cmd);
+                    return (string) $this->ctrl->getLinkTarget($target, $mappedCmd);
                 }
             } catch (Throwable $ignored) {
                 // Fallback below.
             }
         }
 
-        return '?cmd=' . rawurlencode($cmd) . '&course_ref_id=' . rawurlencode((string) $courseRefId);
+        $query = '?cmd=' . rawurlencode($mappedCmd);
+        if ($courseRefId > 0) {
+            $query .= '&course_ref_id=' . rawurlencode((string) $courseRefId);
+        }
+        return $query;
     }
 
     private function redirectToShow(int $courseRefId): void
     {
+        $target = is_object($this->linkTarget) ? $this->linkTarget : $this;
+        $mappedCmd = $this->commandMap['show'] ?? 'show';
+
         if (is_object($this->ctrl)) {
             try {
-                if (method_exists($this->ctrl, 'setParameter')) {
-                    $this->ctrl->setParameter($this, 'course_ref_id', $courseRefId);
+                if ($courseRefId > 0 && method_exists($this->ctrl, 'setParameter')) {
+                    $this->ctrl->setParameter($target, 'course_ref_id', $courseRefId);
                 }
                 if (method_exists($this->ctrl, 'redirect')) {
-                    $this->ctrl->redirect($this, 'show');
+                    $this->ctrl->redirect($target, $mappedCmd);
                     return;
                 }
             } catch (Throwable $ignored) {
