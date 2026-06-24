@@ -94,3 +94,38 @@ if (!$ilDB->tableExists('evnt_evhk_itxeb_read')) {
     $ilDB->addIndex('evnt_evhk_itxeb_read', ['usr_id'], 'i2');
 }
 ?>
+<#5>
+<?php
+/** @var ilDBInterface $ilDB */
+if (!$ilDB->tableExists('evnt_evhk_itxeb_crs_cfg')) {
+    $ilDB->createTable('evnt_evhk_itxeb_crs_cfg', [
+        'course_ref_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'course_obj_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'enabled' => ['type' => 'integer', 'length' => 1, 'notnull' => true, 'default' => 0],
+        'created_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+        'updated_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+        'updated_by' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+    ]);
+    $ilDB->addPrimaryKey('evnt_evhk_itxeb_crs_cfg', ['course_ref_id']);
+    $ilDB->addIndex('evnt_evhk_itxeb_crs_cfg', ['course_obj_id'], 'i1');
+    $ilDB->addIndex('evnt_evhk_itxeb_crs_cfg', ['enabled'], 'i2');
+    $ilDB->addIndex('evnt_evhk_itxeb_crs_cfg', ['updated_by'], 'i3');
+}
+
+if (!$ilDB->tableExists('evnt_evhk_itxeb_res_cfg')) {
+    $ilDB->createTable('evnt_evhk_itxeb_res_cfg', [
+        'course_ref_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'ref_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'obj_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'obj_type' => ['type' => 'text', 'length' => 64, 'notnull' => true, 'default' => ''],
+        'enabled' => ['type' => 'integer', 'length' => 1, 'notnull' => true, 'default' => 0],
+        'created_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+        'updated_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+        'updated_by' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+    ]);
+    $ilDB->addPrimaryKey('evnt_evhk_itxeb_res_cfg', ['course_ref_id', 'ref_id']);
+    $ilDB->addIndex('evnt_evhk_itxeb_res_cfg', ['obj_id'], 'i1');
+    $ilDB->addIndex('evnt_evhk_itxeb_res_cfg', ['obj_type'], 'i2');
+    $ilDB->addIndex('evnt_evhk_itxeb_res_cfg', ['enabled'], 'i3');
+}
+?>
