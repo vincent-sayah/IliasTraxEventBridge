@@ -2,13 +2,14 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.6.0 — développement
+## v0.6.0 — pré-stabilisation
 
 ### Statut
 
 - Branche de développement `v0.6` créée à partir de `main` / `v0.5.5` stable.
 - Version plugin portée à `0.6.0` pour ouvrir la série V0.6.
-- `main` et `v0.5` restent les références stables V0.5.5 tant que la V0.6 n'est pas validée.
+- `main` et `v0.5` restent les références stables V0.5.5 tant que la V0.6 n'est pas validée et taguée.
+- La V0.6 est en phase de pré-stabilisation : code fonctionnel validé sur serveur, documentation principale alignée, checklist de stabilisation ajoutée.
 
 ### Ajouté
 
@@ -20,6 +21,9 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de descriptions xAPI sur les activités objet/cours pour rendre les statements plus lisibles dans TRAX.
 - Ajout d'extensions de diagnostic outbox dans `context.extensions` : `outbox_id`, `outbox_table`, `event_log_id`, `statement_uuid`, `event_record_source`, `source_table` et `deduplication_key`.
 - Ajout d'une section admin `Supervision V0.6` dans l'écran de configuration du plugin, calculée sur les 200 dernières lignes outbox : statuts, événements, objets, familles xAPI, types d'interaction, sources techniques, dernières clés de diagnostic et dernières erreurs.
+- Ajout d'un bloc admin `Exploitation / maintenance` avec compteurs total, 24h, 7j, `sent`, `generated`, `failed`, erreurs à inspecter et retry épuisé.
+- Ajout du guide `docs/OPERATIONS.md` pour l'exploitation SQL et les diagnostics serveur.
+- Ajout du guide `docs/V0.6_STABILISATION.md` pour préparer le tag `v0.6.0`.
 - Mise à jour du plan de validation V0.6 avec les contrôles SQL complets : familles xAPI, métriques `read_event`, diagnostics outbox, wording bilingue, envoi TRAX et absence de traces parasites.
 
 ### Changé
@@ -31,20 +35,21 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les statements sont enrichis au moment de l'insertion outbox afin d'y inclure l'identifiant technique local `outbox_id` sans modifier le schéma SQL.
 - Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
 - L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.
+- `README.md` et `README_TECHNIQUE.md` sont alignés sur l'état V0.6 en pré-stabilisation.
 
-### Cible fonctionnelle
+### Validation observée
 
-- Enrichir les statements xAPI avec les titres ILIAS utiles : cours, objet et contexte.
-- Ajouter les URL ILIAS exploitables dans les statements et/ou extensions xAPI.
-- Exploiter plus explicitement `read_count`, `spent_seconds`, `first_access` et `last_access` issus de `read_event`.
-- Affiner les verbes, activity types et familles de statements selon les types d'objets : consultation, test, fichier, forum, wiki, module, SCORM.
-- Ajouter des extensions xAPI plus riches pour faciliter l'analyse dans TRAX.
-- Préparer les futurs filtres de configuration, diagnostics TRAX et purge configurable.
+- Génération et envoi `sent` validés pour fichier, test, blog, wiki, lien web, mediacast et module HTML.
+- Vérification des extensions V0.6 dans le JSON xAPI : titres, URLs, contexte cours, familles, durée, métriques `read_event`, diagnostics outbox et clé de déduplication.
+- Vérification du wording bilingue `fr-FR` / `en-US`.
+- Vérification de la branche serveur et Windows en `v0.6` propre.
 
-### Premier jalon
+### Reste à faire avant tag
 
-- Initialisation documentaire et technique de la branche V0.6.
-- Ajout d'un plan de reprise V0.6 dans `docs/V0.6_DEV_PLAN.md`.
+- Valider le dernier écran admin d'exploitation / maintenance après pull serveur.
+- Rejouer la checklist `docs/V0.6_STABILISATION.md`.
+- Créer le tag `v0.6.0` uniquement après validation finale.
+- Décider explicitement si `main` doit être promue vers V0.6 après le tag.
 
 ## v0.5.5 — stable
 
