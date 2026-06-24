@@ -8,8 +8,8 @@
  */
 class ilIliasTraxEventBridgeCourseTrackingRepository
 {
-    public const COURSE_TABLE = 'evnt_evhk_itxeb_crs_cfg';
-    public const RESOURCE_TABLE = 'evnt_evhk_itxeb_res_cfg';
+    public const COURSE_TABLE = 'evnt_evhk_itxeb_ccfg';
+    public const RESOURCE_TABLE = 'evnt_evhk_itxeb_rcfg';
 
     /** @var ilDBInterface|mixed */
     private $db;
