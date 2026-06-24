@@ -1,6 +1,6 @@
 # README technique — IliasTraxEventBridge
 
-Version stable V0.6 actuelle : **v0.6.0**. Branche stable : **v0.6**, plugin version **0.6.0**. La branche `main` reste encore alignée sur **v0.5.5** tant que sa promotion vers V0.6 n'est pas décidée.
+Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, plugin version **0.6.0**. La branche **v0.5** reste conservée pour maintenance historique V0.5.5.
 
 ## Type de plugin
 
@@ -30,7 +30,7 @@ public function handleEvent(string $a_component, string $a_event, array $a_param
 
 ## Versions
 
-### v0.5.5 stable
+### v0.5.5 stable historique
 
 La V0.5.5 stabilise :
 
@@ -87,7 +87,7 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-git clone -b v0.6 --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 
 cd "$PLUGIN_NAME"
 grep -n '\$version' plugin.php
@@ -102,10 +102,16 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Résultat attendu sur `v0.6` :
+Résultat attendu :
 
 ```text
 $version = "0.6.0";
+```
+
+Pour verrouiller exactement la release, utiliser le tag :
+
+```bash
+git checkout v0.6.0
 ```
 
 ## Mise à jour technique V0.6
