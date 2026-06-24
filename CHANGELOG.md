@@ -54,6 +54,17 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de `docs/V0.7_COURSE_TRACKING_UI.md`.
 - Le filtrage xAPI avant outbox reste prévu pour le jalon suivant.
 
+### Jalon 4b — accès visible depuis l'administration du plugin
+
+- `ilIliasTraxEventBridgeCourseTrackingGUI` peut désormais être embarqué depuis un autre contrôleur GUI.
+- Ajout d'une section visible `Configuration xAPI par cours` dans l'écran d'administration du plugin.
+- L'administrateur peut saisir un `course_ref_id`, ouvrir l'écran de configuration xAPI du cours, enregistrer les choix, tout activer, tout désactiver ou réinitialiser le cours.
+- Les données sont toujours enregistrées dans `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
+- Cette étape rend l'écran testable dans ILIAS sans dépendre immédiatement d'une injection dans les paramètres natifs du cours.
+- L'intégration directe dans l'objet cours reste l'objectif fonctionnel, mais dépend des points d'extension disponibles pour un plugin EventHook sur ILIAS 10.
+- Ajout de `docs/V0.7_COURSE_TRACKING_ACCESS.md`.
+- Le filtrage xAPI avant outbox reste prévu pour le jalon suivant.
+
 ## v0.6.0 — stable
 
 ### Statut
@@ -88,28 +99,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
 - L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.
 - `README.md`, `README_TECHNIQUE.md`, `docs/VALIDATION.md`, `docs/OPERATIONS.md` et `docs/V0.6_STABILISATION.md` documentent désormais la série V0.6.
-
-### Validation stable observée
-
-- Génération et envoi `sent` validés pour fichier, test, blog, wiki, lien web, mediacast et module HTML.
-- Vérification des extensions V0.6 dans le JSON xAPI : titres, URLs, contexte cours, familles, durée, métriques `read_event`, diagnostics outbox et clé de déduplication.
-- Vérification du wording bilingue `fr-FR` / `en-US`.
-- Vérification de la branche serveur et Windows en `v0.6` propre.
-- Vérification anti-parasites : aucune nouvelle ligne outbox `root` ou `crs`.
-- Promotion de `main` vers V0.6.0 réalisée après validation finale.
-
-### Après tag
-
-- Le tag `v0.6.0` pointe sur le commit documentaire stable final de la branche `v0.6`.
-- `main` est promue vers V0.6.0.
-- Les développements suivants doivent partir d'une nouvelle branche, par exemple `v0.7`.
-
-## v0.5.5 — stable historique
-
-### Statut
-
-- Version stable V0.5 conservée pour maintenance.
-- Branche `v0.5` conservée comme branche stable V0.5.
-- `main` a été promue vers V0.6.0 après stabilisation ; utiliser `v0.5` pour revenir à la série V0.5.5.
-
-### Changé
