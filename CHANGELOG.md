@@ -2,6 +2,28 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.7.0 — développement
+
+### Statut
+
+- Branche `v0.7` créée depuis `main` / `v0.6.0` stable.
+- Version plugin portée à `0.7.0` pour ouvrir la série V0.7.
+- Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource depuis le contexte de l'objet cours.
+- `main` et `v0.6` restent les références stables V0.6.0 pendant le développement V0.7.
+
+### Objectif fonctionnel
+
+- Permettre à un administrateur ou responsable de cours d'activer ou désactiver les traces xAPI pour son cours.
+- Permettre de choisir quelles ressources du cours génèrent des statements xAPI.
+- Filtrer les événements avant insertion dans l'outbox quand le cours ou la ressource n'est pas autorisé.
+- Conserver les statements enrichis V0.6 pour les ressources explicitement activées.
+
+### Premier jalon
+
+- Création de la branche `v0.7`.
+- Ouverture de la version plugin `0.7.0`.
+- Ajout de `docs/V0.7_DEV_PLAN.md` pour cadrer le modèle de données, l'interface cours, les permissions et les règles de filtrage.
+
 ## v0.6.0 — stable
 
 ### Statut
@@ -50,7 +72,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 - Le tag `v0.6.0` pointe sur le commit documentaire stable final de la branche `v0.6`.
 - `main` est promue vers V0.6.0.
-- Les développements suivants doivent partir d'une nouvelle branche, par exemple `v0.7`.
+- Les développements suivants partent de la branche `v0.7`.
 
 ## v0.5.5 — stable historique
 
