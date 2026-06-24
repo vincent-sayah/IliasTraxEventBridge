@@ -87,7 +87,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $action = $this->ctrl->getLinkTarget($this, 'configureCourseTracking');
         return '<section class="itxeb-section itxeb-course-admin-access"><h2>Configuration xAPI par cours</h2>'
             . '<div class="itxeb-alert"><strong>V0.7 :</strong> cette section donne accès à l’écran de configuration xAPI d’un cours. Saisir le <code>ref_id</code> du cours, puis activer/désactiver le cours et ses ressources traçables. L’intégration directe dans les paramètres natifs du cours reste à valider selon les points d’extension ILIAS 10 disponibles.</div>'
-            . '<form method="get" action="' . $this->esc($action) . '"><table class="std itxeb-form-table"><tbody>'
+            . '<form method="post" action="' . $this->esc($action) . '"><table class="std itxeb-form-table"><tbody>'
             . '<tr><td><label for="itxeb_course_ref_id">course_ref_id</label></td><td><input id="itxeb_course_ref_id" name="course_ref_id" type="number" min="1" value="" class="form-control itxeb-input"><div class="itxeb-help">Exemple : le <code>ref_id</code> visible dans l’URL du cours ILIAS.</div></td></tr>'
             . '</tbody></table><p class="itxeb-actions"><button class="btn btn-primary" type="submit">Ouvrir la configuration xAPI du cours</button></p></form></section>';
     }

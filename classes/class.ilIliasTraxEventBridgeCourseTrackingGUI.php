@@ -292,7 +292,7 @@ class ilIliasTraxEventBridgeCourseTrackingGUI
     private function renderCourseRefForm(): string
     {
         return '<section class="itxeb-section"><h2>Ouvrir un cours</h2>'
-            . '<form method="get" action="' . $this->esc($this->link('show', 0)) . '"><table class="std itxeb-summary-table"><tbody>'
+            . '<form method="post" action="' . $this->esc($this->link('show', 0)) . '"><table class="std itxeb-summary-table"><tbody>'
             . '<tr><td><label for="course_ref_id">course_ref_id</label></td><td><input class="form-control itxeb-input" id="course_ref_id" name="course_ref_id" type="number" min="1" value=""></td></tr>'
             . '</tbody></table><p class="itxeb-actions"><button class="btn btn-primary" type="submit">Ouvrir la configuration xAPI</button></p></form></section>';
     }
