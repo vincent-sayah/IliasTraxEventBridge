@@ -7,6 +7,7 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeTraxClient.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingGUI.php';
 
 class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 {
@@ -27,6 +28,11 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             case 'testTraxConnection': $this->testTraxConnection(); break;
             case 'sendGenerated': $this->sendGenerated(); break;
             case 'resetFailed': $this->resetFailed(); break;
+            case 'configureCourseTracking': $this->handleCourseTracking('show'); break;
+            case 'saveCourseTracking': $this->handleCourseTracking('save'); break;
+            case 'enableAllCourseTracking': $this->handleCourseTracking('enableAll'); break;
+            case 'disableAllCourseTracking': $this->handleCourseTracking('disableAll'); break;
+            case 'resetCourseTracking': $this->handleCourseTracking('resetCourse'); break;
             case 'clearLog': $this->repo->clear(); $this->success('Journal vidé.'); $this->ctrl->redirect($this, 'configure'); break;
             case 'clearOutbox': $this->outbox->clear(); $this->success('Outbox vidée.'); $this->ctrl->redirect($this, 'configure'); break;
             case 'configure': default: $this->configure(); break;
@@ -43,9 +49,10 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
     private function configure(): void
     {
-        $html = $this->styles() . '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.6</h1>'
-            . '<p><strong>V0.6 :</strong> enrichissement xAPI, familles de statements, diagnostics outbox, wording bilingue, supervision admin et exploitation.</p>'
+        $html = $this->styles() . '<div class="itxeb-page"><h1>IliasTraxEventBridge — V0.7</h1>'
+            . '<p><strong>V0.7 :</strong> pilotage des traces xAPI par cours et par ressource. Le filtrage effectif avant outbox sera ajouté dans le prochain lot.</p>'
             . $this->renderState()
+            . $this->renderCourseTrackingAccess()
             . $this->renderConfigForm()
             . $this->renderSendActions()
             . $this->renderAdminDashboard()
@@ -75,6 +82,28 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         return '<tr><td>' . $this->esc($label) . '</td><td><strong>date :</strong> ' . $this->esc($at) . '<br><strong>succès :</strong> ' . $this->esc($success) . '<br><strong>HTTP :</strong> ' . $this->esc($http) . '<br><strong>message :</strong> ' . $this->esc($message) . '</td></tr>';
     }
 
+    private function renderCourseTrackingAccess(): string
+    {
+        $action = $this->ctrl->getLinkTarget($this, 'configureCourseTracking');
+        return '<section class="itxeb-section itxeb-course-admin-access"><h2>Configuration xAPI par cours</h2>'
+            . '<div class="itxeb-alert"><strong>V0.7 :</strong> cette section donne accès à l’écran de configuration xAPI d’un cours. Saisir le <code>ref_id</code> du cours, puis activer/désactiver le cours et ses ressources traçables. L’intégration directe dans les paramètres natifs du cours reste à valider selon les points d’extension ILIAS 10 disponibles.</div>'
+            . '<form method="get" action="' . $this->esc($action) . '"><table class="std itxeb-form-table"><tbody>'
+            . '<tr><td><label for="itxeb_course_ref_id">course_ref_id</label></td><td><input id="itxeb_course_ref_id" name="course_ref_id" type="number" min="1" value="" class="form-control itxeb-input"><div class="itxeb-help">Exemple : le <code>ref_id</code> visible dans l’URL du cours ILIAS.</div></td></tr>'
+            . '</tbody></table><p class="itxeb-actions"><button class="btn btn-primary" type="submit">Ouvrir la configuration xAPI du cours</button></p></form></section>';
+    }
+
+    private function handleCourseTracking(string $courseCommand): void
+    {
+        $gui = new ilIliasTraxEventBridgeCourseTrackingGUI($this, [
+            'show' => 'configureCourseTracking',
+            'save' => 'saveCourseTracking',
+            'enableAll' => 'enableAllCourseTracking',
+            'disableAll' => 'disableAllCourseTracking',
+            'resetCourse' => 'resetCourseTracking',
+        ]);
+        $gui->performCommand($courseCommand);
+    }
+
     private function renderConfigForm(): string
     {
         $html = '<section class="itxeb-section"><h2>Configuration TRAX / cron</h2><div class="itxeb-alert"><strong>Important :</strong> cette case autorise seulement le plugin à envoyer via cron. Il faut aussi activer le job cron ILIAS <code>itxeb_send_outbox_to_trax</code> dans <em>Administration &gt; Paramètres système et maintenance &gt; Tâches cron</em>.</div>';
@@ -88,14 +117,14 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function renderSendActions(): string
     {
         $html = '<section class="itxeb-section"><h2>Envoi vers TRAX</h2><div class="itxeb-summary">';
-        foreach (['generated'=>$this->outbox->countByStatus('generated'),'failed'=>$this->outbox->countByStatus('failed'),'retry épuisé'=>$this->outbox->countRetryExhausted($this->config->getMaxRetry()),'sent'=>$this->outbox->countByStatus('sent'),'batch'=>$this->config->getBatchSize(),'max_retry'=>$this->config->getMaxRetry()] as $k=>$v) { $html .= '<span><strong>'.$this->esc((string)$k).' :</strong> '.$this->esc((string)$v).'</span>'; }
+        foreach (['generated'=>$this->outbox->countByStatus('generated'),'failed'=>$this->outbox->countByStatus('failed'),'retry épuisé'=>$this->outbox->countRetryExhausted($this->config->getMaxRetry()),'sent'=>$this->config->getBatchSize(),'max_retry'=>$this->config->getMaxRetry()] as $k=>$v) { $html .= '<span><strong>'.$this->esc((string)$k).' :</strong> '.$this->esc((string)$v).'</span>'; }
         return $html . '</div><p>L’envoi manuel et le cron traitent les statements <code>generated</code> ou <code>failed</code> lorsque <code>retry_count &lt; max_retry</code>. Pour l’envoi automatique, le job cron ILIAS doit être activé et exécuté.</p><p class="itxeb-actions"><a class="btn btn-primary" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'sendGenerated')) . '">Envoyer maintenant</a> <a class="btn btn-default" href="' . $this->esc($this->ctrl->getLinkTarget($this, 'resetFailed')) . '">Réinitialiser les failed</a></p></section>';
     }
 
     private function renderAdminDashboard(): string
     {
         $rows = $this->outbox->findRecent(200);
-        $html = '<section class="itxeb-section"><h2>Supervision V0.6</h2>';
+        $html = '<section class="itxeb-section"><h2>Supervision V0.7</h2>';
         $html .= $this->renderOperationsMetrics();
         if (count($rows) === 0) {
             return $html . '<p><em>Aucune donnée outbox disponible pour la supervision détaillée.</em></p></section>';
