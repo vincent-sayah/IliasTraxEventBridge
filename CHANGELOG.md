@@ -2,14 +2,14 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.6.0 — pré-stabilisation
+## v0.6.0 — stable
 
 ### Statut
 
-- Branche de développement `v0.6` créée à partir de `main` / `v0.5.5` stable.
-- Version plugin portée à `0.6.0` pour ouvrir la série V0.6.
-- `main` et `v0.5` restent les références stables V0.5.5 tant que la V0.6 n'est pas validée et taguée.
-- La V0.6 est en phase de pré-stabilisation : code fonctionnel validé sur serveur, documentation principale alignée, checklist de stabilisation ajoutée.
+- Version stable V0.6.0 taguée après validation serveur et Windows.
+- Branche `v0.6` conservée comme branche stable V0.6.
+- `main` et `v0.5` restent alignées sur la série stable V0.5.5 tant que la promotion de `main` vers V0.6 n'est pas décidée explicitement.
+- Version plugin : `0.6.0`.
 
 ### Ajouté
 
@@ -23,7 +23,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout d'une section admin `Supervision V0.6` dans l'écran de configuration du plugin, calculée sur les 200 dernières lignes outbox : statuts, événements, objets, familles xAPI, types d'interaction, sources techniques, dernières clés de diagnostic et dernières erreurs.
 - Ajout d'un bloc admin `Exploitation / maintenance` avec compteurs total, 24h, 7j, `sent`, `generated`, `failed`, erreurs à inspecter et retry épuisé.
 - Ajout du guide `docs/OPERATIONS.md` pour l'exploitation SQL et les diagnostics serveur.
-- Ajout du guide `docs/V0.6_STABILISATION.md` pour préparer le tag `v0.6.0`.
+- Ajout du guide `docs/V0.6_STABILISATION.md` pour préparer et rejouer la stabilisation V0.6.
 - Mise à jour du plan de validation V0.6 avec les contrôles SQL complets : familles xAPI, métriques `read_event`, diagnostics outbox, wording bilingue, envoi TRAX et absence de traces parasites.
 
 ### Changé
@@ -35,30 +35,28 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les statements sont enrichis au moment de l'insertion outbox afin d'y inclure l'identifiant technique local `outbox_id` sans modifier le schéma SQL.
 - Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
 - L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.
-- `README.md` et `README_TECHNIQUE.md` sont alignés sur l'état V0.6 en pré-stabilisation.
+- `README.md`, `README_TECHNIQUE.md`, `docs/VALIDATION.md`, `docs/OPERATIONS.md` et `docs/V0.6_STABILISATION.md` documentent désormais la série V0.6.
 
-### Validation observée
+### Validation stable observée
 
 - Génération et envoi `sent` validés pour fichier, test, blog, wiki, lien web, mediacast et module HTML.
 - Vérification des extensions V0.6 dans le JSON xAPI : titres, URLs, contexte cours, familles, durée, métriques `read_event`, diagnostics outbox et clé de déduplication.
 - Vérification du wording bilingue `fr-FR` / `en-US`.
 - Vérification de la branche serveur et Windows en `v0.6` propre.
+- Vérification anti-parasites : aucune nouvelle ligne outbox `root` ou `crs`.
 
-### Reste à faire avant tag
+### Après tag
 
-- Valider le dernier écran admin d'exploitation / maintenance après pull serveur.
-- Rejouer la checklist `docs/V0.6_STABILISATION.md`.
-- Créer le tag `v0.6.0` uniquement après validation finale.
-- Décider explicitement si `main` doit être promue vers V0.6 après le tag.
+- Le tag `v0.6.0` doit pointer sur le commit documentaire stable final de la branche `v0.6`.
+- La promotion éventuelle de `main` vers V0.6 reste une décision séparée.
 
 ## v0.5.5 — stable
 
 ### Statut
 
-- Version stable actuelle du dépôt.
-- Branche `main` alignée sur la série stable V0.5.
+- Version stable V0.5 conservée pour maintenance.
+- Branche `main` encore alignée sur la série stable V0.5 tant que la promotion V0.6 n'est pas décidée.
 - Branche `v0.5` conservée comme branche stable V0.5.
-- Prochaine cible de développement : `v0.6`.
 
 ### Changé
 
