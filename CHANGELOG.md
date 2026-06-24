@@ -63,7 +63,16 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Cette étape rend l'écran testable dans ILIAS sans dépendre immédiatement d'une injection dans les paramètres natifs du cours.
 - L'intégration directe dans l'objet cours reste l'objectif fonctionnel, mais dépend des points d'extension disponibles pour un plugin EventHook sur ILIAS 10.
 - Ajout de `docs/V0.7_COURSE_TRACKING_ACCESS.md`.
-- Le filtrage xAPI avant outbox reste prévu pour le jalon suivant.
+- Les formulaires d'accès cours utilisent `POST` pour préserver les paramètres `ilCtrl`.
+
+### Jalon 5 — filtrage avant outbox
+
+- Ajout du filtrage effectif avant insertion dans `evnt_evhk_itxeb_out`.
+- Les événements EventHook ne génèrent un statement que si le cours est activé dans `evnt_evhk_itxeb_ccfg` et si la ressource est activée dans `evnt_evhk_itxeb_rcfg`.
+- Les consultations issues de `read_event` appliquent la même règle avant génération outbox.
+- Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron ; une consultation ultérieure pourra être traitée si `last_access` ou `read_count` évolue.
+- La configuration est strictement opt-in : sans configuration explicite du cours et de la ressource, aucun statement xAPI n'est généré.
+- Ajout de `docs/V0.7_OUTBOX_FILTERING.md`.
 
 ## v0.6.0 — stable
 
@@ -98,4 +107,3 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les statements sont enrichis au moment de l'insertion outbox afin d'y inclure l'identifiant technique local `outbox_id` sans modifier le schéma SQL.
 - Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
 - L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.
-- `README.md`, `README_TECHNIQUE.md`, `docs/VALIDATION.md`, `docs/OPERATIONS.md` et `docs/V0.6_STABILISATION.md` documentent désormais la série V0.6.
