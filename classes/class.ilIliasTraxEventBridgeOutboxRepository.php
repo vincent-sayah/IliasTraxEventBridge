@@ -76,7 +76,7 @@ class ilIliasTraxEventBridgeOutboxRepository
         $rows = [];
         if (!$this->tableExists()) { return $rows; }
 
-        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at, sent_at, last_error, retry_count, max_retry, last_attempt_at '
+        $query = 'SELECT id, event_log_id, statement_uuid, event_type, verb_id, user_id, ref_id, obj_id, obj_type, statement_json, status, created_at, created_ts, sent_at, last_error, retry_count, max_retry, last_attempt_at '
             . 'FROM ' . self::TABLE_NAME . ' ORDER BY id DESC';
 
         if (method_exists($this->db, 'setLimit')) { $this->db->setLimit($limit); }
@@ -171,6 +171,21 @@ class ilIliasTraxEventBridgeOutboxRepository
     public function countRetryExhausted(int $maxRetry): int
     {
         return $this->countWhere(' WHERE status = ' . $this->db->quote('failed', 'text') . ' AND retry_count >= ' . (int) $maxRetry);
+    }
+
+    public function countCreatedSince(int $sinceTs): int
+    {
+        return $this->countWhere(' WHERE created_ts >= ' . max(0, $sinceTs));
+    }
+
+    public function countByStatusSince(string $status, int $sinceTs): int
+    {
+        return $this->countWhere(' WHERE status = ' . $this->db->quote($status, 'text') . ' AND created_ts >= ' . max(0, $sinceTs));
+    }
+
+    public function countFailedWithError(): int
+    {
+        return $this->countWhere(' WHERE status = ' . $this->db->quote('failed', 'text') . ' OR last_error <> ' . $this->db->quote('', 'clob'));
     }
 
     public function clear(): void
