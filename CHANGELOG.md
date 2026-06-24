@@ -34,6 +34,16 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md` avec les requêtes de vérification et les tests SQL manuels.
 - Aucun filtrage xAPI n'est encore appliqué dans ce jalon : le comportement V0.6 reste inchangé jusqu'au lot de filtrage.
 
+### Jalon 3 — résolution cours / ressources
+
+- Ajout de `ilIliasTraxEventBridgeCourseResourceResolver`.
+- Le resolver liste les ressources traçables contenues dans un cours à partir d'un `course_ref_id`.
+- Types préparés : `file`, `tst`, `blog`, `wiki`, `webr`, `mcst`, `frm`, `htlm`, `lm`, `sahs`.
+- Pour chaque ressource, le resolver prépare `ref_id`, `obj_id`, `obj_type`, famille, titre, chemin, état `configured` et état `enabled`.
+- Les états sont joints depuis `evnt_evhk_itxeb_rcfg` quand une configuration existe.
+- Ajout de `docs/V0.7_COURSE_RESOURCE_RESOLVER.md`.
+- Aucun écran cours et aucun filtrage xAPI ne sont encore appliqués dans ce jalon.
+
 ## v0.6.0 — stable
 
 ### Statut
