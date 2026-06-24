@@ -44,6 +44,16 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de `docs/V0.7_COURSE_RESOURCE_RESOLVER.md`.
 - Aucun écran cours et aucun filtrage xAPI ne sont encore appliqués dans ce jalon.
 
+### Jalon 4 — interface de configuration cours
+
+- Ajout de `ilIliasTraxEventBridgeCourseTrackingGUI`.
+- L'interface permet d'afficher le résumé d'un cours, l'état d'activation xAPI du cours et les ressources traçables retournées par le resolver.
+- Actions disponibles : `show`, `save`, `enableAll`, `disableAll`, `resetCourse`.
+- Les choix sont enregistrés dans `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
+- Les droits cours sont vérifiés avant écriture via les permissions `write`, `edit_permission` ou `manage_members`.
+- Ajout de `docs/V0.7_COURSE_TRACKING_UI.md`.
+- Le filtrage xAPI avant outbox reste prévu pour le jalon suivant.
+
 ## v0.6.0 — stable
 
 ### Statut
