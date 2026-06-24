@@ -2,15 +2,15 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS via une outbox locale.
 
-Version stable V0.6 actuelle : **v0.6.0**. Branche stable : **v0.6** avec plugin version **0.6.0**. La branche `main` reste encore alignée sur **v0.5.5** tant que sa promotion vers V0.6 n'est pas décidée.
+Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, plugin version **0.6.0**. La branche **v0.5** reste conservée pour maintenance historique V0.5.5.
 
 ## État des branches
 
 | Branche | Rôle | État |
 |---|---|---|
-| `main` | Stable publiée par défaut | Encore alignée sur la série v0.5.5 |
-| `v0.5` | Maintenance stable V0.5 | Stable v0.5.5 |
-| `v0.6` | Stable V0.6 | Stable v0.6.0 taguée |
+| `main` | Stable publiée par défaut | Stable v0.6.0 |
+| `v0.6` | Maintenance stable V0.6 | Stable v0.6.0 taguée |
+| `v0.5` | Maintenance stable V0.5 | Stable v0.5.5 historique |
 
 ## Fonctionnalités stables v0.5.5
 
@@ -66,7 +66,7 @@ Les actions d'administration, comme la suppression des résultats de test, sont 
 
 ## Installation stable depuis GitHub
 
-Tant que `main` n'est pas promue en V0.6, installer explicitement la branche stable V0.6 :
+La branche `main` pointe sur la dernière stable publiée. Il est aussi possible d'utiliser `v0.6` pour rester explicitement sur la maintenance V0.6.
 
 ```bash
 sudo -i
@@ -78,7 +78,7 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-git clone -b v0.6 --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 
 cd "$PLUGIN_NAME"
 grep -n '\$version' plugin.php
@@ -93,7 +93,7 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Résultat attendu sur `v0.6` :
+Résultat attendu :
 
 ```text
 $version = "0.6.0";
@@ -158,7 +158,7 @@ Dans l'écran de configuration du plugin :
 | Activer le cron plugin | Autorise le job cron du plugin à générer les consultations `read_event` et à envoyer l'outbox. |
 | Endpoint xAPI TRAX | Endpoint xAPI racine ou endpoint complet `/statements`. |
 | Identifiant client TRAX | Client xAPI TRAX. |
-| Secret client TRAX | Secret associé au client xAPI. |
+| Secret client TRAX | Secret associé au client TRAX. |
 | Version xAPI | Recommandé : `1.0.3`. |
 | Timeout HTTP | Timeout d'appel HTTP. |
 | Taille batch | Nombre maximum de statements envoyés par batch manuel ou cron. |
@@ -189,7 +189,7 @@ Identifiant technique :
 itxeb_send_outbox_to_trax
 ```
 
-Le cron doit être actif dans ILIAS et le cron système/CLI d'ILIAS doit tourner régulièrement sur le serveur. Sans cela, les consultations détectées dans `read_event` ne sont transformées en statements xAPI qu'au prochain passage du cron.
+Le cron doit être actif dans ILIAS et le cron système/CLI d'ILIAS doit tourner régulièrement sur le serveur.
 
 ## Supervision V0.6
 
