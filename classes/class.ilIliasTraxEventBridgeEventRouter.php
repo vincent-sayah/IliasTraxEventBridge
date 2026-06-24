@@ -1,9 +1,10 @@
 <?php
 
 /**
- * V0.5 router:
+ * V0.7 router:
  * - persists every received event in debug mode;
  * - generates local xAPI statements only for reliable events contained in a course;
+ * - applies explicit course/resource xAPI configuration before outbox insertion;
  * - stores accepted statements in the outbox.
  */
 class ilIliasTraxEventBridgeEventRouter
@@ -26,13 +27,17 @@ class ilIliasTraxEventBridgeEventRouter
     /** @var ilIliasTraxEventBridgeCourseContextResolver|null */
     private $courseContextResolver;
 
+    /** @var ilIliasTraxEventBridgeCourseTrackingRepository|null */
+    private $courseTrackingRepository;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeEventDebugRepository $repository,
         ilIliasTraxEventBridgePlugin $plugin,
         ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
         ?ilIliasTraxEventBridgeOutboxRepository $outboxRepository = null,
-        ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null
+        ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null,
+        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null
     ) {
         $this->config = $config;
         $this->repository = $repository;
@@ -40,6 +45,7 @@ class ilIliasTraxEventBridgeEventRouter
         $this->statementFactory = $statementFactory;
         $this->outboxRepository = $outboxRepository;
         $this->courseContextResolver = $courseContextResolver;
+        $this->courseTrackingRepository = $courseTrackingRepository;
     }
 
     public function handle(string $component, string $event, array $params): void
@@ -87,6 +93,10 @@ class ilIliasTraxEventBridgeEventRouter
 
         $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
         $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
+
+        if (!$this->isTrackingAllowedForConfiguredCourse((int) $record['course_ref_id'], (int) $record['ref_id'])) {
+            return;
+        }
 
         $statement = $this->statementFactory->createFromEventRecord($record);
         if ($statement !== null) {
@@ -336,6 +346,26 @@ class ilIliasTraxEventBridgeEventRouter
         }
 
         return $this->courseContextResolver;
+    }
+
+    private function getCourseTrackingRepository(): ilIliasTraxEventBridgeCourseTrackingRepository
+    {
+        if ($this->courseTrackingRepository === null) {
+            $this->courseTrackingRepository = new ilIliasTraxEventBridgeCourseTrackingRepository();
+        }
+
+        return $this->courseTrackingRepository;
+    }
+
+    private function isTrackingAllowedForConfiguredCourse(int $courseRefId, int $refId): bool
+    {
+        if ($courseRefId <= 0 || $refId <= 0) {
+            return false;
+        }
+
+        $repository = $this->getCourseTrackingRepository();
+        return $repository->isCourseEnabled($courseRefId)
+            && $repository->isResourceEnabled($courseRefId, $refId);
     }
 
     private function getServerValue(string $key): string
