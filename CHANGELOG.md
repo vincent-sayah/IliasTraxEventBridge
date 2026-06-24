@@ -18,11 +18,20 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Filtrer les événements avant insertion dans l'outbox quand le cours ou la ressource n'est pas autorisé.
 - Conserver les statements enrichis V0.6 pour les ressources explicitement activées.
 
-### Premier jalon
+### Jalon 1 — ouverture V0.7
 
 - Création de la branche `v0.7`.
 - Ouverture de la version plugin `0.7.0`.
 - Ajout de `docs/V0.7_DEV_PLAN.md` pour cadrer le modèle de données, l'interface cours, les permissions et les règles de filtrage.
+
+### Jalon 2 — tables de configuration cours / ressources
+
+- Ajout de la migration SQL `#5` dans `sql/dbupdate.php`.
+- Création de la table `evnt_evhk_itxeb_crs_cfg` pour stocker l'activation xAPI par cours.
+- Création de la table `evnt_evhk_itxeb_res_cfg` pour stocker l'activation xAPI par ressource dans un cours.
+- Ajout du repository `ilIliasTraxEventBridgeCourseTrackingRepository` pour lire et écrire ces configurations.
+- Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md` avec les requêtes de vérification et les tests SQL manuels.
+- Aucun filtrage xAPI n'est encore appliqué dans ce jalon : le comportement V0.6 reste inchangé jusqu'au lot de filtrage.
 
 ## v0.6.0 — stable
 
