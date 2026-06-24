@@ -7,8 +7,8 @@ Toutes les évolutions notables du plugin sont listées ici.
 ### Statut
 
 - Version stable V0.6.0 taguée après validation serveur et Windows.
-- Branche `v0.6` conservée comme branche stable V0.6.
-- `main` et `v0.5` restent alignées sur la série stable V0.5.5 tant que la promotion de `main` vers V0.6 n'est pas décidée explicitement.
+- Branches `main` et `v0.6` alignées sur la stable V0.6.0.
+- Branche `v0.5` conservée pour maintenance historique V0.5.5.
 - Version plugin : `0.6.0`.
 
 ### Ajouté
@@ -44,19 +44,21 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Vérification du wording bilingue `fr-FR` / `en-US`.
 - Vérification de la branche serveur et Windows en `v0.6` propre.
 - Vérification anti-parasites : aucune nouvelle ligne outbox `root` ou `crs`.
+- Promotion de `main` vers V0.6.0 réalisée après validation finale.
 
 ### Après tag
 
-- Le tag `v0.6.0` doit pointer sur le commit documentaire stable final de la branche `v0.6`.
-- La promotion éventuelle de `main` vers V0.6 reste une décision séparée.
+- Le tag `v0.6.0` pointe sur le commit documentaire stable final de la branche `v0.6`.
+- `main` est promue vers V0.6.0.
+- Les développements suivants doivent partir d'une nouvelle branche, par exemple `v0.7`.
 
-## v0.5.5 — stable
+## v0.5.5 — stable historique
 
 ### Statut
 
 - Version stable V0.5 conservée pour maintenance.
-- Branche `main` encore alignée sur la série stable V0.5 tant que la promotion V0.6 n'est pas décidée.
 - Branche `v0.5` conservée comme branche stable V0.5.
+- `main` a été promue vers V0.6.0 après stabilisation ; utiliser `v0.5` pour revenir à la série V0.5.5.
 
 ### Changé
 
