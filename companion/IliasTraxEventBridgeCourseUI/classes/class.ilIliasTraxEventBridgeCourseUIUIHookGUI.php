@@ -5,9 +5,8 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIBridge.php';
 /**
  * UIHook GUI skeleton for exposing course-level TRAX/xAPI configuration.
  *
- * Lot 2 is intentionally non-invasive: no HTML is injected yet. The class only
- * proves that the companion plugin can be loaded safely and can discover the
- * current course context.
+ * Lot 3 prepares course-context detection and contextual URL generation. The
+ * next lots will use this information to inject a visible course entry.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -44,15 +43,30 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        // Lot 2 skeleton only. Course-tab injection is handled in a later lot.
+        // Lot 3 only prepares context detection. Course entry injection is next.
+    }
+
+    /** @return array<string,mixed> */
+    public function getCurrentCourseContext(): array
+    {
+        return $this->bridge->getCourseContext();
     }
 
     public function isReadyForCourseContext(): bool
     {
-        $courseRefId = $this->bridge->detectCourseRefId();
+        $context = $this->getCurrentCourseContext();
 
-        return $courseRefId > 0
-            && $this->bridge->isMainPluginAvailable()
-            && $this->bridge->canManageCourse($courseRefId);
+        return (int) ($context['course_ref_id'] ?? 0) > 0
+            && (bool) ($context['main_plugin_available'] ?? false)
+            && (bool) ($context['course_tracking_classes_available'] ?? false)
+            && (bool) ($context['can_manage'] ?? false)
+            && (string) ($context['configuration_url'] ?? '') !== '';
+    }
+
+    public function getContextualConfigurationUrl(): string
+    {
+        $context = $this->getCurrentCourseContext();
+
+        return (string) ($context['configuration_url'] ?? '');
     }
 }
