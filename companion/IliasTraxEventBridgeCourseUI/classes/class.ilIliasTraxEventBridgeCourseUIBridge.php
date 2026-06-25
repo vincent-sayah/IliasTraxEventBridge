@@ -15,7 +15,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
     {
         $this->mainPluginPath = $mainPluginPath !== null
             ? rtrim($mainPluginPath, '/')
-            : dirname(__DIR__, 3) . '/EventHandling/EventHook/IliasTraxEventBridge';
+            : dirname(__DIR__, 4) . '/EventHandling/EventHook/IliasTraxEventBridge';
     }
 
     public function getMainPluginPath(): string
