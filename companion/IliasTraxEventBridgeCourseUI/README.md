@@ -26,6 +26,30 @@ Ce lot fournit un squelette non invasif :
 - bridge `ilIliasTraxEventBridgeCourseUIBridge` ;
 - classe UIHook `ilIliasTraxEventBridgeCourseUIUIHookGUI`.
 
+## État Lot 3
+
+Le lot 3 ajoute la détection contextualisée du cours courant.
+
+Le bridge prépare maintenant :
+
+- `course_ref_id` ;
+- `course_obj_id` ;
+- `course_title` ;
+- `can_manage` ;
+- `main_plugin_available` ;
+- `course_tracking_classes_available` ;
+- `configuration_url` ;
+- `detection_candidates`.
+
+La détection peut exploiter :
+
+- `ref_id` ;
+- `course_ref_id` ;
+- `target_ref_id` ;
+- `itxeb_course_ref_id` ;
+- `target=crs_<id>` ;
+- `REQUEST_URI`, notamment `/goto.php/crs/<id>` et `/crs/<id>`.
+
 Aucune entrée n'est encore injectée dans l'interface cours à ce stade.
 
 ## Chemin d'installation cible
@@ -69,7 +93,7 @@ sudo -u apache php cli/setup.php build --yes
 
 Ensuite, vérifier dans l'administration des plugins ILIAS que `IliasTraxEventBridgeCourseUI` apparaît comme plugin UIHook.
 
-## Validation Lot 2
+## Validation syntaxe
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
@@ -79,6 +103,21 @@ find companion/IliasTraxEventBridgeCourseUI -name "*.php" -print0 | xargs -0 -n1
 
 Résultat attendu : aucune erreur de syntaxe PHP.
 
+## Validation rapide du bridge
+
+Après installation provisoire dans le dossier UIHook, vérifier le chemin vers le plugin principal :
+
+```bash
+php -r 'require "/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIBridge.php"; $b = new ilIliasTraxEventBridgeCourseUIBridge(); echo $b->getMainPluginPath(), PHP_EOL; echo $b->isMainPluginAvailable() ? "main plugin OK\n" : "main plugin missing\n";'
+```
+
+Résultat attendu :
+
+```text
+/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+main plugin OK
+```
+
 ## Suite
 
-Lot 3 : détection fiable du contexte cours et préparation de l'URL de configuration xAPI contextualisée.
+Lot 4 : ajouter une entrée visible dans l'objet cours en utilisant le contexte et l'URL contextualisée préparés par le lot 3.
