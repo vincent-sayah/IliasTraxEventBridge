@@ -2,14 +2,15 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.7.0 — développement
+## v0.7.0 — stabilisation candidate
 
 ### Statut
 
 - Branche `v0.7` créée depuis `main` / `v0.6.0` stable.
 - Version plugin portée à `0.7.0` pour ouvrir la série V0.7.
-- Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource depuis le contexte de l'objet cours.
-- `main` et `v0.6` restent les références stables V0.6.0 pendant le développement V0.7.
+- Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource.
+- `main` et `v0.6` restent les références stables V0.6.0 pendant la stabilisation V0.7.
+- La branche `v0.7` est fonctionnellement validée sur le scénario cours activé / ressources activées / ressources refusées ; elle reste candidate tant que le tag `v0.7.0` n'est pas posé et promu.
 
 ### Objectif fonctionnel
 
@@ -73,6 +74,14 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron ; une consultation ultérieure pourra être traitée si `last_access` ou `read_count` évolue.
 - La configuration est strictement opt-in : sans configuration explicite du cours et de la ressource, aucun statement xAPI n'est généré.
 - Ajout de `docs/V0.7_OUTBOX_FILTERING.md`.
+
+### Jalon 6 — stabilisation documentaire V0.7
+
+- Alignement de `README.md` avec l'état V0.7 candidate : `main` reste stable V0.6.0, `v0.7` porte la candidate `0.7.0`.
+- Alignement de `README_TECHNIQUE.md` avec l'architecture V0.7 : nouvelles classes, tables `ccfg` / `rcfg`, flux de filtrage EventHook et `read_event`.
+- Mise à jour de `docs/VALIDATION.md` pour remplacer le plan V0.6 par un plan V0.7 complet.
+- Ajout des critères de validation réels : cours activé, ressources activées envoyées, ressources désactivées refusées avant outbox.
+- Préparation de la suite : validation finale serveur/Windows, puis tag `v0.7.0` et promotion éventuelle de `main`.
 
 ## v0.6.0 — stable
 
