@@ -35,7 +35,8 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function getHTML($a_comp, $a_part, $a_par = []): array
     {
-        $this->injectCourseSettingsSubtab();
+        $this->debugHook('getHTML', $a_comp, $a_part, $a_par);
+        $this->injectCourseSettingsSubtab('getHTML');
 
         if (self::$entryInjected) {
             return [
@@ -46,7 +47,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
         if ($this->isCourseUiCommandRequest()) {
             self::$entryInjected = true;
-            $this->injectCourseSettingsSubtab();
+            $this->injectCourseSettingsSubtab('getHTML:screen');
             $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
             return [
                 'mode' => ilUIHookPluginGUI::APPEND,
@@ -69,7 +70,8 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        $this->injectCourseSettingsSubtab();
+        $this->debugHook('modifyGUI', $a_comp, $a_part, $a_par);
+        $this->injectCourseSettingsSubtab('modifyGUI');
     }
 
     /** @return array<string,mixed> */
@@ -96,14 +98,21 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         return (string) ($context['configuration_url'] ?? '');
     }
 
-    private function injectCourseSettingsSubtab(): void
+    private function injectCourseSettingsSubtab(string $source): void
     {
-        if (self::$subtabInjected || !$this->isReadyForCourseContext()) {
+        if (self::$subtabInjected) {
+            $this->debug('inject skip already source=' . $source);
+            return;
+        }
+
+        if (!$this->isReadyForCourseContext()) {
+            $this->debug('inject skip not-ready source=' . $source . ' uri=' . $this->currentUri());
             return;
         }
 
         $url = $this->getContextualConfigurationUrl();
         if ($url === '') {
+            $this->debug('inject skip empty-url source=' . $source);
             return;
         }
 
@@ -116,8 +125,17 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             }
 
             if (!is_object($tabs)) {
+                $this->debug('inject skip no-tabs source=' . $source);
                 return;
             }
+
+            $this->debug('inject tabs source=' . $source
+                . ' class=' . get_class($tabs)
+                . ' addSubTab=' . (method_exists($tabs, 'addSubTab') ? '1' : '0')
+                . ' addSubTabTarget=' . (method_exists($tabs, 'addSubTabTarget') ? '1' : '0')
+                . ' activateSubTab=' . (method_exists($tabs, 'activateSubTab') ? '1' : '0')
+                . ' url=' . $url
+            );
 
             $injected = false;
 
@@ -135,8 +153,12 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
             if ($injected) {
                 self::$subtabInjected = true;
+                $this->debug('inject success source=' . $source);
+            } else {
+                $this->debug('inject failed no-method source=' . $source);
             }
-        } catch (Throwable $ignored) {
+        } catch (Throwable $e) {
+            $this->debug('inject exception source=' . $source . ' error=' . $e->getMessage());
             // UI hook must never break the course page.
         }
     }
@@ -183,5 +205,53 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             return '';
         }
         return '';
+    }
+
+    /** @param array<string,mixed> $a_par */
+    private function debugHook(string $method, $a_comp, $a_part, array $a_par): void
+    {
+        if (!$this->debugEnabled()) {
+            return;
+        }
+
+        $context = $this->getCurrentCourseContext();
+        $this->debug($method
+            . ' comp=' . (is_scalar($a_comp) ? (string) $a_comp : gettype($a_comp))
+            . ' part=' . (is_scalar($a_part) ? (string) $a_part : gettype($a_part))
+            . ' par_keys=' . implode(',', array_keys($a_par))
+            . ' course_ref_id=' . (string) ((int) ($context['course_ref_id'] ?? 0))
+            . ' can_manage=' . (!empty($context['can_manage']) ? '1' : '0')
+            . ' uri=' . $this->currentUri()
+        );
+    }
+
+    private function debug(string $line): void
+    {
+        if (!$this->debugEnabled()) {
+            return;
+        }
+
+        @file_put_contents(
+            $this->debugLogPath(),
+            date('Y-m-d H:i:s') . ' ' . $line . PHP_EOL,
+            FILE_APPEND
+        );
+    }
+
+    private function debugEnabled(): bool
+    {
+        return is_file(dirname(__DIR__) . '/debug.tabs');
+    }
+
+    private function debugLogPath(): string
+    {
+        return dirname(__DIR__) . '/debug.tabs.log';
+    }
+
+    private function currentUri(): string
+    {
+        return isset($_SERVER['REQUEST_URI']) && is_scalar($_SERVER['REQUEST_URI'])
+            ? (string) $_SERVER['REQUEST_URI']
+            : '';
     }
 }
