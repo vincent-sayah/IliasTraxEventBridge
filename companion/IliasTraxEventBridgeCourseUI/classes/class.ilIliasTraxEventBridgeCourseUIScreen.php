@@ -110,7 +110,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             );
         }
 
-        $this->message = 'Configuration TRAX / xAPI du cours enregistrée.';
+        $this->message = 'Configuration xAPI du cours enregistrée.';
         $this->messageType = 'success';
     }
 
@@ -141,7 +141,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     private function resetCourse(int $courseRefId): void
     {
         $this->repository->deleteCourseConfig($courseRefId);
-        $this->message = 'Configuration TRAX / xAPI du cours réinitialisée.';
+        $this->message = 'Configuration xAPI du cours réinitialisée.';
         $this->messageType = 'success';
     }
 
@@ -237,7 +237,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function renderShell(string $content, int $courseRefId, string $courseTitle): string
     {
-        $title = trim($courseTitle) !== '' ? 'TRAX / xAPI — ' . $courseTitle : 'TRAX / xAPI — configuration du cours';
+        $title = trim($courseTitle) !== '' ? 'Suivi xAPI — ' . $courseTitle : 'Suivi xAPI — configuration du cours';
         return $this->styles()
             . '<div id="itxeb-course-ui-screen" class="itxeb-cui-screen">'
             . '<div class="itxeb-cui-panel">'
