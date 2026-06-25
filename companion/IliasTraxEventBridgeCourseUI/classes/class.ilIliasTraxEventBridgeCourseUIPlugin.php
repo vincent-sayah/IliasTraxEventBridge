@@ -23,7 +23,7 @@ class ilIliasTraxEventBridgeCourseUIPlugin extends ilUserInterfaceHookPlugin
 
     public function getMainPluginPath(): string
     {
-        return dirname(__DIR__, 3)
+        return dirname(__DIR__, 4)
             . '/EventHandling/EventHook/'
             . self::MAIN_PLUGIN_NAME;
     }
