@@ -23,7 +23,27 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de `ilIliasTraxEventBridgeCourseUIBridge`, bridge de découverte du plugin principal, chargement des classes V0.7 et vérification des droits cours.
 - Ajout de `ilIliasTraxEventBridgeCourseUIUIHookGUI`, classe UIHook non invasive pour le lot 2.
 - Ajout de `companion/IliasTraxEventBridgeCourseUI/README.md` avec le chemin d'installation cible et les commandes de validation.
-- Aucun onglet ou bloc n'est encore injecté dans l'objet cours à ce stade.
+
+### Lot 3 — détection contexte cours
+
+- Le bridge détecte le cours courant depuis `ref_id`, `course_ref_id`, `target_ref_id`, `itxeb_course_ref_id`, `target=crs_<id>` ou l'URL courante.
+- Le bridge prépare `course_ref_id`, `course_obj_id`, `course_title`, les droits de gestion, la disponibilité du plugin principal et l'URL contextualisée.
+- Compatibilité ILIAS 10 : les superglobales remplacées par `SuperGlobalDropInReplacement` sont prises en charge.
+
+### Lot 4 — entrée visible dans l'objet cours
+
+- Ajout d'un bouton flottant `TRAX / xAPI` dans l'objet cours.
+- Le bouton apparaît uniquement si un cours est détecté et si l'utilisateur a le droit de gérer le cours.
+- Le bouton pointe vers l'URL contextualisée du cours.
+
+### Lot 5 — écran complet depuis l'objet cours
+
+- Ajout de `ilIliasTraxEventBridgeCourseUIScreen` dans le plugin compagnon.
+- Le bouton `TRAX / xAPI` ouvre maintenant un panneau complet de configuration depuis l'objet cours.
+- L'écran affiche le résumé du cours, l'activation xAPI du cours et les ressources traçables.
+- Actions prises en charge : `showCourseTracking`, `saveCourseTracking`, `enableAllCourseTracking`, `disableAllCourseTracking`, `resetCourseTracking`.
+- Les choix sont enregistrés dans les tables V0.7 existantes `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
+- La saisie manuelle du `course_ref_id` n'est plus nécessaire depuis l'objet cours.
 
 ## v0.7.0 — stable
 
