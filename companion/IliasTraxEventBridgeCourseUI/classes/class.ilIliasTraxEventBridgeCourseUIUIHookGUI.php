@@ -5,6 +5,10 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
 
 /**
  * UIHook GUI for exposing course-level xAPI configuration.
+ *
+ * Official ILIAS 10 UIHook tab handling is done through modifyGUI(..., 'sub_tabs', ['tabs' => ...]).
+ * The course-settings detection is intentionally relaxed because ILIAS may hide the current command
+ * behind ilCtrl instead of plain $_GET['cmd'].
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -52,7 +56,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             ];
         }
 
-        if ($this->isReadyForCourseContext() && $this->isSettingsAreaRequest()) {
+        if ($this->isReadyForCourseContext()) {
             return [
                 'mode' => ilUIHookPluginGUI::REPLACE,
                 'html' => $this->injectSubtabIntoHtml($a_par['html']),
@@ -81,7 +85,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
     private function modifySubTabs($tabs): void
     {
-        if (!$this->isReadyForCourseContext() || !$this->isSettingsAreaRequest()) {
+        if (!$this->isReadyForCourseContext()) {
             return;
         }
 
@@ -147,6 +151,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         $patterns = [
             '/(<li[^>]*>\s*<a[^>]*>\s*Multi-Linguisme\s*<\/a>\s*<\/li>)/iu',
             '/(<li[^>]*>\s*<a[^>]*>\s*Multilinguisme\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Multilingualism\s*<\/a>\s*<\/li>)/iu',
         ];
 
         foreach ($patterns as $pattern) {
@@ -159,6 +164,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         $patterns = [
             '/(<a[^>]*>\s*Multi-Linguisme\s*<\/a>)/iu',
             '/(<a[^>]*>\s*Multilinguisme\s*<\/a>)/iu',
+            '/(<a[^>]*>\s*Multilingualism\s*<\/a>)/iu',
         ];
 
         foreach ($patterns as $pattern) {
@@ -234,16 +240,6 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             'disableAllCourseTracking',
             'resetCourseTracking',
         ], true);
-    }
-
-    private function isSettingsAreaRequest(): bool
-    {
-        if ($this->isCourseUiCommandRequest()) {
-            return true;
-        }
-
-        $cmd = strtolower($this->requestValue($_GET, 'cmd'));
-        return in_array($cmd, ['edit', 'update', 'editinfo', 'updateinfo'], true);
     }
 
     private function requestValue($source, string $key): string
