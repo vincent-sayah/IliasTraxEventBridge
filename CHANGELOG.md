@@ -2,15 +2,38 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.7.0 — stabilisation candidate
+## v0.7.1 — développement course object UI
+
+### Statut
+
+- Branche de développement : `v0.7.1-course-object-ui`.
+- Base : tag stable `v0.7.0` / branche `v0.7`.
+- Objectif : permettre la sélection des ressources xAPI depuis l'objet cours, par un administrateur de cours, et non plus principalement depuis la configuration globale du plugin.
+
+### Lot 1 — cadrage
+
+- Ajout de `docs/V0.7.1_COURSE_OBJECT_UI.md`.
+- Décision d'architecture : conserver `IliasTraxEventBridge` comme plugin principal EventHook et ajouter un plugin compagnon UIHook léger.
+
+### Lot 2 — squelette plugin compagnon
+
+- Ajout du dossier `companion/IliasTraxEventBridgeCourseUI`.
+- Ajout du `plugin.php` du plugin compagnon avec l'identifiant `itxebcui` et la version `0.1.0`.
+- Ajout de `ilIliasTraxEventBridgeCourseUIPlugin`, classe plugin UIHook.
+- Ajout de `ilIliasTraxEventBridgeCourseUIBridge`, bridge de découverte du plugin principal, chargement des classes V0.7 et vérification des droits cours.
+- Ajout de `ilIliasTraxEventBridgeCourseUIUIHookGUI`, classe UIHook non invasive pour le lot 2.
+- Ajout de `companion/IliasTraxEventBridgeCourseUI/README.md` avec le chemin d'installation cible et les commandes de validation.
+- Aucun onglet ou bloc n'est encore injecté dans l'objet cours à ce stade.
+
+## v0.7.0 — stable
 
 ### Statut
 
 - Branche `v0.7` créée depuis `main` / `v0.6.0` stable.
 - Version plugin portée à `0.7.0` pour ouvrir la série V0.7.
 - Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource.
-- `main` et `v0.6` restent les références stables V0.6.0 pendant la stabilisation V0.7.
-- La branche `v0.7` est fonctionnellement validée sur le scénario cours activé / ressources activées / ressources refusées ; elle reste candidate tant que le tag `v0.7.0` n'est pas posé et promu.
+- `main` et `v0.6` restent les références stables V0.6.0.
+- Tag stable : `v0.7.0`.
 
 ### Objectif fonctionnel
 
