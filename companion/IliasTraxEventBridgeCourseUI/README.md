@@ -4,14 +4,14 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 ## Objectif
 
-Ce plugin expose la configuration TRAX / xAPI directement depuis l'objet cours ILIAS.
+Ce plugin expose la configuration xAPI directement depuis l'objet cours ILIAS.
 
 Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
 - la captation EventHook ;
 - l'outbox ;
 - le cron ;
-- l'envoi TRAX ;
+- l'envoi vers le LRS configuré ;
 - les tables `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg` ;
 - le filtrage avant outbox.
 
@@ -50,35 +50,31 @@ La détection peut exploiter :
 - `target=crs_<id>` ;
 - `REQUEST_URI`, notamment `/goto.php/crs/<id>` et `/crs/<id>`.
 
-## État Lot 4
+## État Lot 4 / 5 — accès cours final
 
-Le lot 4 ajoute une entrée visible non destructive dans l'objet cours.
+L'accès visible final n'est plus un bouton flottant.
 
-Si le contexte est un cours et si l'utilisateur peut gérer le cours, le plugin compagnon injecte un bouton flottant :
+Le plugin compagnon tente d'ajouter un sous-onglet générique dans les onglets du cours :
 
 ```text
-TRAX / xAPI
+Suivi xAPI
 ```
 
-Ce bouton pointe vers l'URL contextualisée préparée par le lot 3 :
+Ce libellé est volontairement indépendant du LRS utilisé.
+
+Conditions d'affichage :
+
+- cours détecté ;
+- utilisateur autorisé à gérer le cours ;
+- plugin principal disponible ;
+- classes de configuration V0.7 disponibles ;
+- URL contextualisée disponible.
+
+Le sous-onglet pointe vers :
 
 ```text
 itxeb_cui_cmd=showCourseTracking
 itxeb_course_ref_id=<course_ref_id>
-```
-
-## État Lot 5
-
-Le lot 5 affiche l'écran complet de configuration depuis l'objet cours.
-
-Commandes UIHook prises en charge :
-
-```text
-showCourseTracking
-enableAllCourseTracking
-disableAllCourseTracking
-resetCourseTracking
-saveCourseTracking
 ```
 
 L'écran affiche :
@@ -149,31 +145,18 @@ find companion/IliasTraxEventBridgeCourseUI -name "*.php" -print0 | xargs -0 -n1
 
 Résultat attendu : aucune erreur de syntaxe PHP.
 
-## Validation rapide du bridge
-
-Après installation provisoire dans le dossier UIHook, vérifier le chemin vers le plugin principal :
-
-```bash
-php -r 'require "/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIBridge.php"; $b = new ilIliasTraxEventBridgeCourseUIBridge(); echo $b->getMainPluginPath(), PHP_EOL; echo $b->isMainPluginAvailable() ? "main plugin OK\n" : "main plugin missing\n";'
-```
-
-Résultat attendu :
-
-```text
-/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-main plugin OK
-```
-
-## Validation visuelle Lot 5
+## Validation visuelle
 
 1. Ouvrir un cours avec un utilisateur qui peut gérer le cours.
-2. Cliquer sur le bouton flottant `TRAX / xAPI`.
-3. Vérifier que le panneau de configuration s'ouvre.
-4. Cocher `Activer les traces xAPI pour ce cours`.
-5. Cocher une ou plusieurs ressources.
-6. Cliquer sur `Enregistrer la configuration xAPI`.
-7. Vérifier le message de succès.
-8. Vérifier en SQL que les tables sont modifiées.
+2. Ouvrir l'onglet `Paramètres` du cours.
+3. Vérifier la présence du sous-onglet `Suivi xAPI`.
+4. Cliquer sur `Suivi xAPI`.
+5. Vérifier que le panneau de configuration s'ouvre.
+6. Cocher `Activer les traces xAPI pour ce cours`.
+7. Cocher une ou plusieurs ressources.
+8. Cliquer sur `Enregistrer la configuration xAPI`.
+9. Vérifier le message de succès.
+10. Vérifier en SQL que les tables sont modifiées.
 
 SQL de contrôle :
 
