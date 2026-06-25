@@ -50,7 +50,32 @@ La détection peut exploiter :
 - `target=crs_<id>` ;
 - `REQUEST_URI`, notamment `/goto.php/crs/<id>` et `/crs/<id>`.
 
-Aucune entrée n'est encore injectée dans l'interface cours à ce stade.
+## État Lot 4
+
+Le lot 4 ajoute une entrée visible non destructive dans l'objet cours.
+
+Si le contexte est un cours et si l'utilisateur peut gérer le cours, le plugin compagnon injecte un bouton flottant :
+
+```text
+TRAX / xAPI
+```
+
+Ce bouton pointe vers l'URL contextualisée préparée par le lot 3 :
+
+```text
+itxeb_cui_cmd=showCourseTracking
+itxeb_course_ref_id=<course_ref_id>
+```
+
+Le bouton est volontairement limité aux utilisateurs qui ont au moins un des droits suivants :
+
+```text
+write
+edit_permission
+manage_members
+```
+
+Le lot 4 ne câble pas encore l'écran complet. Le clic peut donc seulement recharger la page avec les paramètres contextualisés. Le rendu de l'écran complet est prévu au lot 5.
 
 ## Chemin d'installation cible
 
@@ -89,9 +114,10 @@ find "$TARGET_DIR" -name "*.php" -print0 | xargs -0 -n1 php -l
 cd "$ILIAS_ROOT"
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
+systemctl restart httpd
 ```
 
-Ensuite, vérifier dans l'administration des plugins ILIAS que `IliasTraxEventBridgeCourseUI` apparaît comme plugin UIHook.
+Ensuite, vérifier dans l'administration des plugins ILIAS que `IliasTraxEventBridgeCourseUI` apparaît comme plugin UIHook et qu'il est actif.
 
 ## Validation syntaxe
 
@@ -118,6 +144,14 @@ Résultat attendu :
 main plugin OK
 ```
 
+## Validation visuelle Lot 4
+
+1. Activer le plugin compagnon dans l'administration des plugins ILIAS.
+2. Ouvrir un cours avec un utilisateur qui peut gérer le cours.
+3. Vérifier la présence d'un bouton flottant `TRAX / xAPI` en bas à droite.
+4. Ouvrir le même cours avec un utilisateur sans droits de gestion.
+5. Vérifier que le bouton n'apparaît pas.
+
 ## Suite
 
-Lot 4 : ajouter une entrée visible dans l'objet cours en utilisant le contexte et l'URL contextualisée préparés par le lot 3.
+Lot 5 : router l'URL contextualisée vers l'écran complet `ilIliasTraxEventBridgeCourseTrackingGUI` sans saisie manuelle du `course_ref_id`.
