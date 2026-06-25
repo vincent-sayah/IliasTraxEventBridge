@@ -1,6 +1,8 @@
 # README technique — IliasTraxEventBridge
 
-Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, plugin version **0.6.0**. La branche **v0.5** reste conservée pour maintenance historique V0.5.5.
+Version stable publiée : **v0.6.0** sur `main` et `v0.6`, plugin version **0.6.0**.
+
+Branche de stabilisation : **v0.7**, plugin version **0.7.0**. La V0.7 ajoute la configuration xAPI par cours et par ressource, puis applique cette configuration avant insertion dans l'outbox.
 
 ## Type de plugin
 
@@ -55,25 +57,46 @@ La V0.6.0 conserve le périmètre V0.5.5 et ajoute :
 - supervision admin V0.6 avec compteurs opérationnels et dernières erreurs ;
 - documentation d'exploitation dans `docs/OPERATIONS.md`.
 
+### v0.7.0 candidate
+
+La V0.7.0 ajoute :
+
+- tables de configuration `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg` ;
+- repository `ilIliasTraxEventBridgeCourseTrackingRepository` ;
+- resolver `ilIliasTraxEventBridgeCourseResourceResolver` ;
+- écran `ilIliasTraxEventBridgeCourseTrackingGUI` ;
+- accès visible depuis `ilIliasTraxEventBridgeConfigGUI` ;
+- filtrage effectif avant `evnt_evhk_itxeb_out` pour les événements EventHook et les consultations `read_event`.
+
+La règle V0.7 est volontairement stricte :
+
+```text
+cours activé ET ressource activée => statement autorisé
+sinon => aucune insertion outbox
+```
+
 ## Organisation des classes
 
 | Classe | Rôle |
 |---|---|
 | `ilIliasTraxEventBridgePlugin` | Point d'entrée EventHook ILIAS |
-| `ilIliasTraxEventBridgeConfigGUI` | Écran de configuration, actions manuelles, supervision V0.6 |
+| `ilIliasTraxEventBridgeConfigGUI` | Écran de configuration, actions manuelles, supervision, accès V0.7 à la configuration cours |
 | `ilIliasTraxEventBridgeConfig` | Lecture/écriture des paramètres via `ilSetting` |
-| `ilIliasTraxEventBridgeEventRouter` | Normalisation, filtrage cours et routage des événements ILIAS |
+| `ilIliasTraxEventBridgeEventRouter` | Normalisation, filtrage cours, filtrage V0.7 ressource et routage des événements ILIAS |
 | `ilIliasTraxEventBridgeCourseContextResolver` | Résolution du cours parent d'un objet ILIAS |
+| `ilIliasTraxEventBridgeCourseTrackingRepository` | Lecture/écriture des décisions xAPI cours/ressources V0.7 |
+| `ilIliasTraxEventBridgeCourseResourceResolver` | Liste les ressources traçables d'un cours avec état configuré/activé |
+| `ilIliasTraxEventBridgeCourseTrackingGUI` | Interface de configuration xAPI par cours et ressource |
 | `ilIliasTraxEventBridgeEventDebugRepository` | Persistance du journal brut |
 | `ilIliasTraxEventBridgeStatementFactory` | Mapping événement ILIAS ou consultation `read_event` vers statement xAPI |
 | `ilIliasTraxEventBridgeOutboxRepository` | Stockage, statut d'envoi, diagnostics et compteurs outbox |
 | `ilIliasTraxEventBridgeOutboxSender` | Service d'envoi partagé par action manuelle et cron |
-| `ilIliasTraxEventBridgeCron` | Job cron ILIAS d'envoi outbox vers TRAX et génération des consultations `read_event` |
-| `ilIliasTraxEventBridgeReadEventTracker` | Détection des consultations réelles d'objets via la table ILIAS `read_event` |
+| `ilIliasTraxEventBridgeCron` | Job cron ILIAS d'envoi outbox vers TRAX et génération filtrée des consultations `read_event` |
+| `ilIliasTraxEventBridgeReadEventTracker` | Détection et filtrage des consultations réelles d'objets via la table ILIAS `read_event` |
 | `ilIliasTraxEventBridgeTraxClient` | Client HTTP xAPI/TRAX |
 | `ilIliasTraxEventBridgeHttpResult` | Objet résultat HTTP |
 
-## Installation technique V0.6
+## Installation technique stable V0.6
 
 Exemple avec ILIAS dans `/var/www/ilias` :
 
@@ -102,19 +125,19 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Résultat attendu :
+Résultat attendu stable :
 
 ```text
 $version = "0.6.0";
 ```
 
-Pour verrouiller exactement la release, utiliser le tag :
+Pour verrouiller exactement la release stable, utiliser le tag :
 
 ```bash
 git checkout v0.6.0
 ```
 
-## Mise à jour technique V0.6
+## Mise à jour technique V0.7 candidate
 
 ```bash
 sudo -i
@@ -123,8 +146,8 @@ cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/Event
 
 git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
 git fetch origin --prune --tags
-git switch v0.6
-git pull --ff-only origin v0.6
+git switch v0.7
+git pull --ff-only origin v0.7
 
 git status --short
 git branch --show-current
@@ -136,7 +159,13 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-## Flux interne V0.6
+Résultat attendu V0.7 :
+
+```text
+$version = "0.7.0";
+```
+
+## Flux interne V0.7
 
 ```mermaid
 flowchart TD
@@ -150,7 +179,9 @@ flowchart TD
     G -->|non| END
     G -->|oui| CRS[CourseContextResolver]
     CRS -->|pas de cours parent| END
-    CRS -->|cours parent trouvé| F[StatementFactory]
+    CRS -->|cours parent trouvé| CFG{Cours + ressource activés ?}
+    CFG -->|non| END
+    CFG -->|oui| F[StatementFactory]
 
     F -->|événement ignoré| END
     F -->|statement généré| O[OutboxRepository.enqueue]
@@ -159,17 +190,21 @@ flowchart TD
 
     CRON[Cron ILIAS] --> READ[ReadEventTracker]
     READ --> READDB[(read_event)]
-    READ --> DEDUP[(evnt_evhk_itxeb_read)]
-    READ --> OUT[Statements repository_object_access enrichis]
+    READ --> CFGREAD{Cours + ressource activés ?}
+    CFGREAD -->|non| DEDUP[(evnt_evhk_itxeb_read)]
+    CFGREAD -->|oui| OUT[Statements repository_object_access enrichis]
     OUT --> O
+    READ --> DEDUP
     CRON --> SEND[OutboxSender]
     SEND --> TRAX[TRAX 3 LRS]
 
-    ADMIN[ConfigGUI] --> SUP[Supervision V0.6]
+    ADMIN[ConfigGUI] --> CCFG[Configuration xAPI par cours]
+    CCFG --> TCFG[(evnt_evhk_itxeb_ccfg / rcfg)]
+    ADMIN --> SUP[Supervision V0.6]
     SUP --> DB
 ```
 
-Le journal brut reste alimenté même si l'objet n'est pas dans un cours. Le filtre agit uniquement avant la génération xAPI et l'ajout dans l'outbox.
+Le journal brut reste alimenté même si l'objet n'est pas autorisé. Le filtre V0.7 agit avant la génération xAPI et l'ajout dans l'outbox.
 
 ## Filtre “objet contenu dans un cours uniquement”
 
@@ -194,9 +229,30 @@ course_url
 
 Ces valeurs sont ajoutées dans les extensions du statement xAPI, et le cours parent est ajouté dans `context.contextActivities.parent`.
 
+## Filtre V0.7 par cours et ressource
+
+La V0.7 ajoute une seconde décision après résolution du cours parent :
+
+```text
+evnt_evhk_itxeb_ccfg.enabled = 1
+et
+evnt_evhk_itxeb_rcfg.enabled = 1
+```
+
+Si le cours ou la ressource n'est pas activé, le statement n'est pas créé et aucune ligne n'est insérée dans `evnt_evhk_itxeb_out`.
+
+Les tables sont :
+
+| Table | Clé | Rôle |
+|---|---|---|
+| `evnt_evhk_itxeb_ccfg` | `course_ref_id` | Activation globale du cours |
+| `evnt_evhk_itxeb_rcfg` | `course_ref_id`, `ref_id` | Activation d'une ressource dans un cours |
+
+L'accès de configuration V0.7 est disponible depuis l'administration du plugin via la section `Configuration xAPI par cours`.
+
 ## Tracking `read_event`
 
-La table ILIAS `read_event` est utilisée pour détecter l'exploitation réelle des objets de dépôt. Le cron lit les consultations, vérifie que l'objet est contenu dans un cours, puis ajoute un statement `repository_object_access` dans l'outbox.
+La table ILIAS `read_event` est utilisée pour détecter l'exploitation réelle des objets de dépôt. Le cron lit les consultations, vérifie que l'objet est contenu dans un cours, applique le filtre V0.7, puis ajoute un statement `repository_object_access` dans l'outbox uniquement si le cours et la ressource sont activés.
 
 La table locale suivante évite les doublons :
 
@@ -214,7 +270,7 @@ read_count
 processed_at
 ```
 
-Le plugin génère une nouvelle trace si `last_access` ou `read_count` a évolué depuis le dernier traitement.
+Le plugin génère une nouvelle trace si `last_access` ou `read_count` a évolué depuis le dernier traitement. Une consultation refusée par la configuration V0.7 est aussi marquée traitée afin d'éviter une boucle cron.
 
 Les records issus de `read_event` enrichissent les statements avec :
 
@@ -247,24 +303,24 @@ Exemples de correspondance `cmdClass` :
 | `ilObjWebResourceGUI` | `webr` |
 | `ilObjMediaCastGUI` | `mcst` |
 
-## Mapping xAPI V0.6
+## Mapping xAPI conservé en V0.7
 
-| Source | Condition | `event_type` | Famille V0.6 |
+| Source | Condition | `event_type` | Famille |
 |---|---|---|---|
-| EventHook test | `Tracking:updateStatus` sur un objet `tst` dans un cours | `test_tracking_status` | `test_tracking` |
-| EventHook fichier | `cmd=sendfile` sur un objet `file` dans un cours | `file_downloaded` | `file_download` |
-| `read_event` blog | consultation blog dans un cours | `repository_object_access` | `repository_blog_access` |
-| `read_event` forum | consultation forum dans un cours | `repository_object_access` | `repository_forum_access` |
-| `read_event` lien web | consultation lien web dans un cours | `repository_object_access` | `repository_web_link_access` |
-| `read_event` mediacast | consultation mediacast dans un cours | `repository_object_access` | `repository_media_access` |
-| `read_event` wiki | consultation wiki dans un cours | `repository_object_access` | `repository_wiki_access` |
-| `read_event` module HTML | consultation module HTML dans un cours | `repository_object_access` | `repository_html_module_access` |
-| `read_event` module web | consultation module web dans un cours | `repository_object_access` | `repository_learning_module_access` |
-| `read_event` SCORM | consultation module SCORM dans un cours | `repository_object_access` | `repository_scorm_access` |
+| EventHook test | `Tracking:updateStatus` sur un objet `tst` dans un cours activé et ressource activée | `test_tracking_status` | `test_tracking` |
+| EventHook fichier | `cmd=sendfile` sur un objet `file` dans un cours activé et ressource activée | `file_downloaded` | `file_download` |
+| `read_event` blog | consultation blog dans un cours activé et ressource activée | `repository_object_access` | `repository_blog_access` |
+| `read_event` forum | consultation forum dans un cours activé et ressource activée | `repository_object_access` | `repository_forum_access` |
+| `read_event` lien web | consultation lien web dans un cours activé et ressource activée | `repository_object_access` | `repository_web_link_access` |
+| `read_event` mediacast | consultation mediacast dans un cours activé et ressource activée | `repository_object_access` | `repository_media_access` |
+| `read_event` wiki | consultation wiki dans un cours activé et ressource activée | `repository_object_access` | `repository_wiki_access` |
+| `read_event` module HTML | consultation module HTML dans un cours activé et ressource activée | `repository_object_access` | `repository_html_module_access` |
+| `read_event` module web | consultation module web dans un cours activé et ressource activée | `repository_object_access` | `repository_learning_module_access` |
+| `read_event` SCORM | consultation module SCORM dans un cours activé et ressource activée | `repository_object_access` | `repository_scorm_access` |
 
 Les événements `Tracking:updateStatus` génériques sur `crs` ou `root` ne génèrent plus de statements xAPI depuis v0.5.5.
 
-## Extensions xAPI V0.6
+## Extensions xAPI
 
 Extensions fonctionnelles :
 
@@ -316,9 +372,11 @@ Sources techniques attendues :
 | `evnt_evhk_itxeb_log` | Journal brut des événements EventHook reçus |
 | `evnt_evhk_itxeb_out` | Outbox locale des statements xAPI |
 | `evnt_evhk_itxeb_read` | Pointeur anti-doublon pour les consultations `read_event` |
+| `evnt_evhk_itxeb_ccfg` | Configuration d'activation xAPI par cours |
+| `evnt_evhk_itxeb_rcfg` | Configuration d'activation xAPI par ressource |
 | `read_event` | Table ILIAS utilisée comme source de consultation réelle |
 
-## Supervision admin V0.6
+## Supervision admin
 
 L'écran de configuration affiche une section `Supervision V0.6` avec :
 
@@ -331,6 +389,19 @@ L'écran de configuration affiche une section `Supervision V0.6` avec :
 Ces données sont issues de `ilIliasTraxEventBridgeOutboxRepository` et du JSON xAPI stocké dans `statement_json`.
 
 ## Vérifications SQL
+
+Configuration V0.7 d'un cours :
+
+```sql
+SELECT *
+FROM evnt_evhk_itxeb_ccfg
+WHERE course_ref_id = 194;
+
+SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
+FROM evnt_evhk_itxeb_rcfg
+WHERE course_ref_id = 194
+ORDER BY ref_id;
+```
 
 Outbox récente :
 
@@ -374,6 +445,11 @@ LIMIT 20;
 ## Documents liés
 
 - `README.md` : présentation et installation.
-- `docs/VALIDATION.md` : plan de validation V0.6 complet.
+- `docs/VALIDATION.md` : plan de validation V0.7.
 - `docs/OPERATIONS.md` : exploitation et maintenance.
-- `docs/V0.6_STABILISATION.md` : checklist de stabilisation V0.6.
+- `docs/V0.7_DEV_PLAN.md` : plan de développement V0.7.
+- `docs/V0.7_COURSE_TRACKING_CONFIG.md` : tables de configuration V0.7.
+- `docs/V0.7_COURSE_RESOURCE_RESOLVER.md` : résolution ressources cours.
+- `docs/V0.7_COURSE_TRACKING_UI.md` : interface de configuration cours.
+- `docs/V0.7_COURSE_TRACKING_ACCESS.md` : accès admin plugin.
+- `docs/V0.7_OUTBOX_FILTERING.md` : filtrage avant outbox.
