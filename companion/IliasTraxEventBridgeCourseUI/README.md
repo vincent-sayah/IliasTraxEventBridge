@@ -4,7 +4,7 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 ## Objectif
 
-Ce plugin est destiné à exposer la configuration TRAX / xAPI directement depuis l'objet cours ILIAS.
+Ce plugin expose la configuration TRAX / xAPI directement depuis l'objet cours ILIAS.
 
 Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
@@ -67,15 +67,35 @@ itxeb_cui_cmd=showCourseTracking
 itxeb_course_ref_id=<course_ref_id>
 ```
 
-Le bouton est volontairement limité aux utilisateurs qui ont au moins un des droits suivants :
+## État Lot 5
+
+Le lot 5 affiche l'écran complet de configuration depuis l'objet cours.
+
+Commandes UIHook prises en charge :
 
 ```text
-write
-edit_permission
-manage_members
+showCourseTracking
+enableAllCourseTracking
+disableAllCourseTracking
+resetCourseTracking
+saveCourseTracking
 ```
 
-Le lot 4 ne câble pas encore l'écran complet. Le clic peut donc seulement recharger la page avec les paramètres contextualisés. Le rendu de l'écran complet est prévu au lot 5.
+L'écran affiche :
+
+- le résumé du cours ;
+- l'état d'activation xAPI du cours ;
+- la liste des ressources traçables ;
+- les cases à cocher par ressource ;
+- le bouton Enregistrer ;
+- les actions Tout activer, Tout désactiver, Réinitialiser.
+
+Les écritures sont faites dans les tables V0.7 existantes :
+
+```text
+evnt_evhk_itxeb_ccfg
+evnt_evhk_itxeb_rcfg
+```
 
 ## Chemin d'installation cible
 
@@ -144,14 +164,30 @@ Résultat attendu :
 main plugin OK
 ```
 
-## Validation visuelle Lot 4
+## Validation visuelle Lot 5
 
-1. Activer le plugin compagnon dans l'administration des plugins ILIAS.
-2. Ouvrir un cours avec un utilisateur qui peut gérer le cours.
-3. Vérifier la présence d'un bouton flottant `TRAX / xAPI` en bas à droite.
-4. Ouvrir le même cours avec un utilisateur sans droits de gestion.
-5. Vérifier que le bouton n'apparaît pas.
+1. Ouvrir un cours avec un utilisateur qui peut gérer le cours.
+2. Cliquer sur le bouton flottant `TRAX / xAPI`.
+3. Vérifier que le panneau de configuration s'ouvre.
+4. Cocher `Activer les traces xAPI pour ce cours`.
+5. Cocher une ou plusieurs ressources.
+6. Cliquer sur `Enregistrer la configuration xAPI`.
+7. Vérifier le message de succès.
+8. Vérifier en SQL que les tables sont modifiées.
+
+SQL de contrôle :
+
+```sql
+SELECT *
+FROM evnt_evhk_itxeb_ccfg
+WHERE course_ref_id = 194;
+
+SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
+FROM evnt_evhk_itxeb_rcfg
+WHERE course_ref_id = 194
+ORDER BY ref_id;
+```
 
 ## Suite
 
-Lot 5 : router l'URL contextualisée vers l'écran complet `ilIliasTraxEventBridgeCourseTrackingGUI` sans saisie manuelle du `course_ref_id`.
+Lot 6 : stabilisation documentaire, validation non-régression outbox et préparation du tag `v0.7.1`.
