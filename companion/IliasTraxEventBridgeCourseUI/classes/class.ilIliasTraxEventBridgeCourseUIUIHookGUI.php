@@ -35,6 +35,8 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function getHTML($a_comp, $a_part, $a_par = []): array
     {
+        $this->injectCourseSettingsSubtab();
+
         if (self::$entryInjected) {
             return [
                 'mode' => ilUIHookPluginGUI::KEEP,
@@ -44,6 +46,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
         if ($this->isCourseUiCommandRequest()) {
             self::$entryInjected = true;
+            $this->injectCourseSettingsSubtab();
             $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
             return [
                 'mode' => ilUIHookPluginGUI::APPEND,
@@ -116,11 +119,21 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
                 return;
             }
 
+            $injected = false;
+
             if (method_exists($tabs, 'addSubTab')) {
                 $tabs->addSubTab('itxeb_course_xapi_settings', 'Suivi xAPI', $url);
-                if ($this->isCourseUiCommandRequest() && method_exists($tabs, 'activateSubTab')) {
-                    $tabs->activateSubTab('itxeb_course_xapi_settings');
-                }
+                $injected = true;
+            } elseif (method_exists($tabs, 'addSubTabTarget')) {
+                $tabs->addSubTabTarget('Suivi xAPI', $url, '', '', '', 'itxeb_course_xapi_settings');
+                $injected = true;
+            }
+
+            if ($injected && $this->isCourseUiCommandRequest() && method_exists($tabs, 'activateSubTab')) {
+                $tabs->activateSubTab('itxeb_course_xapi_settings');
+            }
+
+            if ($injected) {
                 self::$subtabInjected = true;
             }
         } catch (Throwable $ignored) {
