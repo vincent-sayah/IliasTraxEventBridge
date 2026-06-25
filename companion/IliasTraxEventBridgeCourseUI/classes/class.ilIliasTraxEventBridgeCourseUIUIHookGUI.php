@@ -1,13 +1,13 @@
 <?php
 
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIBridge.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
 
 /**
  * UIHook GUI for exposing course-level TRAX/xAPI configuration.
  *
- * Lot 4 injects a visible, non-destructive course entry for users allowed to
- * manage the course. The link target is prepared here and will be wired to the
- * full configuration screen in the next lot.
+ * Lot 5 renders the full configuration screen from the course object, without
+ * asking the administrator to type course_ref_id manually.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -32,7 +32,23 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function getHTML($a_comp, $a_part, $a_par = []): array
     {
-        if (self::$entryInjected || !$this->isReadyForCourseContext()) {
+        if (self::$entryInjected) {
+            return [
+                'mode' => ilUIHookPluginGUI::KEEP,
+                'html' => '',
+            ];
+        }
+
+        if ($this->isCourseUiCommandRequest()) {
+            self::$entryInjected = true;
+            $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
+            return [
+                'mode' => ilUIHookPluginGUI::APPEND,
+                'html' => $screen->handle(),
+            ];
+        }
+
+        if (!$this->isReadyForCourseContext()) {
             return [
                 'mode' => ilUIHookPluginGUI::KEEP,
                 'html' => '',
@@ -56,7 +72,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        // getHTML() injects the visible placeholder. Full screen routing is next.
+        // getHTML() handles the button and the full course configuration screen.
     }
 
     /** @return array<string,mixed> */
@@ -83,6 +99,22 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         return (string) ($context['configuration_url'] ?? '');
     }
 
+    private function isCourseUiCommandRequest(): bool
+    {
+        $cmd = $this->requestValue($_POST, 'itxeb_cui_cmd');
+        if ($cmd === '') {
+            $cmd = $this->requestValue($_GET, 'itxeb_cui_cmd');
+        }
+
+        return in_array($cmd, [
+            'showCourseTracking',
+            'saveCourseTracking',
+            'enableAllCourseTracking',
+            'disableAllCourseTracking',
+            'resetCourseTracking',
+        ], true);
+    }
+
     /** @param array<string,mixed> $context */
     private function renderCourseEntry(array $context): string
     {
@@ -105,6 +137,34 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             . '</a>'
             . '<span class="itxeb-course-ui-note">Configuration xAPI du cours</span>'
             . '</div>';
+    }
+
+    private function requestValue($source, string $key): string
+    {
+        try {
+            if (is_array($source)) {
+                return isset($source[$key]) && is_scalar($source[$key]) ? (string) $source[$key] : '';
+            }
+            if ($source instanceof ArrayAccess) {
+                return isset($source[$key]) && is_scalar($source[$key]) ? (string) $source[$key] : '';
+            }
+            if (is_object($source)) {
+                if (method_exists($source, 'offsetExists') && method_exists($source, 'offsetGet')) {
+                    if (!$source->offsetExists($key)) {
+                        return '';
+                    }
+                    $value = $source->offsetGet($key);
+                    return is_scalar($value) ? (string) $value : '';
+                }
+                if (method_exists($source, 'retrieve')) {
+                    $value = $source->retrieve($key, false);
+                    return is_scalar($value) ? (string) $value : '';
+                }
+            }
+        } catch (Throwable $ignored) {
+            return '';
+        }
+        return '';
     }
 
     private function esc(string $value): string
