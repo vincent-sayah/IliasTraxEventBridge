@@ -4,10 +4,10 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIBridge.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
 
 /**
- * UIHook GUI for exposing course-level TRAX/xAPI configuration.
+ * UIHook GUI for exposing course-level xAPI configuration.
  *
- * Lot 5 renders the full configuration screen from the course object, without
- * asking the administrator to type course_ref_id manually.
+ * The final UI entry is a generic course settings subtab named "Suivi xAPI".
+ * The previous floating button is intentionally removed.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -16,6 +16,9 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
     /** @var bool */
     private static $entryInjected = false;
+
+    /** @var bool */
+    private static $subtabInjected = false;
 
     public function __construct()
     {
@@ -48,18 +51,9 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             ];
         }
 
-        if (!$this->isReadyForCourseContext()) {
-            return [
-                'mode' => ilUIHookPluginGUI::KEEP,
-                'html' => '',
-            ];
-        }
-
-        self::$entryInjected = true;
-
         return [
-            'mode' => ilUIHookPluginGUI::APPEND,
-            'html' => $this->renderCourseEntry($this->getCurrentCourseContext()),
+            'mode' => ilUIHookPluginGUI::KEEP,
+            'html' => '',
         ];
     }
 
@@ -72,7 +66,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        // getHTML() handles the button and the full course configuration screen.
+        $this->injectCourseSettingsSubtab();
     }
 
     /** @return array<string,mixed> */
@@ -99,6 +93,41 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         return (string) ($context['configuration_url'] ?? '');
     }
 
+    private function injectCourseSettingsSubtab(): void
+    {
+        if (self::$subtabInjected || !$this->isReadyForCourseContext()) {
+            return;
+        }
+
+        $url = $this->getContextualConfigurationUrl();
+        if ($url === '') {
+            return;
+        }
+
+        try {
+            $tabs = null;
+            if (isset($GLOBALS['DIC']) && is_object($GLOBALS['DIC']) && method_exists($GLOBALS['DIC'], 'tabs')) {
+                $tabs = $GLOBALS['DIC']->tabs();
+            } elseif (isset($GLOBALS['ilTabs']) && is_object($GLOBALS['ilTabs'])) {
+                $tabs = $GLOBALS['ilTabs'];
+            }
+
+            if (!is_object($tabs)) {
+                return;
+            }
+
+            if (method_exists($tabs, 'addSubTab')) {
+                $tabs->addSubTab('itxeb_course_xapi_settings', 'Suivi xAPI', $url);
+                if ($this->isCourseUiCommandRequest() && method_exists($tabs, 'activateSubTab')) {
+                    $tabs->activateSubTab('itxeb_course_xapi_settings');
+                }
+                self::$subtabInjected = true;
+            }
+        } catch (Throwable $ignored) {
+            // UI hook must never break the course page.
+        }
+    }
+
     private function isCourseUiCommandRequest(): bool
     {
         $cmd = $this->requestValue($_POST, 'itxeb_cui_cmd');
@@ -113,30 +142,6 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             'disableAllCourseTracking',
             'resetCourseTracking',
         ], true);
-    }
-
-    /** @param array<string,mixed> $context */
-    private function renderCourseEntry(array $context): string
-    {
-        $url = $this->esc((string) ($context['configuration_url'] ?? ''));
-        $courseRefId = $this->esc((string) ((int) ($context['course_ref_id'] ?? 0)));
-        $courseTitle = trim((string) ($context['course_title'] ?? ''));
-        $label = $courseTitle !== ''
-            ? 'TRAX / xAPI — ' . $courseTitle
-            : 'TRAX / xAPI';
-
-        return '<style>'
-            . '#itxeb-course-ui-entry{position:fixed;right:24px;bottom:24px;z-index:9999;background:#ffffff;border:1px solid #b8c7d9;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.16);padding:10px 12px;font-family:Arial,sans-serif;max-width:320px}'
-            . '#itxeb-course-ui-entry .itxeb-course-ui-button{display:inline-block;background:#336699;color:#fff;text-decoration:none;border-radius:4px;padding:7px 12px;font-weight:bold}'
-            . '#itxeb-course-ui-entry .itxeb-course-ui-button:hover{background:#244f78;color:#fff;text-decoration:none}'
-            . '#itxeb-course-ui-entry .itxeb-course-ui-note{display:block;margin-top:6px;color:#555;font-size:12px}'
-            . '</style>'
-            . '<div id="itxeb-course-ui-entry" class="itxeb-course-ui-entry" data-course-ref-id="' . $courseRefId . '">'
-            . '<a class="itxeb-course-ui-button" href="' . $url . '" title="Configuration TRAX / xAPI du cours">'
-            . $this->esc($label)
-            . '</a>'
-            . '<span class="itxeb-course-ui-note">Configuration xAPI du cours</span>'
-            . '</div>';
     }
 
     private function requestValue($source, string $key): string
@@ -165,10 +170,5 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             return '';
         }
         return '';
-    }
-
-    private function esc(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }
