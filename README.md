@@ -2,7 +2,9 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers TRAX 3 LRS via une outbox locale.
 
-Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, plugin version **0.6.0**. La branche **v0.5** reste conservée pour maintenance historique V0.5.5.
+Version stable publiée : **v0.6.0** sur `main` et `v0.6`.
+
+Branche de stabilisation en cours : **v0.7**, plugin version **0.7.0**. La V0.7 ajoute le pilotage explicite des traces xAPI par cours et par ressource.
 
 ## État des branches
 
@@ -10,6 +12,7 @@ Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, p
 |---|---|---|
 | `main` | Stable publiée par défaut | Stable v0.6.0 |
 | `v0.6` | Maintenance stable V0.6 | Stable v0.6.0 taguée |
+| `v0.7` | Stabilisation V0.7 | Candidate v0.7.0, validation fonctionnelle en cours |
 | `v0.5` | Maintenance stable V0.5 | Stable v0.5.5 historique |
 
 ## Fonctionnalités stables v0.5.5
@@ -21,7 +24,6 @@ Version stable actuelle : **v0.6.0**. Branches stables : **main** et **v0.6**, p
 - Envoi manuel vers TRAX.
 - Envoi automatique par job cron ILIAS `itxeb_send_outbox_to_trax`.
 - Retry configurable avec `retry_count`, `max_retry` et `last_attempt_at`.
-- Bouton de réinitialisation des statements en échec.
 - Filtre métier : seuls les objets contenus dans un **cours** peuvent générer des statements xAPI.
 - Exclusion des objets placés directement dans une catégorie, un dossier hors cours ou un autre contexte non cours.
 - Suivi de l'exploitation réelle des objets de dépôt via la table ILIAS `read_event`.
@@ -45,7 +47,29 @@ La V0.6 conserve le périmètre métier de la V0.5.5 et enrichit les statements 
 - Guide d'exploitation `docs/OPERATIONS.md`.
 - Plan de validation complet `docs/VALIDATION.md`.
 
-## Objets couverts en V0.6
+## Apports V0.7.0 candidate
+
+La V0.7 ajoute un pilotage explicite des traces xAPI par cours et par ressource.
+
+- Tables de configuration V0.7 compatibles avec la limite ILIAS de 22 caractères :
+  - `evnt_evhk_itxeb_ccfg` : activation xAPI par cours ;
+  - `evnt_evhk_itxeb_rcfg` : activation xAPI par ressource dans un cours.
+- Repository de configuration `ilIliasTraxEventBridgeCourseTrackingRepository`.
+- Resolver `ilIliasTraxEventBridgeCourseResourceResolver` pour lister les ressources traçables d'un cours.
+- Interface `ilIliasTraxEventBridgeCourseTrackingGUI` pour activer/désactiver le cours et ses ressources.
+- Accès visible depuis l'administration du plugin via la section `Configuration xAPI par cours`.
+- Filtrage effectif avant outbox : aucune ligne n'est insérée dans `evnt_evhk_itxeb_out` si le cours ou la ressource n'est pas explicitement activé.
+- Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron.
+
+Règle V0.7 :
+
+```text
+statement xAPI autorisé = cours activé ET ressource activée
+```
+
+Sans configuration explicite du cours et de la ressource, aucune trace xAPI n'est générée.
+
+## Objets couverts
 
 | Action ILIAS | Source | `event_type` SQL | Verbe xAPI / famille |
 |---|---|---|---|
@@ -66,7 +90,7 @@ Les actions d'administration, comme la suppression des résultats de test, sont 
 
 ## Installation stable depuis GitHub
 
-La branche `main` pointe sur la dernière stable publiée. Il est aussi possible d'utiliser `v0.6` pour rester explicitement sur la maintenance V0.6.
+La branche `main` pointe sur la dernière stable publiée.
 
 ```bash
 sudo -i
@@ -93,7 +117,7 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-Résultat attendu :
+Résultat attendu stable :
 
 ```text
 $version = "0.6.0";
@@ -125,7 +149,7 @@ sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 ```
 
-## Mise à jour d'une installation existante vers V0.6
+## Mise à jour d'une installation existante vers V0.7 candidate
 
 ```bash
 sudo -i
@@ -134,8 +158,8 @@ cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/Event
 
 git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
 git fetch origin --prune --tags
-git switch v0.6
-git pull --ff-only origin v0.6
+git switch v0.7
+git pull --ff-only origin v0.7
 
 git status --short
 git branch --show-current
@@ -145,6 +169,12 @@ find . -name "*.php" -print0 | xargs -0 -n1 php -l
 cd /var/www/ilias
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
+```
+
+Résultat attendu V0.7 :
+
+```text
+$version = "0.7.0";
 ```
 
 ## Configuration TRAX
@@ -166,6 +196,30 @@ Dans l'écran de configuration du plugin :
 | Base URL ILIAS forcée | Utilisée pour les IRIs xAPI et `actor.account.homePage`. |
 
 Le plugin ajoute automatiquement `/statements` si l'endpoint fourni ne se termine pas déjà par `/statements`.
+
+## Configuration xAPI par cours V0.7
+
+Dans ILIAS :
+
+```text
+Administration > Plugins > IliasTraxEventBridge > Configurer
+```
+
+Section :
+
+```text
+Configuration xAPI par cours
+```
+
+Procédure :
+
+1. saisir le `course_ref_id` du cours ;
+2. ouvrir l'écran `TRAX / xAPI — configuration du cours` ;
+3. cocher `Activer les traces xAPI pour ce cours` ;
+4. cocher les ressources à tracer ;
+5. cliquer sur `Enregistrer la configuration xAPI`.
+
+La V0.7 applique ensuite le filtrage avant outbox. Une ressource non cochée ou un cours non activé ne génère aucune ligne dans `evnt_evhk_itxeb_out`.
 
 ## Cron ILIAS
 
@@ -191,7 +245,7 @@ itxeb_send_outbox_to_trax
 
 Le cron doit être actif dans ILIAS et le cron système/CLI d'ILIAS doit tourner régulièrement sur le serveur.
 
-## Supervision V0.6
+## Supervision
 
 Dans ILIAS :
 
@@ -207,6 +261,19 @@ La section `Supervision V0.6` affiche :
 - les dernières erreurs.
 
 ## Vérifications SQL utiles
+
+Configuration V0.7 d'un cours :
+
+```sql
+SELECT *
+FROM evnt_evhk_itxeb_ccfg
+WHERE course_ref_id = 194;
+
+SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
+FROM evnt_evhk_itxeb_rcfg
+WHERE course_ref_id = 194
+ORDER BY ref_id;
+```
 
 Outbox récente :
 
@@ -227,7 +294,7 @@ ORDER BY processed_at DESC
 LIMIT 20;
 ```
 
-Inspection JSON V0.6 :
+Inspection JSON :
 
 ```sql
 SELECT id, event_type, obj_type, status, statement_json
@@ -253,6 +320,12 @@ LIMIT 20;
 - [Changelog](CHANGELOG.md)
 - [Guide d'exploitation](docs/OPERATIONS.md)
 - [Plan de validation](docs/VALIDATION.md)
+- [Plan de développement V0.7](docs/V0.7_DEV_PLAN.md)
+- [Configuration cours / ressources V0.7](docs/V0.7_COURSE_TRACKING_CONFIG.md)
+- [Resolver ressources cours V0.7](docs/V0.7_COURSE_RESOURCE_RESOLVER.md)
+- [Interface de configuration cours V0.7](docs/V0.7_COURSE_TRACKING_UI.md)
+- [Accès admin configuration cours V0.7](docs/V0.7_COURSE_TRACKING_ACCESS.md)
+- [Filtrage avant outbox V0.7](docs/V0.7_OUTBOX_FILTERING.md)
 - [Plan de stabilisation V0.6](docs/V0.6_STABILISATION.md)
 - [Guide d'import GitHub](GITHUB_IMPORT.md)
 - [Documentation centrale](doc/README.md)
