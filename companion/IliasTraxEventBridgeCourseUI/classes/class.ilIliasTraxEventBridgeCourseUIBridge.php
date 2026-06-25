@@ -3,8 +3,9 @@
 /**
  * Bridge between the UIHook companion plugin and the main EventHook plugin.
  *
- * Lot 3 prepares robust course-context detection and a contextual configuration
- * URL. Actual visual injection is introduced in the next V0.7.1 lots.
+ * Lot 4 compatibility fix: ILIAS 10 may replace PHP superglobals with
+ * ILIAS\HTTP\Wrapper\SuperGlobalDropInReplacement objects. This class therefore
+ * never type-hints request containers as arrays.
  */
 class ilIliasTraxEventBridgeCourseUIBridge
 {
@@ -53,9 +54,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
         return class_exists('ilIliasTraxEventBridgeCourseTrackingGUI');
     }
 
-    /**
-     * @return array<string,mixed>
-     */
+    /** @return array<string,mixed> */
     public function getCourseContext(): array
     {
         $courseRefId = $this->detectCourseRefId();
@@ -83,9 +82,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
         return 0;
     }
 
-    /**
-     * @return array<int,int>
-     */
+    /** @return array<int,int> */
     public function collectCourseRefIdCandidates(): array
     {
         $candidates = [];
@@ -121,7 +118,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
 
-        $params = $_GET;
+        $params = $this->requestContainerToArray($_GET);
         $params['itxeb_cui_cmd'] = 'showCourseTracking';
         $params['itxeb_course_ref_id'] = (string) $courseRefId;
         unset($params['cmd']);
@@ -131,10 +128,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
 
     public function isCourseUiRequest(): bool
     {
-        $cmd = isset($_GET['itxeb_cui_cmd']) && is_scalar($_GET['itxeb_cui_cmd'])
-            ? (string) $_GET['itxeb_cui_cmd']
-            : '';
-
+        $cmd = $this->requestValue($_GET, 'itxeb_cui_cmd');
         return $cmd === 'showCourseTracking';
     }
 
@@ -193,33 +187,29 @@ class ilIliasTraxEventBridgeCourseUIBridge
         }
     }
 
-    /**
-     * @param array<int,int> $candidates
-     * @param array<string,mixed> $source
-     */
-    private function appendNumericRequestCandidate(array &$candidates, array $source, string $key): void
+    /** @param array<int,int> $candidates */
+    private function appendNumericRequestCandidate(array &$candidates, $source, string $key): void
     {
-        if (!isset($source[$key]) || !is_scalar($source[$key])) {
+        $raw = $this->requestValue($source, $key);
+        if ($raw === '') {
             return;
         }
 
-        $value = (int) $source[$key];
+        $value = (int) $raw;
         if ($value > 0) {
             $candidates[] = $value;
         }
     }
 
-    /**
-     * @param array<int,int> $candidates
-     * @param array<string,mixed> $source
-     */
-    private function appendStructuredRequestCandidate(array &$candidates, array $source, string $key): void
+    /** @param array<int,int> $candidates */
+    private function appendStructuredRequestCandidate(array &$candidates, $source, string $key): void
     {
-        if (!isset($source[$key]) || !is_scalar($source[$key])) {
+        $raw = $this->requestValue($source, $key);
+        if ($raw === '') {
             return;
         }
 
-        $this->appendCandidatesFromText($candidates, (string) $source[$key]);
+        $this->appendCandidatesFromText($candidates, $raw);
     }
 
     /** @param array<int,int> $candidates */
@@ -247,6 +237,68 @@ class ilIliasTraxEventBridgeCourseUIBridge
                 }
             }
         }
+    }
+
+    private function requestValue($source, string $key): string
+    {
+        try {
+            if (is_array($source)) {
+                if (!isset($source[$key]) || !is_scalar($source[$key])) {
+                    return '';
+                }
+                return (string) $source[$key];
+            }
+
+            if ($source instanceof ArrayAccess) {
+                if (!isset($source[$key]) || !is_scalar($source[$key])) {
+                    return '';
+                }
+                return (string) $source[$key];
+            }
+
+            if (is_object($source)) {
+                if (method_exists($source, 'offsetExists') && method_exists($source, 'offsetGet')) {
+                    if (!$source->offsetExists($key)) {
+                        return '';
+                    }
+                    $value = $source->offsetGet($key);
+                    return is_scalar($value) ? (string) $value : '';
+                }
+
+                if (method_exists($source, 'retrieve')) {
+                    $value = $source->retrieve($key, false);
+                    return is_scalar($value) ? (string) $value : '';
+                }
+            }
+        } catch (Throwable $ignored) {
+            return '';
+        }
+
+        return '';
+    }
+
+    /** @return array<string,string> */
+    private function requestContainerToArray($source): array
+    {
+        if (is_array($source)) {
+            $result = [];
+            foreach ($source as $key => $value) {
+                if (is_scalar($key) && is_scalar($value)) {
+                    $result[(string) $key] = (string) $value;
+                }
+            }
+            return $result;
+        }
+
+        $result = [];
+        foreach (['ref_id', 'target', 'cmdClass', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
+            $value = $this->requestValue($source, $key);
+            if ($value !== '') {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     private function currentScriptUrl(): string
