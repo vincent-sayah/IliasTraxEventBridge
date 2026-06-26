@@ -30,12 +30,16 @@ class ilIliasTraxEventBridgeReadEventTracker
     /** @var ilIliasTraxEventBridgeCourseTrackingRepository */
     private $courseTrackingRepository;
 
+    /** @var ilIliasTraxEventBridgeDenyLogRepository */
+    private $denyLogRepository;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeOutboxRepository $outboxRepository,
         ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
         ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null,
-        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null
+        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null,
+        ?ilIliasTraxEventBridgeDenyLogRepository $denyLogRepository = null
     ) {
         if (isset($GLOBALS['DIC']) && method_exists($GLOBALS['DIC'], 'database')) {
             $this->db = $GLOBALS['DIC']->database();
@@ -50,6 +54,7 @@ class ilIliasTraxEventBridgeReadEventTracker
         $this->statementFactory = $statementFactory ?: new ilIliasTraxEventBridgeStatementFactory($config);
         $this->courseContextResolver = $courseContextResolver ?: new ilIliasTraxEventBridgeCourseContextResolver();
         $this->courseTrackingRepository = $courseTrackingRepository ?: new ilIliasTraxEventBridgeCourseTrackingRepository();
+        $this->denyLogRepository = $denyLogRepository ?: new ilIliasTraxEventBridgeDenyLogRepository();
     }
 
     public function scanAndEnqueue(int $limit = 100): int
@@ -81,6 +86,7 @@ class ilIliasTraxEventBridgeReadEventTracker
             $courseContext = $this->courseContextResolver->resolve($record);
 
             if (!$courseContext['is_in_course']) {
+                $this->logDeniedTrace('not_in_course', $record, 'read_event', $objId);
                 $this->markProcessed($objId, $usrId, $lastAccess, $readCount);
                 continue;
             }
@@ -91,7 +97,9 @@ class ilIliasTraxEventBridgeReadEventTracker
             $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
             $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
 
-            if (!$this->isTrackingAllowedForConfiguredCourse((int) $record['course_ref_id'], (int) $record['ref_id'])) {
+            $denialReason = $this->trackingDenialReason((int) $record['course_ref_id'], (int) $record['ref_id']);
+            if ($denialReason !== '') {
+                $this->logDeniedTrace($denialReason, $record, 'read_event', $objId);
                 $this->markProcessed($objId, $usrId, $lastAccess, $readCount);
                 continue;
             }
@@ -102,6 +110,8 @@ class ilIliasTraxEventBridgeReadEventTracker
                 if ($outboxId > 0) {
                     $generated++;
                 }
+            } else {
+                $this->logDeniedTrace('unsupported_object_type', $record, 'read_event', $objId);
             }
 
             $this->markProcessed($objId, $usrId, $lastAccess, $readCount);
@@ -288,14 +298,43 @@ class ilIliasTraxEventBridgeReadEventTracker
         return array_values(array_unique($refIds));
     }
 
-    private function isTrackingAllowedForConfiguredCourse(int $courseRefId, int $refId): bool
+    private function trackingDenialReason(int $courseRefId, int $refId): string
     {
-        if ($courseRefId <= 0 || $refId <= 0) {
-            return false;
+        if ($courseRefId <= 0) {
+            return 'missing_course_context';
         }
 
-        return $this->courseTrackingRepository->isCourseEnabled($courseRefId)
-            && $this->courseTrackingRepository->isResourceEnabled($courseRefId, $refId);
+        if ($refId <= 0) {
+            return 'missing_resource_context';
+        }
+
+        if (!$this->courseTrackingRepository->isCourseConfigured($courseRefId)) {
+            return 'course_not_configured';
+        }
+
+        if (!$this->courseTrackingRepository->isCourseEnabled($courseRefId)) {
+            return 'course_disabled';
+        }
+
+        if (!$this->courseTrackingRepository->isResourceConfigured($courseRefId, $refId)) {
+            return 'resource_not_configured';
+        }
+
+        if (!$this->courseTrackingRepository->isResourceEnabled($courseRefId, $refId)) {
+            return 'resource_disabled';
+        }
+
+        return '';
+    }
+
+    /** @param array<string,mixed> $record */
+    private function logDeniedTrace(string $reason, array $record, string $sourceTable, int $sourceId): void
+    {
+        try {
+            $this->denyLogRepository->log($reason, $record, $sourceTable, $sourceId);
+        } catch (Throwable $ignored) {
+            // Deny logging must never block cron execution.
+        }
     }
 
     /** @return array<int,string> */
