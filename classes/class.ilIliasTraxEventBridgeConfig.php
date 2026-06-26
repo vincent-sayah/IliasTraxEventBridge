@@ -3,7 +3,7 @@
 /**
  * Configuration wrapper.
  *
- * V0.4 adds cron-based delivery, retry limits and operational diagnostics.
+ * V0.8 adds deny-log diagnostics that can be enabled on demand.
  */
 class ilIliasTraxEventBridgeConfig
 {
@@ -25,6 +25,9 @@ class ilIliasTraxEventBridgeConfig
 
     public function isLocalXapiGenerationEnabled(): bool { return $this->getBool('local_xapi_generation_enabled', true); }
     public function setLocalXapiGenerationEnabled(bool $enabled): void { $this->setBool('local_xapi_generation_enabled', $enabled); }
+
+    public function isDenyLogEnabled(): bool { return $this->getBool('deny_log_enabled', false); }
+    public function setDenyLogEnabled(bool $enabled): void { $this->setBool('deny_log_enabled', $enabled); }
 
     public function getMaxPayloadChars(): int { return max(500, min(30000, (int) $this->get('max_payload_chars', '10000'))); }
     public function setMaxPayloadChars(int $value): void { $this->set('max_payload_chars', (string) max(500, min(30000, $value))); }
