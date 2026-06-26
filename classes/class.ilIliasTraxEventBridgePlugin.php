@@ -3,11 +3,12 @@
 /**
  * ILIAS 10 EventHook plugin.
  *
- * V0.7 objective:
+ * V0.8 objective:
  * - listen to active ILIAS events through EventHook;
  * - persist compact debug records into evnt_evhk_itxeb_log;
  * - generate local xAPI statements only for configured course resources;
  * - send the outbox manually or automatically through ILIAS cron;
+ * - log denied traces in evnt_evhk_itxeb_dlog;
  * - never block or break ILIAS user navigation.
  */
 class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJobProvider
@@ -28,6 +29,7 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJo
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseContextResolver.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingRepository.php';
+            require_once __DIR__ . '/class.ilIliasTraxEventBridgeDenyLogRepository.php';
             require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventRouter.php';
 
             $config = new ilIliasTraxEventBridgeConfig();
@@ -42,7 +44,8 @@ class ilIliasTraxEventBridgePlugin extends ilEventHookPlugin implements ilCronJo
                 new ilIliasTraxEventBridgeStatementFactory($config),
                 new ilIliasTraxEventBridgeOutboxRepository(),
                 new ilIliasTraxEventBridgeCourseContextResolver(),
-                new ilIliasTraxEventBridgeCourseTrackingRepository()
+                new ilIliasTraxEventBridgeCourseTrackingRepository(),
+                new ilIliasTraxEventBridgeDenyLogRepository()
             );
             $router->handle($a_component, $a_event, $a_parameter);
         } catch (Throwable $e) {
