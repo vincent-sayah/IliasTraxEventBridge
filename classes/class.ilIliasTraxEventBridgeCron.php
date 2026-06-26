@@ -8,6 +8,7 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeStatementFactory.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseContextResolver.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingRepository.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeDenyLogRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeReadEventTracker.php';
 
 /**
@@ -29,7 +30,7 @@ class ilIliasTraxEventBridgeCron extends ilCronJob
 
     public function getDescription(): string
     {
-        return 'Génère les traces de consultation read_event autorisées, puis envoie automatiquement les statements xAPI generated/failed vers TRAX.';
+        return 'Génère les traces de consultation read_event autorisées, journalise les refus V0.8, puis envoie automatiquement les statements xAPI generated/failed vers TRAX.';
     }
 
     public function getDefaultScheduleType(): CronJobScheduleType
@@ -74,7 +75,8 @@ class ilIliasTraxEventBridgeCron extends ilCronJob
                 $outbox,
                 new ilIliasTraxEventBridgeStatementFactory($config),
                 new ilIliasTraxEventBridgeCourseContextResolver(),
-                new ilIliasTraxEventBridgeCourseTrackingRepository()
+                new ilIliasTraxEventBridgeCourseTrackingRepository(),
+                new ilIliasTraxEventBridgeDenyLogRepository()
             ))->scanAndEnqueue(100);
 
             $sendResult = (new ilIliasTraxEventBridgeOutboxSender($config, $outbox))->sendBatch();
