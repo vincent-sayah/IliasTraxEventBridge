@@ -111,6 +111,17 @@ class ilIliasTraxEventBridgeDenyLogRepository
         return is_array($row) ? (int) ($row['cnt'] ?? 0) : 0;
     }
 
+    public function clear(): int
+    {
+        if (!$this->tableExists()) {
+            return 0;
+        }
+
+        $count = $this->countAll();
+        $this->db->manipulate('DELETE FROM ' . self::TABLE_NAME);
+        return $count;
+    }
+
     private function tableExists(): bool
     {
         return method_exists($this->db, 'tableExists') && $this->db->tableExists(self::TABLE_NAME);
