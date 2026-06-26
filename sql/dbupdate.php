@@ -128,3 +128,36 @@ if (!$ilDB->tableExists('evnt_evhk_itxeb_rcfg')) {
     $ilDB->addIndex('evnt_evhk_itxeb_rcfg', ['enabled'], 'i3');
 }
 ?>
+<#6>
+<?php
+/** @var ilDBInterface $ilDB */
+if (!$ilDB->tableExists('evnt_evhk_itxeb_dlog')) {
+    $ilDB->createTable('evnt_evhk_itxeb_dlog', [
+        'id' => ['type' => 'integer', 'length' => 8, 'notnull' => true],
+        'created_at' => ['type' => 'text', 'length' => 19, 'notnull' => true, 'default' => ''],
+        'created_ts' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'reason' => ['type' => 'text', 'length' => 64, 'notnull' => true, 'default' => ''],
+        'event_type' => ['type' => 'text', 'length' => 64, 'notnull' => true, 'default' => ''],
+        'component' => ['type' => 'text', 'length' => 255, 'notnull' => true, 'default' => ''],
+        'event_name' => ['type' => 'text', 'length' => 255, 'notnull' => true, 'default' => ''],
+        'user_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'course_ref_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'course_obj_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'ref_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'obj_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'obj_type' => ['type' => 'text', 'length' => 64, 'notnull' => true, 'default' => ''],
+        'source_table' => ['type' => 'text', 'length' => 64, 'notnull' => true, 'default' => ''],
+        'source_id' => ['type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0],
+        'payload_json' => ['type' => 'clob', 'notnull' => false],
+        'request_uri' => ['type' => 'clob', 'notnull' => false],
+        'http_method' => ['type' => 'text', 'length' => 16, 'notnull' => true, 'default' => ''],
+    ]);
+    $ilDB->addPrimaryKey('evnt_evhk_itxeb_dlog', ['id']);
+    $ilDB->createSequence('evnt_evhk_itxeb_dlog');
+    $ilDB->addIndex('evnt_evhk_itxeb_dlog', ['created_ts'], 'i1');
+    $ilDB->addIndex('evnt_evhk_itxeb_dlog', ['reason'], 'i2');
+    $ilDB->addIndex('evnt_evhk_itxeb_dlog', ['course_ref_id'], 'i3');
+    $ilDB->addIndex('evnt_evhk_itxeb_dlog', ['ref_id'], 'i4');
+    $ilDB->addIndex('evnt_evhk_itxeb_dlog', ['source_table'], 'i5');
+}
+?>
