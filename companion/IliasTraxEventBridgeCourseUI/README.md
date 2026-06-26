@@ -4,7 +4,11 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 ## Objectif
 
-Ce plugin expose la configuration xAPI directement depuis l'objet cours ILIAS.
+Ce plugin expose la configuration xAPI directement depuis l'objet cours ILIAS :
+
+```text
+Cours > Paramètres > Suivi xAPI
+```
 
 Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
@@ -17,26 +21,85 @@ Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
 Ce plugin compagnon est uniquement responsable de l'entrée UI dans le cours.
 
-## État V0.7.1
+## Packaging V0.8
 
-V0.7.1 validée fonctionnellement.
+À partir de la V0.8, les fichiers PHP du compagnon ne sont plus stockés directement dans le dossier source `companion/`.
 
-L'accès visible final n'est plus un bouton flottant. Il est intégré comme sous-onglet du cours :
+Ils sont stockés sous forme de templates :
 
 ```text
-Cours > Paramètres > Suivi xAPI
+plugin.php.tpl
+classes/*.php.tpl
 ```
 
-Le libellé `Suivi xAPI` est volontairement indépendant du LRS utilisé.
+Objectif : éviter que Composer voie deux copies des mêmes classes lorsque :
 
-L'écran de configuration s'affiche dans le contenu central ILIAS. Il ne s'affiche plus dans une fenêtre flottante et ne contient plus de bouton `Fermer`.
+```text
+1. le dépôt principal est cloné dans EventHandling/EventHook/IliasTraxEventBridge ;
+2. le compagnon est installé dans UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI.
+```
 
-Les onglets ILIAS restent visibles :
+Avant la V0.8, cela produisait des warnings du type :
 
-- fil d'Ariane ;
-- titre du cours ;
-- onglets principaux ;
-- sous-onglets de l'onglet `Paramètres`.
+```text
+Ambiguous class resolution, "ilIliasTraxEventBridgeCourseUIPlugin" was found in both ...
+```
+
+Le script d'installation matérialise les templates `.php.tpl` en vrais fichiers `.php` uniquement dans le slot actif `UserInterfaceHook`.
+
+## Installation serveur
+
+Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
+
+```bash
+sudo -i
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+bash scripts/install_course_ui_companion.sh
+
+cd /var/www/ilias
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
+systemctl restart httpd
+```
+
+Variables optionnelles :
+
+```bash
+ILIAS_ROOT=/var/www/ilias
+HTTPD_USER=apache
+```
+
+Exemple avec variables explicites :
+
+```bash
+ILIAS_ROOT=/var/www/ilias HTTPD_USER=apache bash scripts/install_course_ui_companion.sh
+```
+
+## Chemin d'installation cible
+
+Le script installe le compagnon ici :
+
+```text
+/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
+```
+
+Le plugin principal reste ici :
+
+```text
+/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+```
+
+## Validation Composer
+
+Après installation par script, cette commande ne doit plus afficher de warning `Ambiguous class resolution` concernant `IliasTraxEventBridgeCourseUI` :
+
+```bash
+cd /var/www/ilias
+sudo -u apache composer du
+```
+
+Les éventuels warnings ILIAS génériques sur `scripts/PHP-CS-Fixer/example` sont indépendants du plugin.
 
 ## Conditions d'affichage
 
@@ -66,82 +129,6 @@ itxeb_course_ref_id=<course_ref_id>
 ```
 
 Cette construction permet à ILIAS de reconstruire normalement la page du cours, puis au plugin compagnon de remplacer uniquement le contenu central.
-
-## Écran affiché
-
-L'écran affiche :
-
-- le résumé du cours ;
-- l'état d'activation xAPI du cours ;
-- la liste des ressources traçables ;
-- les cases à cocher par ressource ;
-- le bouton `Enregistrer la configuration xAPI` ;
-- les actions `Tout activer`, `Tout désactiver`, `Réinitialiser ce cours`.
-
-Les écritures sont faites dans les tables V0.7 existantes :
-
-```text
-evnt_evhk_itxeb_ccfg
-evnt_evhk_itxeb_rcfg
-```
-
-La règle de filtrage reste celle du plugin principal :
-
-```text
-statement xAPI autorisé = cours activé ET ressource activée
-```
-
-## Chemin d'installation cible
-
-Le dossier `IliasTraxEventBridgeCourseUI` doit être installé ici :
-
-```text
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
-```
-
-Le plugin principal doit rester ici :
-
-```text
-/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-```
-
-## Installation serveur
-
-Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
-
-```bash
-sudo -i
-
-export ILIAS_ROOT="/var/www/ilias"
-export SOURCE_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge/companion/IliasTraxEventBridgeCourseUI"
-export TARGET_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
-
-mkdir -p "$(dirname "$TARGET_DIR")"
-rm -rf "$TARGET_DIR"
-cp -a "$SOURCE_DIR" "$TARGET_DIR"
-
-chown -R apache:apache "$TARGET_DIR"
-find "$TARGET_DIR" -type d -exec chmod 755 {} \;
-find "$TARGET_DIR" -type f -exec chmod 644 {} \;
-find "$TARGET_DIR" -name "*.php" -print0 | xargs -0 -n1 php -l
-
-cd "$ILIAS_ROOT"
-sudo -u apache composer du
-sudo -u apache php cli/setup.php build --yes
-systemctl restart httpd
-```
-
-Ensuite, vérifier dans l'administration des plugins ILIAS que `IliasTraxEventBridgeCourseUI` apparaît comme plugin UIHook et qu'il est actif.
-
-## Validation syntaxe
-
-```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-
-find companion/IliasTraxEventBridgeCourseUI -name "*.php" -print0 | xargs -0 -n1 php -l
-```
-
-Résultat attendu : aucune erreur de syntaxe PHP.
 
 ## Validation visuelle
 
@@ -191,4 +178,4 @@ repository_object_access / htlm / ref_id 207 / status sent
 
 Plugin compagnon : `0.1.1`.
 
-Cette version accompagne `IliasTraxEventBridge` `0.7.1`.
+Cette version accompagne `IliasTraxEventBridge` `0.8.0`.
