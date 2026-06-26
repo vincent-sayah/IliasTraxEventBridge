@@ -50,6 +50,13 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             ];
         }
 
+        if ($this->isPluginListRequest($a_par['html'])) {
+            return [
+                'mode' => ilUIHookPluginGUI::REPLACE,
+                'html' => $this->injectPluginListActionLayoutCss($a_par['html']),
+            ];
+        }
+
         return [
             'mode' => ilUIHookPluginGUI::KEEP,
             'html' => '',
@@ -164,6 +171,47 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;"><a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a></div>';
         $newHtml = preg_replace('/(<form\b)/i', $fallback . '$1', $html, 1, $count);
         return is_string($newHtml) && $count > 0 ? $newHtml : $html . $fallback;
+    }
+
+    private function isPluginListRequest(string $html): bool
+    {
+        if (strpos($html, 'itxeb_plugin_list_action_layout_fix') !== false) {
+            return false;
+        }
+
+        $cmdClass = strtolower($this->requestValue($_GET, 'cmdClass'));
+        if ($cmdClass === '') {
+            $cmdClass = strtolower($this->requestValue($_GET, 'cmdclass'));
+        }
+
+        $requestUri = strtolower($_SERVER['REQUEST_URI'] ?? '');
+        $isComponentSettings = $cmdClass === 'ilobjcomponentsettingsgui'
+            || strpos($requestUri, 'cmdclass=ilobjcomponentsettingsgui') !== false;
+
+        if (!$isComponentSettings) {
+            return false;
+        }
+
+        return strpos($html, 'il-table-presentation') !== false
+            && strpos($html, 'il-table-presentation-actions col-lg-auto col-sm-12') !== false;
+    }
+
+    private function injectPluginListActionLayoutCss(string $html): string
+    {
+        $style = '<style id="itxeb_plugin_list_action_layout_fix">'
+            . '@media (min-width:768px) and (max-width:1199px){'
+            . '.il-table-presentation-data>.il-table-presentation-row>.il-table-presentation-row-contents>.row{display:flex;flex-wrap:nowrap;align-items:flex-start}'
+            . '.il-table-presentation-data>.il-table-presentation-row>.il-table-presentation-row-contents>.row>.il-table-presentation-row-header{flex:1 1 auto;width:auto;max-width:none}'
+            . '.il-table-presentation-data>.il-table-presentation-row>.il-table-presentation-row-contents>.row>.il-table-presentation-actions{flex:0 0 auto;width:auto;max-width:none;text-align:right;padding-left:8px}'
+            . '.il-table-presentation-data>.il-table-presentation-row>.il-table-presentation-row-contents>.row>.il-table-presentation-actions>br{display:none}'
+            . '}'
+            . '</style>';
+
+        if (stripos($html, '</head>') !== false) {
+            return preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?: $html;
+        }
+
+        return $style . $html;
     }
 
     private function replaceCenterColumnContent(string $pageHtml, string $contentHtml): string
