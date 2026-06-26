@@ -2,6 +2,50 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.8.0 — supervision outbox et diagnostic des refus
+
+### Statut
+
+- Branche de développement : `v0.8-outbox-supervision`.
+- Base : tag stable `v0.7.1`.
+- Version plugin principal : `0.8.0`.
+- Version plugin compagnon UIHook : `0.1.1`.
+- Objectif : ajouter des outils d'exploitation pour comprendre pourquoi une trace xAPI n'est pas générée, sans activer ce diagnostic en permanence sur une plateforme volumineuse.
+
+### Lot 1 — journal SQL des refus
+
+- Ajout de la table `evnt_evhk_itxeb_dlog` via l'étape SQL `<#6>`.
+- Ajout du repository `ilIliasTraxEventBridgeDenyLogRepository`.
+- Journalisation non bloquante des refus issus de `EventHook`.
+- Journalisation non bloquante des refus issus de `read_event`.
+- Motifs pris en charge : `not_in_course`, `missing_course_context`, `missing_resource_context`, `course_not_configured`, `course_disabled`, `resource_not_configured`, `resource_disabled`, `unsupported_object_type`.
+- Validation réalisée sur les ressources désactivées d'un cours : les refus sont bien journalisés avec `reason = resource_disabled`.
+
+### Lot 2 — supervision admin des refus
+
+- Ajout d'une section `Diagnostic des traces refusées V0.8` dans l'écran de configuration du plugin.
+- Affichage du total des refus, de la synthèse par motif, par source et par type d'événement.
+- Affichage des 50 derniers refus avec contexte utilisateur, cours, ressource, source technique et payload JSON.
+- Ajout de la case `Activer le diagnostic des traces refusées`.
+- Par défaut, le diagnostic des refus est désactivé pour éviter une croissance inutile de `evnt_evhk_itxeb_dlog`.
+- Ajout du bouton `Purger le diagnostic des traces refusées`, qui vide uniquement `evnt_evhk_itxeb_dlog`.
+- Validation réalisée : activation/désactivation fonctionnelle et purge fonctionnelle.
+
+### Lot 3 — packaging propre du plugin compagnon UIHook
+
+- Remplacement des fichiers PHP source du compagnon par des templates `.php.tpl`.
+- Ajout du script `scripts/install_course_ui_companion.sh` pour générer les vrais fichiers PHP uniquement dans le slot actif `UserInterfaceHook`.
+- Suppression des warnings Composer `Ambiguous class resolution` liés à `IliasTraxEventBridgeCourseUI`.
+- Mise à jour de la documentation d'installation du plugin compagnon.
+- Validation réalisée : le sous-onglet `Paramètres > Suivi xAPI` reste fonctionnel après installation par templates.
+
+### Documentation
+
+- Ajout de `docs/V0.8_LOT1_DENY_LOG.md`.
+- Ajout de `docs/V0.8_LOT2_DENY_SUPERVISION.md`.
+- Ajout de `docs/V0.8_LOT3_COMPANION_PACKAGING.md`.
+- Ajout de `docs/RELEASE_0.8.0.md`.
+
 ## v0.7.1 — développement course object UI
 
 ### Statut
