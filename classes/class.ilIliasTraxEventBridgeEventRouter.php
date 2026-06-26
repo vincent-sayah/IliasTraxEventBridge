@@ -1,11 +1,12 @@
 <?php
 
 /**
- * V0.7 router:
+ * V0.8 router:
  * - persists every received event in debug mode;
  * - generates local xAPI statements only for reliable events contained in a course;
  * - applies explicit course/resource xAPI configuration before outbox insertion;
- * - stores accepted statements in the outbox.
+ * - stores accepted statements in the outbox;
+ * - logs denied statements in evnt_evhk_itxeb_dlog for diagnostics.
  */
 class ilIliasTraxEventBridgeEventRouter
 {
@@ -30,6 +31,9 @@ class ilIliasTraxEventBridgeEventRouter
     /** @var ilIliasTraxEventBridgeCourseTrackingRepository|null */
     private $courseTrackingRepository;
 
+    /** @var ilIliasTraxEventBridgeDenyLogRepository|null */
+    private $denyLogRepository;
+
     public function __construct(
         ilIliasTraxEventBridgeConfig $config,
         ilIliasTraxEventBridgeEventDebugRepository $repository,
@@ -37,7 +41,8 @@ class ilIliasTraxEventBridgeEventRouter
         ?ilIliasTraxEventBridgeStatementFactory $statementFactory = null,
         ?ilIliasTraxEventBridgeOutboxRepository $outboxRepository = null,
         ?ilIliasTraxEventBridgeCourseContextResolver $courseContextResolver = null,
-        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null
+        ?ilIliasTraxEventBridgeCourseTrackingRepository $courseTrackingRepository = null,
+        ?ilIliasTraxEventBridgeDenyLogRepository $denyLogRepository = null
     ) {
         $this->config = $config;
         $this->repository = $repository;
@@ -46,6 +51,7 @@ class ilIliasTraxEventBridgeEventRouter
         $this->outboxRepository = $outboxRepository;
         $this->courseContextResolver = $courseContextResolver;
         $this->courseTrackingRepository = $courseTrackingRepository;
+        $this->denyLogRepository = $denyLogRepository;
     }
 
     public function handle(string $component, string $event, array $params): void
@@ -77,6 +83,7 @@ class ilIliasTraxEventBridgeEventRouter
 
         $courseContext = $this->getCourseContextResolver()->resolve($record);
         if (!$courseContext['is_in_course']) {
+            $this->logDeniedTrace('not_in_course', $record, 'evnt_evhk_itxeb_log', $eventLogId);
             return;
         }
 
@@ -94,13 +101,17 @@ class ilIliasTraxEventBridgeEventRouter
         $record['course_ref_id'] = (int) $courseContext['course_ref_id'];
         $record['course_obj_id'] = (int) $courseContext['course_obj_id'];
 
-        if (!$this->isTrackingAllowedForConfiguredCourse((int) $record['course_ref_id'], (int) $record['ref_id'])) {
+        $denialReason = $this->trackingDenialReason((int) $record['course_ref_id'], (int) $record['ref_id']);
+        if ($denialReason !== '') {
+            $this->logDeniedTrace($denialReason, $record, 'evnt_evhk_itxeb_log', $eventLogId);
             return;
         }
 
         $statement = $this->statementFactory->createFromEventRecord($record);
         if ($statement !== null) {
             $this->outboxRepository->enqueue($record, $statement, $eventLogId);
+        } else {
+            $this->logDeniedTrace('unsupported_object_type', $record, 'evnt_evhk_itxeb_log', $eventLogId);
         }
     }
 
@@ -357,15 +368,53 @@ class ilIliasTraxEventBridgeEventRouter
         return $this->courseTrackingRepository;
     }
 
-    private function isTrackingAllowedForConfiguredCourse(int $courseRefId, int $refId): bool
+    private function getDenyLogRepository(): ilIliasTraxEventBridgeDenyLogRepository
     {
-        if ($courseRefId <= 0 || $refId <= 0) {
-            return false;
+        if ($this->denyLogRepository === null) {
+            $this->denyLogRepository = new ilIliasTraxEventBridgeDenyLogRepository();
+        }
+
+        return $this->denyLogRepository;
+    }
+
+    private function trackingDenialReason(int $courseRefId, int $refId): string
+    {
+        if ($courseRefId <= 0) {
+            return 'missing_course_context';
+        }
+
+        if ($refId <= 0) {
+            return 'missing_resource_context';
         }
 
         $repository = $this->getCourseTrackingRepository();
-        return $repository->isCourseEnabled($courseRefId)
-            && $repository->isResourceEnabled($courseRefId, $refId);
+        if (!$repository->isCourseConfigured($courseRefId)) {
+            return 'course_not_configured';
+        }
+
+        if (!$repository->isCourseEnabled($courseRefId)) {
+            return 'course_disabled';
+        }
+
+        if (!$repository->isResourceConfigured($courseRefId, $refId)) {
+            return 'resource_not_configured';
+        }
+
+        if (!$repository->isResourceEnabled($courseRefId, $refId)) {
+            return 'resource_disabled';
+        }
+
+        return '';
+    }
+
+    /** @param array<string,mixed> $record */
+    private function logDeniedTrace(string $reason, array $record, string $sourceTable, int $sourceId): void
+    {
+        try {
+            $this->getDenyLogRepository()->log($reason, $record, $sourceTable, $sourceId);
+        } catch (Throwable $ignored) {
+            // Deny logging must never block ILIAS navigation or statement generation.
+        }
     }
 
     private function getServerValue(string $key): string
