@@ -6,7 +6,7 @@
  * - generates local xAPI statements only for reliable events contained in a course;
  * - applies explicit course/resource xAPI configuration before outbox insertion;
  * - stores accepted statements in the outbox;
- * - logs denied statements in evnt_evhk_itxeb_dlog for diagnostics.
+ * - logs denied statements in evnt_evhk_itxeb_dlog only when deny diagnostics are enabled.
  */
 class ilIliasTraxEventBridgeEventRouter
 {
@@ -410,6 +410,10 @@ class ilIliasTraxEventBridgeEventRouter
     /** @param array<string,mixed> $record */
     private function logDeniedTrace(string $reason, array $record, string $sourceTable, int $sourceId): void
     {
+        if (!$this->config->isDenyLogEnabled()) {
+            return;
+        }
+
         try {
             $this->getDenyLogRepository()->log($reason, $record, $sourceTable, $sourceId);
         } catch (Throwable $ignored) {
