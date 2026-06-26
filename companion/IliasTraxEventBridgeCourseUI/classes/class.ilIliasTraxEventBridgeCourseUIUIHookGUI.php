@@ -7,16 +7,13 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
  * UIHook GUI for exposing course-level xAPI configuration.
  *
  * Official ILIAS 10 UIHook tab handling is done through modifyGUI(..., 'sub_tabs', ['tabs' => ...]).
- * The course-settings detection is intentionally relaxed because ILIAS may hide the current command
- * behind ilCtrl instead of plain $_GET['cmd'].
+ * The actual screen is rendered only through getHTML(..., 'template_show', ['html' => ...]) so the
+ * normal ILIAS header, main tabs and sub-tabs remain untouched.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
     /** @var ilIliasTraxEventBridgeCourseUIBridge */
     private $bridge;
-
-    /** @var bool */
-    private static $entryInjected = false;
 
     public function __construct()
     {
@@ -32,19 +29,9 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
     public function getHTML($a_comp, $a_part, $a_par = []): array
     {
         if ($a_part !== 'template_show' || !isset($a_par['html']) || !is_string($a_par['html'])) {
-            if (!$this->isCourseUiCommandRequest() || self::$entryInjected) {
-                return [
-                    'mode' => ilUIHookPluginGUI::KEEP,
-                    'html' => '',
-                ];
-            }
-
-            self::$entryInjected = true;
-            $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
-
             return [
-                'mode' => ilUIHookPluginGUI::APPEND,
-                'html' => $screen->handle(),
+                'mode' => ilUIHookPluginGUI::KEEP,
+                'html' => '',
             ];
         }
 
@@ -145,7 +132,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             return $html;
         }
 
-        $li = '<li><a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a></li>';
+        $li = '<li id="subtab_itxeb_course_xapi_settings"><a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a></li>';
         $anchor = '<a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a>';
 
         $patterns = [
@@ -182,7 +169,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
     private function replaceCenterColumnContent(string $pageHtml, string $contentHtml): string
     {
         if ($pageHtml === '' || !class_exists('DOMDocument')) {
-            return $pageHtml . $contentHtml;
+            return $pageHtml;
         }
 
         $internalErrors = libxml_use_internal_errors(true);
@@ -191,7 +178,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         if (!$loaded) {
             libxml_clear_errors();
             libxml_use_internal_errors($internalErrors);
-            return $pageHtml . $contentHtml;
+            return $pageHtml;
         }
 
         $xpath = new DOMXPath($dom);
@@ -199,7 +186,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         if (!$centerColumn instanceof DOMElement) {
             libxml_clear_errors();
             libxml_use_internal_errors($internalErrors);
-            return $pageHtml . $contentHtml;
+            return $pageHtml;
         }
 
         while ($centerColumn->firstChild !== null) {
