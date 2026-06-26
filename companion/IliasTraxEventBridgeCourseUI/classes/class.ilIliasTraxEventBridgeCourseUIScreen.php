@@ -240,11 +240,9 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $title = trim($courseTitle) !== '' ? 'Suivi xAPI — ' . $courseTitle : 'Suivi xAPI — configuration du cours';
         return $this->styles()
             . '<div id="itxeb-course-ui-screen" class="itxeb-cui-screen">'
-            . '<div class="itxeb-cui-panel">'
-            . '<div class="itxeb-cui-header"><div><h1>' . $this->esc($title) . '</h1><p>Configuration xAPI depuis l’objet cours' . ($courseRefId > 0 ? ' — course_ref_id ' . $this->esc((string) $courseRefId) : '') . '</p></div>'
-            . '<a class="btn btn-default" href="' . $this->esc($this->closeUrl()) . '">Fermer</a></div>'
+            . '<div class="itxeb-cui-header"><h1>' . $this->esc($title) . '</h1><p>Configuration xAPI depuis l’objet cours' . ($courseRefId > 0 ? ' — course_ref_id ' . $this->esc((string) $courseRefId) : '') . '</p></div>'
             . $content
-            . '</div></div>';
+            . '</div>';
     }
 
     private function renderMessage(): string
@@ -363,24 +361,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
             : '';
     }
 
-    private function closeUrl(): string
-    {
-        $uri = $this->currentRequestUri();
-        if ($uri === '') {
-            return './';
-        }
-
-        $parts = parse_url($uri);
-        $path = (string) ($parts['path'] ?? '');
-        $query = [];
-        if (isset($parts['query'])) {
-            parse_str((string) $parts['query'], $query);
-        }
-        unset($query['itxeb_cui_cmd'], $query['itxeb_course_ref_id']);
-
-        return $path . (count($query) > 0 ? '?' . http_build_query($query, '', '&') : '');
-    }
-
     private function esc(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -389,9 +369,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
     private function styles(): string
     {
         return '<style>'
-            . '#itxeb-course-ui-screen{position:fixed;inset:3vh 3vw;z-index:10000;background:rgba(245,247,250,.98);border:1px solid #aab7c4;border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.28);overflow:auto;padding:0;font-family:Arial,sans-serif}'
-            . '#itxeb-course-ui-screen .itxeb-cui-panel{padding:18px 22px 28px}'
-            . '#itxeb-course-ui-screen .itxeb-cui-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;border-bottom:1px solid #d5dde5;margin-bottom:16px;padding-bottom:12px}'
+            . '#itxeb-course-ui-screen{margin:0;padding:0;font-family:Arial,sans-serif}'
+            . '#itxeb-course-ui-screen .itxeb-cui-header{border-bottom:1px solid #d5dde5;margin-bottom:16px;padding-bottom:12px}'
             . '#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}'
             . '#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}.itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}.itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}.itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}'
             . '#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}'
