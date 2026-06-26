@@ -17,52 +17,30 @@ Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
 Ce plugin compagnon est uniquement responsable de l'entrée UI dans le cours.
 
-## État Lot 2
+## État V0.7.1
 
-Ce lot fournit un squelette non invasif :
+V0.7.1 validée fonctionnellement.
 
-- `plugin.php` du plugin compagnon ;
-- classe plugin `ilIliasTraxEventBridgeCourseUIPlugin` ;
-- bridge `ilIliasTraxEventBridgeCourseUIBridge` ;
-- classe UIHook `ilIliasTraxEventBridgeCourseUIUIHookGUI`.
-
-## État Lot 3
-
-Le lot 3 ajoute la détection contextualisée du cours courant.
-
-Le bridge prépare maintenant :
-
-- `course_ref_id` ;
-- `course_obj_id` ;
-- `course_title` ;
-- `can_manage` ;
-- `main_plugin_available` ;
-- `course_tracking_classes_available` ;
-- `configuration_url` ;
-- `detection_candidates`.
-
-La détection peut exploiter :
-
-- `ref_id` ;
-- `course_ref_id` ;
-- `target_ref_id` ;
-- `itxeb_course_ref_id` ;
-- `target=crs_<id>` ;
-- `REQUEST_URI`, notamment `/goto.php/crs/<id>` et `/crs/<id>`.
-
-## État Lot 4 / 5 — accès cours final
-
-L'accès visible final n'est plus un bouton flottant.
-
-Le plugin compagnon tente d'ajouter un sous-onglet générique dans les onglets du cours :
+L'accès visible final n'est plus un bouton flottant. Il est intégré comme sous-onglet du cours :
 
 ```text
-Suivi xAPI
+Cours > Paramètres > Suivi xAPI
 ```
 
-Ce libellé est volontairement indépendant du LRS utilisé.
+Le libellé `Suivi xAPI` est volontairement indépendant du LRS utilisé.
 
-Conditions d'affichage :
+L'écran de configuration s'affiche dans le contenu central ILIAS. Il ne s'affiche plus dans une fenêtre flottante et ne contient plus de bouton `Fermer`.
+
+Les onglets ILIAS restent visibles :
+
+- fil d'Ariane ;
+- titre du cours ;
+- onglets principaux ;
+- sous-onglets de l'onglet `Paramètres`.
+
+## Conditions d'affichage
+
+Le sous-onglet `Suivi xAPI` est affiché si les conditions suivantes sont réunies :
 
 - cours détecté ;
 - utilisateur autorisé à gérer le cours ;
@@ -70,12 +48,26 @@ Conditions d'affichage :
 - classes de configuration V0.7 disponibles ;
 - URL contextualisée disponible.
 
-Le sous-onglet pointe vers :
+## URL du sous-onglet
+
+Le sous-onglet conserve le contexte de l'onglet `Paramètres` du cours, notamment :
+
+```text
+cmd=edit
+cmdClass=ilObjCourseGUI
+ref_id=<course_ref_id>
+```
+
+Il ajoute les paramètres spécifiques au plugin compagnon :
 
 ```text
 itxeb_cui_cmd=showCourseTracking
 itxeb_course_ref_id=<course_ref_id>
 ```
+
+Cette construction permet à ILIAS de reconstruire normalement la page du cours, puis au plugin compagnon de remplacer uniquement le contenu central.
+
+## Écran affiché
 
 L'écran affiche :
 
@@ -83,14 +75,20 @@ L'écran affiche :
 - l'état d'activation xAPI du cours ;
 - la liste des ressources traçables ;
 - les cases à cocher par ressource ;
-- le bouton Enregistrer ;
-- les actions Tout activer, Tout désactiver, Réinitialiser.
+- le bouton `Enregistrer la configuration xAPI` ;
+- les actions `Tout activer`, `Tout désactiver`, `Réinitialiser ce cours`.
 
 Les écritures sont faites dans les tables V0.7 existantes :
 
 ```text
 evnt_evhk_itxeb_ccfg
 evnt_evhk_itxeb_rcfg
+```
+
+La règle de filtrage reste celle du plugin principal :
+
+```text
+statement xAPI autorisé = cours activé ET ressource activée
 ```
 
 ## Chemin d'installation cible
@@ -107,7 +105,7 @@ Le plugin principal doit rester ici :
 /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 ```
 
-## Installation serveur provisoire
+## Installation serveur
 
 Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
 
@@ -151,12 +149,13 @@ Résultat attendu : aucune erreur de syntaxe PHP.
 2. Ouvrir l'onglet `Paramètres` du cours.
 3. Vérifier la présence du sous-onglet `Suivi xAPI`.
 4. Cliquer sur `Suivi xAPI`.
-5. Vérifier que le panneau de configuration s'ouvre.
-6. Cocher `Activer les traces xAPI pour ce cours`.
-7. Cocher une ou plusieurs ressources.
-8. Cliquer sur `Enregistrer la configuration xAPI`.
-9. Vérifier le message de succès.
-10. Vérifier en SQL que les tables sont modifiées.
+5. Vérifier que le contenu s'affiche dans la zone centrale ILIAS.
+6. Vérifier que les onglets du cours restent visibles.
+7. Cocher `Activer les traces xAPI pour ce cours`.
+8. Cocher une ou plusieurs ressources.
+9. Cliquer sur `Enregistrer la configuration xAPI`.
+10. Vérifier le message de succès.
+11. Vérifier en SQL que les tables sont modifiées.
 
 SQL de contrôle :
 
@@ -171,6 +170,25 @@ WHERE course_ref_id = 194
 ORDER BY ref_id;
 ```
 
-## Suite
+## Validation outbox réalisée
 
-Lot 6 : stabilisation documentaire, validation non-régression outbox et préparation du tag `v0.7.1`.
+Configuration validée sur le cours `194` :
+
+```text
+Cours activé : oui
+Ressources activées : file ref_id 196, htlm ref_id 207
+Autres ressources : désactivées
+```
+
+Outbox validée :
+
+```text
+file_downloaded / file / ref_id 196 / status sent
+repository_object_access / htlm / ref_id 207 / status sent
+```
+
+## Version
+
+Plugin compagnon : `0.1.1`.
+
+Cette version accompagne `IliasTraxEventBridge` `0.7.1`.
