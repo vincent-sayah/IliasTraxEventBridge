@@ -119,9 +119,12 @@ class ilIliasTraxEventBridgeCourseUIBridge
         }
 
         $params = $this->requestContainerToArray($_GET);
+        $params['baseClass'] = $params['baseClass'] ?? 'ilrepositorygui';
+        $params['cmdClass'] = $params['cmdClass'] ?? 'ilObjCourseGUI';
+        $params['cmd'] = 'edit';
+        $params['ref_id'] = (string) $courseRefId;
         $params['itxeb_cui_cmd'] = 'showCourseTracking';
         $params['itxeb_course_ref_id'] = (string) $courseRefId;
-        unset($params['cmd']);
 
         return $script . '?' . http_build_query($params, '', '&');
     }
@@ -291,7 +294,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
         }
 
         $result = [];
-        foreach (['ref_id', 'target', 'cmdClass', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
+        foreach (['baseClass', 'ref_id', 'target', 'cmdNode', 'cmdClass', 'cmd', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
             $value = $this->requestValue($source, $key);
             if ($value !== '') {
                 $result[$key] = $value;
