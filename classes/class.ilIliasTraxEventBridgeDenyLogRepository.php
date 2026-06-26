@@ -27,7 +27,7 @@ class ilIliasTraxEventBridgeDenyLogRepository
     /** @param array<string,mixed> $eventRecord */
     public function log(string $reason, array $eventRecord, string $sourceTable = '', int $sourceId = 0): int
     {
-        if (!$this->tableExists()) {
+        if (!$this->isEnabled() || !$this->tableExists()) {
             return 0;
         }
 
@@ -120,6 +120,19 @@ class ilIliasTraxEventBridgeDenyLogRepository
         $count = $this->countAll();
         $this->db->manipulate('DELETE FROM ' . self::TABLE_NAME);
         return $count;
+    }
+
+    private function isEnabled(): bool
+    {
+        if (!class_exists('ilIliasTraxEventBridgeConfig')) {
+            return false;
+        }
+
+        try {
+            return (new ilIliasTraxEventBridgeConfig())->isDenyLogEnabled();
+        } catch (Throwable $ignored) {
+            return false;
+        }
     }
 
     private function tableExists(): bool
