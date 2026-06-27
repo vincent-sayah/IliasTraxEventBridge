@@ -1,39 +1,70 @@
-# Plan de validation — IliasTraxEventBridge v0.7
+# Plan de validation — IliasTraxEventBridge v0.8.0
 
-Version de stabilisation actuelle : **v0.7.0**.
+Version stable publiée : **v0.8.0** sur `main`.
 
-Ce plan valide la branche V0.7 : configuration xAPI par cours et par ressource, interface d'accès admin, filtrage avant outbox, conservation des enrichissements V0.6, envoi TRAX et absence de traces parasites `root` / `crs`.
-
-La branche stable publiée reste `main` / `v0.6` tant que la V0.7 n'est pas taguée et promue.
+Ce plan valide la release V0.8.0 : configuration xAPI par cours et par ressource, accès depuis l'objet cours, filtrage avant outbox, outbox, envoi LRS/TRAX, diagnostic des traces refusées, purge et packaging propre du plugin compagnon UIHook.
 
 ## Test 1 — État Git et version plugin
 
-Dans le dossier du plugin :
+Dans le dossier du plugin principal :
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 
 git status --short
-git branch --show-current
-git log --oneline --decorate -10
+git log --oneline --decorate -5
 grep -n '\$version' plugin.php
+grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 ```
 
 Résultat attendu :
 
 ```text
 git status --short : vide
-branche courante : v0.7
-plugin.php : 0.7.0
+HEAD sur tag v0.8.0 ou branche main à jour
+plugin.php : 0.8.0
+plugin.php.tpl companion : 0.1.1
 ```
 
-## Test 2 — Build ILIAS et syntaxe PHP
+## Test 2 — Syntaxe PHP et packaging companion
 
-Depuis le dossier du plugin :
+Depuis le dossier du plugin principal :
 
 ```bash
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
+find companion/IliasTraxEventBridgeCourseUI -name "*.php" -print
 ```
+
+Résultat attendu :
+
+```text
+aucune erreur de syntaxe PHP
+aucun fichier .php dans companion/IliasTraxEventBridgeCourseUI
+```
+
+Installer ou régénérer le companion :
+
+```bash
+bash scripts/install_course_ui_companion.sh
+```
+
+Contrôler le slot UIHook actif :
+
+```bash
+find /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI -name "*.php" -print
+```
+
+Résultat attendu :
+
+```text
+plugin.php
+classes/class.ilIliasTraxEventBridgeCourseUIPlugin.php
+classes/class.ilIliasTraxEventBridgeCourseUIBridge.php
+classes/class.ilIliasTraxEventBridgeCourseUIScreen.php
+classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php
+```
+
+## Test 3 — Build ILIAS
 
 Depuis la racine ILIAS :
 
@@ -41,18 +72,27 @@ Depuis la racine ILIAS :
 cd /var/www/ilias
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
+systemctl restart httpd
 ```
 
-Résultat attendu : aucun défaut de syntaxe PHP et build ILIAS terminé sans erreur.
+Résultat attendu :
 
-## Test 3 — Tables attendues
+```text
+build terminé sans erreur bloquante
+plus aucun warning Composer Ambiguous class resolution sur IliasTraxEventBridgeCourseUI
+```
+
+Des warnings ILIAS indépendants, par exemple sur `scripts/PHP-CS-Fixer/example`, peuvent rester.
+
+## Test 4 — Tables attendues
 
 ```sql
 SHOW TABLES LIKE 'evnt_evhk_itxeb_log';
 SHOW TABLES LIKE 'evnt_evhk_itxeb_out';
 SHOW TABLES LIKE 'evnt_evhk_itxeb_read';
-SHOW TABLES LIKE 'evnt_evhk_itxeb_%cfg';
-SHOW TABLES LIKE 'read_event';
+SHOW TABLES LIKE 'evnt_evhk_itxeb_ccfg';
+SHOW TABLES LIKE 'evnt_evhk_itxeb_rcfg';
+SHOW TABLES LIKE 'evnt_evhk_itxeb_dlog';
 ```
 
 Résultat attendu :
@@ -63,46 +103,39 @@ evnt_evhk_itxeb_out
 evnt_evhk_itxeb_read
 evnt_evhk_itxeb_ccfg
 evnt_evhk_itxeb_rcfg
-read_event
+evnt_evhk_itxeb_dlog
 ```
 
-Structure V0.7 :
+Structures utiles :
 
 ```sql
 DESCRIBE evnt_evhk_itxeb_ccfg;
 DESCRIBE evnt_evhk_itxeb_rcfg;
-SHOW INDEX FROM evnt_evhk_itxeb_ccfg;
-SHOW INDEX FROM evnt_evhk_itxeb_rcfg;
+DESCRIBE evnt_evhk_itxeb_dlog;
 ```
 
-## Test 4 — Accès écran configuration xAPI par cours
+## Test 5 — Accès depuis l'objet cours
 
 Dans ILIAS :
 
 ```text
-Administration > Plugins > IliasTraxEventBridge > Configurer
+Cours > Paramètres > Suivi xAPI
 ```
 
-Vérifier la présence de la section :
+Résultat attendu :
 
 ```text
-Configuration xAPI par cours
+le sous-onglet Suivi xAPI est visible
+l'écran s'ouvre dans le contenu central ILIAS
+les onglets du cours restent visibles
 ```
 
-Saisir le `course_ref_id` d'un cours, par exemple :
+## Test 6 — Enregistrement configuration cours / ressources
 
-```text
-194
-```
-
-Résultat attendu : l'écran `TRAX / xAPI — configuration du cours` s'ouvre sans erreur `The requested page could not be found`.
-
-## Test 5 — Enregistrement configuration cours / ressources
-
-Depuis l'écran V0.7 :
+Depuis l'écran `Suivi xAPI` du cours :
 
 1. cocher `Activer les traces xAPI pour ce cours` ;
-2. cocher uniquement quelques ressources, par exemple `file` et `htlm` ;
+2. cocher quelques ressources, par exemple `file` et `htlm` ;
 3. cliquer sur `Enregistrer la configuration xAPI`.
 
 Vérifier ensuite :
@@ -127,15 +160,16 @@ ressources non cochées : enabled = 0
 updated_by renseigné
 ```
 
-Exemple validé :
+Exemple déjà validé :
 
 ```text
 course_ref_id 194 / course_obj_id 629 / enabled 1
-file ref_id 196 / obj_id 636 / enabled 1
-htlm ref_id 207 / obj_id 655 / enabled 1
+file ref_id 196 / enabled 1
+htlm ref_id 207 / enabled 1
+autres ressources / enabled 0
 ```
 
-## Test 6 — Filtrage ressource activée
+## Test 7 — Filtrage ressource activée
 
 Noter le dernier identifiant outbox :
 
@@ -144,14 +178,7 @@ SELECT COALESCE(MAX(id), 0) AS max_outbox_id
 FROM evnt_evhk_itxeb_out;
 ```
 
-Consulter ensuite une ressource activée, par exemple :
-
-```text
-file ref_id 196
-htlm ref_id 207
-```
-
-Lancer le cron si nécessaire :
+Consulter une ressource activée, puis lancer le cron si nécessaire :
 
 ```bash
 cd /var/www/ilias
@@ -162,7 +189,7 @@ Vérifier :
 
 ```sql
 SELECT id, event_log_id, event_type, obj_type, ref_id, obj_id,
-       user_id, status, created_at, sent_at
+       user_id, status, created_at, sent_at, last_error
 FROM evnt_evhk_itxeb_out
 ORDER BY id DESC
 LIMIT 20;
@@ -171,40 +198,20 @@ LIMIT 20;
 Résultat attendu :
 
 ```text
-file activé -> ligne outbox file_downloaded -> sent
-htlm activé -> ligne outbox repository_object_access -> sent
+ressource activée -> ligne outbox generated puis sent
+last_error vide après envoi OK
 ```
 
-Exemple validé :
-
-```text
-file ref_id 196 -> file_downloaded -> sent
-htlm ref_id 207 -> repository_object_access -> sent
-```
-
-## Test 7 — Filtrage ressource désactivée
+## Test 8 — Filtrage ressource désactivée
 
 Noter le dernier identifiant outbox :
 
 ```sql
-SELECT MAX(id) AS max_outbox_id
+SELECT COALESCE(MAX(id), 0) AS max_outbox_id
 FROM evnt_evhk_itxeb_out;
 ```
 
-Consulter une ressource désactivée, par exemple :
-
-```text
-wiki ref_id 199
-test ref_id 200
-webr ref_id 204 ou 209
-```
-
-Lancer le cron si nécessaire :
-
-```bash
-cd /var/www/ilias
-sudo -u apache php cron/cron.php run itxeb_send_outbox_to_trax
-```
+Consulter une ressource désactivée, puis lancer le cron si nécessaire.
 
 Vérifier :
 
@@ -222,38 +229,83 @@ Résultat attendu :
 Empty set
 ```
 
-Cela confirme que le refus V0.7 a lieu avant insertion dans `evnt_evhk_itxeb_out`.
+Cela confirme que le refus a lieu avant insertion dans `evnt_evhk_itxeb_out`.
 
-## Test 8 — Consultation réelle via read_event
+## Test 9 — Diagnostic des traces refusées désactivé
 
-Avant ou après le cron, vérifier que `read_event` est alimentée :
+Dans l'administration du plugin, décocher :
 
-```sql
-SELECT r.obj_id, r.usr_id, r.read_count, r.spent_seconds,
-       r.first_access, r.last_access,
-       od.type, od.title
-FROM read_event r
-JOIN object_data od ON od.obj_id = r.obj_id
-ORDER BY r.last_access DESC
-LIMIT 20;
+```text
+Activer le diagnostic des traces refusées
 ```
 
-Après le cron, vérifier la table anti-doublon :
+Noter le compteur :
 
 ```sql
-SELECT *
-FROM evnt_evhk_itxeb_read
-ORDER BY processed_at DESC
-LIMIT 20;
+SELECT COUNT(*) AS total
+FROM evnt_evhk_itxeb_dlog;
+```
+
+Consulter une ressource désactivée, lancer le cron si nécessaire, puis recompter.
+
+Résultat attendu :
+
+```text
+le total ne doit pas augmenter
+```
+
+## Test 10 — Diagnostic des traces refusées activé
+
+Dans l'administration du plugin, cocher :
+
+```text
+Activer le diagnostic des traces refusées
+```
+
+Consulter une ressource désactivée, lancer le cron si nécessaire, puis vérifier :
+
+```sql
+SELECT id, created_at, reason, event_type, user_id, course_ref_id,
+       ref_id, obj_id, obj_type, source_table, source_id
+FROM evnt_evhk_itxeb_dlog
+ORDER BY id DESC
+LIMIT 30;
+
+SELECT reason, COUNT(*) AS total
+FROM evnt_evhk_itxeb_dlog
+GROUP BY reason
+ORDER BY total DESC, reason ASC;
 ```
 
 Résultat attendu :
 
-- une ressource activée peut générer une ligne outbox ;
-- une ressource désactivée ne génère pas d'outbox ;
-- une consultation refusée est quand même marquée traitée dans `evnt_evhk_itxeb_read` pour éviter une boucle cron.
+```text
+reason = resource_disabled pour les ressources désactivées
+source_table = read_event ou evnt_evhk_itxeb_log selon la source
+```
 
-## Test 9 — Enrichissement xAPI conservé
+## Test 11 — Purge du diagnostic des refus
+
+Dans l'administration du plugin :
+
+```text
+Diagnostic des traces refusées V0.8 > Purger le diagnostic des traces refusées
+```
+
+Vérifier :
+
+```sql
+SELECT COUNT(*) AS total
+FROM evnt_evhk_itxeb_dlog;
+```
+
+Résultat attendu :
+
+```text
+total = 0
+```
+
+## Test 12 — Enrichissement xAPI conservé
 
 Inspecter un statement récent :
 
@@ -276,70 +328,9 @@ context.extensions.course_title
 context.extensions.course_url
 ```
 
-Résultat attendu : l'objet et le cours parent sont identifiables par titre et URL comme en V0.6.
+## Test 13 — Diagnostics outbox dans le JSON xAPI
 
-## Test 10 — Familles de statements et verbes
-
-```sql
-SELECT id, event_type, obj_type, verb_id, status, statement_json
-FROM evnt_evhk_itxeb_out
-ORDER BY id DESC
-LIMIT 10\G
-```
-
-Dans `statement_json`, vérifier les extensions :
-
-```text
-statement_family
-interaction_type
-repository_object_family
-```
-
-Résultat attendu par type :
-
-```text
-blog -> statement_family = repository_blog_access        ; interaction_type = read
-wiki -> statement_family = repository_wiki_access        ; interaction_type = read
-htlm -> statement_family = repository_html_module_access ; interaction_type = read
-webr -> statement_family = repository_web_link_access    ; interaction_type = visit
-mcst -> statement_family = repository_media_access       ; interaction_type = view
-file -> statement_family = file_download                 ; interaction_type = download
-tst  -> statement_family = test_tracking                 ; interaction_type = assessment_progress
-```
-
-## Test 11 — Métriques read_event et durée xAPI
-
-Pour une consultation issue de `read_event`, vérifier :
-
-```text
-result.extensions.read_count
-result.extensions.spent_seconds
-result.extensions.read_event_last_access
-result.extensions.read_event_first_access
-context.extensions.read_count
-context.extensions.spent_seconds
-context.extensions.read_event_last_access
-context.extensions.read_event_first_access
-```
-
-Si `spent_seconds > 0`, vérifier aussi :
-
-```text
-result.duration = PT...S
-```
-
-## Test 12 — Diagnostics outbox dans le JSON xAPI
-
-Inspecter un statement récent :
-
-```sql
-SELECT id, event_type, obj_type, status, statement_json
-FROM evnt_evhk_itxeb_out
-ORDER BY id DESC
-LIMIT 1\G
-```
-
-Vérifier dans `context.extensions` :
+Dans `context.extensions`, vérifier :
 
 ```text
 outbox_id
@@ -349,82 +340,20 @@ statement_uuid
 event_record_source
 source_table
 deduplication_key
+statement_family
+interaction_type
+repository_object_family
 ```
 
-Résultat attendu pour une trace `read_event` :
-
-```text
-outbox_id = id de la ligne evnt_evhk_itxeb_out
-outbox_table = evnt_evhk_itxeb_out
-event_log_id = 0
-event_record_source = read_event_tracker
-source_table = read_event
-deduplication_key = read_event:{obj_id}:{user_id}:{read_event_last_access}:{read_count}
-```
-
-Résultat attendu pour un EventHook journalisé, par exemple fichier ou test :
-
-```text
-event_log_id > 0
-event_record_source = event_hook_log
-source_table = evnt_evhk_itxeb_log
-deduplication_key = event_log:{event_log_id}
-```
-
-## Test 13 — Wording bilingue
-
-Dans `object.definition.description`, vérifier que `fr-FR` et `en-US` sont distincts.
-
-Exemple attendu pour un module HTML :
-
-```json
-"description": {
-  "fr-FR": "Consultation d’un module HTML ILIAS dans un cours",
-  "en-US": "Consultation of an ILIAS HTML learning module in a course"
-}
-```
-
-Exemple attendu pour le cours parent :
-
-```json
-"description": {
-  "fr-FR": "Cours parent ILIAS",
-  "en-US": "Parent ILIAS course"
-}
-```
-
-## Test 14 — Objet hors cours
-
-Créer ou consulter un objet directement dans une catégorie ou dans un contexte hors cours.
-
-Vérification utile :
-
-```sql
-SELECT id, component, event_name, obj_type, ref_id, obj_id, request_uri, created_at
-FROM evnt_evhk_itxeb_log
-ORDER BY id DESC
-LIMIT 50;
-```
-
-Résultat attendu :
-
-```text
-événement brut éventuellement présent dans evnt_evhk_itxeb_log
-aucune ligne correspondante dans evnt_evhk_itxeb_out
-aucun envoi vers TRAX
-```
-
-## Test 15 — Absence de pollution root / crs
-
-Noter le dernier identifiant outbox avant les tests, puis remplacer `<ID_DE_DEPART>` :
+## Test 14 — Absence de pollution root / crs
 
 ```sql
 SELECT id, event_log_id, event_type, obj_type, ref_id, obj_id,
        user_id, status, created_at, sent_at
 FROM evnt_evhk_itxeb_out
-WHERE id > <ID_DE_DEPART>
-  AND obj_type IN ('root', 'crs')
-ORDER BY id DESC;
+WHERE obj_type IN ('root', 'crs')
+ORDER BY id DESC
+LIMIT 20;
 ```
 
 Résultat attendu :
@@ -433,7 +362,7 @@ Résultat attendu :
 Empty set
 ```
 
-## Test 16 — Envoi TRAX
+## Test 15 — Envoi LRS/TRAX
 
 ```sql
 SELECT id, event_type, obj_type, status, retry_count, sent_at, last_error
@@ -451,53 +380,39 @@ sent_at renseigné
 last_error vide
 ```
 
-## Test 17 — Authentification TRAX invalide
-
-Configurer volontairement un mauvais secret TRAX, puis envoyer l'outbox.
-
-Résultat attendu :
-
-```text
-status = failed
-last_error contient une erreur HTTP ou réseau
-retry_count augmente
-```
-
-Reconfigurer ensuite le bon client xAPI TRAX et relancer l'envoi.
-
-## Test 18 — Requêtes de synthèse V0.7
-
-Répartition par type :
+## Test 16 — Synthèse finale
 
 ```sql
 SELECT event_type, obj_type, verb_id, status, COUNT(*) AS nb
 FROM evnt_evhk_itxeb_out
 GROUP BY event_type, obj_type, verb_id, status
 ORDER BY event_type, obj_type, verb_id, status;
-```
 
-Configuration par cours :
-
-```sql
 SELECT course_ref_id, course_obj_id, enabled, updated_at, updated_by
 FROM evnt_evhk_itxeb_ccfg
 ORDER BY updated_at DESC;
-```
 
-Configuration par ressource :
-
-```sql
 SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
 FROM evnt_evhk_itxeb_rcfg
 ORDER BY course_ref_id, ref_id;
+
+SELECT reason, COUNT(*) AS total
+FROM evnt_evhk_itxeb_dlog
+GROUP BY reason
+ORDER BY total DESC, reason ASC;
 ```
 
-Dernières erreurs :
+## Validation réalisée V0.8.0
 
-```sql
-SELECT id, event_type, obj_type, status, retry_count, last_attempt_at, last_error
-FROM evnt_evhk_itxeb_out
-WHERE status = 'failed' OR last_error <> ''
-ORDER BY updated_at DESC
-LIMIT 20;
+```text
+Tag v0.8.0 publié : OK
+main promu sur v0.8.0 : OK
+plugin principal 0.8.0 : OK
+companion 0.1.1 : OK
+php -l plugin principal : OK
+installation companion par templates : OK
+composer du sans warnings Ambiguous class resolution CourseUI : OK
+activation/désactivation diagnostic refus : OK
+purge diagnostic refus : OK
+Suivi xAPI dans l'objet cours : OK
 ```
