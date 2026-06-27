@@ -89,16 +89,18 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             return $html;
         }
 
-        $url = $this->esc($this->getContextualConfigurationUrl());
+        $baseHref = $this->findMainTabHref($html, ['Contenu', 'Content', 'Inhalt'])
+            ?: $this->findMainTabHref($html, ['Membres', 'Members', 'Participants'])
+            ?: $this->findMainTabHref($html, ['Paramètres', 'Settings', 'Réglages'])
+            ?: $this->getContextualConfigurationUrl();
+        $url = $this->esc($this->buildXapiUrlFromHref($baseHref));
         if ($url === '') {
             return $html;
         }
 
         $active = $this->isCourseUiCommandRequest();
-        $liClass = $active ? ' class="active"' : '';
-        $aClass = $active ? ' class="active"' : '';
-        $li = '<li id="tab_itxeb_course_xapi_main"' . $liClass . '><a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a></li>';
-        $anchor = '<a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a>';
+        $li = $this->mainTabLi($url, $active);
+        $anchor = $this->mainTabAnchor($url, $active);
 
         // Preferred position: immediately after the main course tab "Membres".
         foreach ([
@@ -137,9 +139,79 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         }
 
         // Last resort: visible link before the central form/content.
-        $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;"><a id="itxeb_course_xapi_main_tab" href="' . $url . '">Suivi xAPI</a></div>';
+        $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;">' . $anchor . '</div>';
         $newHtml = preg_replace('/(<form\b)/i', $fallback . '$1', $html, 1, $count);
         return is_string($newHtml) && $count > 0 ? $newHtml : $html . $fallback;
+    }
+
+    /** @param array<int,string> $labels */
+    private function findMainTabHref(string $html, array $labels): string
+    {
+        foreach ($labels as $label) {
+            $pattern = '/<a[^>]+href=("|\')([^"\']+)\1[^>]*>\s*' . preg_quote($label, '/') . '\s*<\/a>/iu';
+            if (preg_match($pattern, $html, $matches)) {
+                return html_entity_decode((string) $matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+        }
+        return '';
+    }
+
+    private function buildXapiUrlFromHref(string $href): string
+    {
+        if ($href === '') {
+            return '';
+        }
+
+        $parts = parse_url($href);
+        $path = (string) ($parts['path'] ?? $this->currentScriptName());
+        if ($path === '') {
+            $path = $this->currentScriptName();
+        }
+        $query = [];
+        if (isset($parts['query']) && is_string($parts['query']) && $parts['query'] !== '') {
+            parse_str($parts['query'], $query);
+        }
+        if (!is_array($query)) {
+            $query = [];
+        }
+
+        $courseRefId = (int) ($query['ref_id'] ?? 0);
+        if ($courseRefId <= 0) {
+            $context = $this->getCurrentCourseContext();
+            $courseRefId = (int) ($context['course_ref_id'] ?? 0);
+        }
+        if ($courseRefId > 0) {
+            $query['ref_id'] = (string) $courseRefId;
+            $query['itxeb_course_ref_id'] = (string) $courseRefId;
+        }
+
+        // Avoid invalid commands such as ilObjCourseGUI::showObject(). Keep the
+        // valid ILIAS routing parameters already present in the selected tab URL.
+        unset($query['cmd']);
+        $query['itxeb_cui_cmd'] = 'showCourseDashboard';
+
+        $rebuilt = $path . '?' . http_build_query($query, '', '&');
+        if (isset($parts['fragment']) && is_string($parts['fragment']) && $parts['fragment'] !== '') {
+            $rebuilt .= '#' . $parts['fragment'];
+        }
+        return $rebuilt;
+    }
+
+    private function currentScriptName(): string
+    {
+        return isset($_SERVER['SCRIPT_NAME']) && is_scalar($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : 'ilias.php';
+    }
+
+    private function mainTabLi(string $url, bool $active): string
+    {
+        $liClass = $active ? ' class="active"' : '';
+        return '<li id="tab_itxeb_course_xapi_main"' . $liClass . '>' . $this->mainTabAnchor($url, $active) . '</li>';
+    }
+
+    private function mainTabAnchor(string $url, bool $active): string
+    {
+        $aClass = $active ? ' class="active"' : '';
+        return '<a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a>';
     }
 
     private function replaceCenterColumnContent(string $pageHtml, string $contentHtml): string
