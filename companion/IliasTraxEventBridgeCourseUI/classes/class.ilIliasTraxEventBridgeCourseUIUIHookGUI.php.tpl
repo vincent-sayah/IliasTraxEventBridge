@@ -31,9 +31,12 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         if ($this->isCourseUiCommandRequest()) {
             $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
             $html = $this->replaceCenterColumnContent($a_par['html'], $screen->handle());
+            $html = $this->removeNativeCourseChrome($html);
+            $html = $this->injectCourseMainTabIntoHtml($html);
+            $html = $this->activateInjectedMainTab($html);
             return [
                 'mode' => ilUIHookPluginGUI::REPLACE,
-                'html' => $this->injectCourseMainTabIntoHtml($html),
+                'html' => $html,
             ];
         }
 
@@ -142,6 +145,239 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;">' . $anchor . '</div>';
         $newHtml = preg_replace('/(<form\b)/i', $fallback . '$1', $html, 1, $count);
         return is_string($newHtml) && $count > 0 ? $newHtml : $html . $fallback;
+    }
+
+    private function activateInjectedMainTab(string $html): string
+    {
+        if ($html === '' || strpos($html, 'tab_itxeb_course_xapi_main') === false || !class_exists('DOMDocument')) {
+            return $html;
+        }
+
+        $internalErrors = libxml_use_internal_errors(true);
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        if (!$loaded) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $html;
+        }
+
+        $tab = $dom->getElementById('tab_itxeb_course_xapi_main');
+        if (!$tab instanceof DOMElement) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $html;
+        }
+
+        $parent = $tab->parentNode;
+        if ($parent instanceof DOMNode) {
+            foreach ($parent->childNodes as $sibling) {
+                if (!$sibling instanceof DOMElement) {
+                    continue;
+                }
+                if ($sibling->isSameNode($tab)) {
+                    continue;
+                }
+                $this->removeClass($sibling, 'active');
+                foreach ($sibling->getElementsByTagName('a') as $a) {
+                    if ($a instanceof DOMElement) {
+                        $this->removeClass($a, 'active');
+                        if ($a->hasAttribute('aria-selected')) {
+                            $a->setAttribute('aria-selected', 'false');
+                        }
+                    }
+                }
+            }
+        }
+
+        $this->addClass($tab, 'active');
+        foreach ($tab->getElementsByTagName('a') as $a) {
+            if ($a instanceof DOMElement) {
+                $this->addClass($a, 'active');
+                if ($a->hasAttribute('aria-selected')) {
+                    $a->setAttribute('aria-selected', 'true');
+                }
+            }
+        }
+
+        $html = $dom->saveHTML();
+        $html = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $html) ?? $html;
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+        return $html;
+    }
+
+    private function removeNativeCourseChrome(string $html): string
+    {
+        if ($html === '' || !class_exists('DOMDocument')) {
+            return $html;
+        }
+
+        $internalErrors = libxml_use_internal_errors(true);
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        if (!$loaded) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $html;
+        }
+
+        $xpath = new DOMXPath($dom);
+
+        foreach ([
+            '//*[@id="ilSubTabs" or @id="il_sub_tabs" or @id="ilToolbar" or @id="il_toolbar"]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " ilSubTabs ")]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " il_SubTabs ")]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " ilTabsContentSub ")]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " ilToolbar ")]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " ilToolbarContainer ")]',
+        ] as $query) {
+            $nodes = $xpath->query($query);
+            if ($nodes === false) {
+                continue;
+            }
+            $this->removeNodeList($nodes);
+        }
+
+        foreach ([
+            'Editer Participants',
+            'Éditer Participants',
+            'Répartition par groupes',
+            'Galerie des Membres du Cours',
+            'Voir',
+            'Gérer',
+            'Ajouter un nouvel objet',
+            'Editer la page',
+            'Éditer la page',
+            'Vue des membres',
+            'Rechercher utilisateurs',
+            'Feuille de Présence',
+            'Envoyer un message aux membres',
+        ] as $label) {
+            $this->removeNativeBlockContainingLabel($xpath, $label);
+        }
+
+        $html = $dom->saveHTML();
+        $html = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $html) ?? $html;
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+        return $html;
+    }
+
+    private function removeNodeList(DOMNodeList $nodes): void
+    {
+        $toRemove = [];
+        foreach ($nodes as $node) {
+            if ($node instanceof DOMElement && !$this->containsItxebNode($node)) {
+                $toRemove[] = $node;
+            }
+        }
+        foreach ($toRemove as $node) {
+            if ($node->parentNode instanceof DOMNode) {
+                $node->parentNode->removeChild($node);
+            }
+        }
+    }
+
+    private function removeNativeBlockContainingLabel(DOMXPath $xpath, string $label): void
+    {
+        $query = '//*[self::a or self::button or self::span or self::label][contains(normalize-space(.), ' . $this->xpathLiteral($label) . ')]';
+        $nodes = $xpath->query($query);
+        if ($nodes === false) {
+            return;
+        }
+
+        $toRemove = [];
+        foreach ($nodes as $node) {
+            if (!$node instanceof DOMElement || $this->containsItxebNode($node)) {
+                continue;
+            }
+            $target = $this->findRemovableNativeAncestor($node);
+            if ($target instanceof DOMElement && !$this->containsItxebNode($target)) {
+                $toRemove[] = $target;
+            }
+        }
+
+        foreach ($toRemove as $node) {
+            if ($node->parentNode instanceof DOMNode) {
+                $node->parentNode->removeChild($node);
+            }
+        }
+    }
+
+    private function findRemovableNativeAncestor(DOMElement $node): DOMElement
+    {
+        $current = $node;
+        for ($i = 0; $i < 5; $i++) {
+            $parent = $current->parentNode;
+            if (!$parent instanceof DOMElement) {
+                break;
+            }
+            $tag = strtolower($parent->tagName);
+            if (in_array($tag, ['nav', 'ul', 'form', 'section'], true)) {
+                return $parent;
+            }
+            if ($tag === 'div') {
+                $class = ' ' . $parent->getAttribute('class') . ' ';
+                if (stripos($class, ' ilToolbar ') !== false || stripos($class, ' ilSubTabs ') !== false || stripos($class, ' il_SubTabs ') !== false) {
+                    return $parent;
+                }
+                $current = $parent;
+                continue;
+            }
+            if ($tag === 'body' || $tag === 'html') {
+                break;
+            }
+            $current = $parent;
+        }
+        return $node;
+    }
+
+    private function containsItxebNode(DOMElement $node): bool
+    {
+        if (strpos((string) $node->getAttribute('id'), 'itxeb') !== false || strpos((string) $node->getAttribute('class'), 'itxeb') !== false) {
+            return true;
+        }
+        foreach ($node->getElementsByTagName('*') as $child) {
+            if ($child instanceof DOMElement && (strpos((string) $child->getAttribute('id'), 'itxeb') !== false || strpos((string) $child->getAttribute('class'), 'itxeb') !== false)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function addClass(DOMElement $element, string $class): void
+    {
+        $classes = preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [];
+        if (!in_array($class, $classes, true)) {
+            $classes[] = $class;
+        }
+        $element->setAttribute('class', trim(implode(' ', array_filter($classes))));
+    }
+
+    private function removeClass(DOMElement $element, string $class): void
+    {
+        $classes = preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [];
+        $classes = array_values(array_filter($classes, static function (string $value) use ($class): bool {
+            return $value !== '' && $value !== $class;
+        }));
+        if (count($classes) > 0) {
+            $element->setAttribute('class', implode(' ', $classes));
+        } else {
+            $element->removeAttribute('class');
+        }
+    }
+
+    private function xpathLiteral(string $value): string
+    {
+        if (strpos($value, "'") === false) {
+            return "'" . $value . "'";
+        }
+        if (strpos($value, '"') === false) {
+            return '"' . $value . '"';
+        }
+        $parts = explode("'", $value);
+        return "concat('" . implode("', \"'\", '", $parts) . "')";
     }
 
     /** @param array<int,string> $labels */
