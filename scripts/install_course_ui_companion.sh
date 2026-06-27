@@ -8,6 +8,7 @@ SOURCE_DIR="$PLUGIN_ROOT/companion/IliasTraxEventBridgeCourseUI"
 TARGET_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
 TYPE_FILTER_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_type_filter.php"
 SUCCESS_RATE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_success_rates.php"
+FAILURE_SIGNAL_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_failure_signals.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -49,6 +50,12 @@ if [[ -f "$SUCCESS_RATE_PATCHER" ]]; then
   php "$SUCCESS_RATE_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 else
   echo "Success rate patcher not found, skipping: $SUCCESS_RATE_PATCHER"
+fi
+
+if [[ -f "$FAILURE_SIGNAL_PATCHER" ]]; then
+  php "$FAILURE_SIGNAL_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Failure signal patcher not found, skipping: $FAILURE_SIGNAL_PATCHER"
 fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
