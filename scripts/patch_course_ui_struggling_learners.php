@@ -24,11 +24,11 @@ if (strpos($code, 'renderStrugglingLearners(') !== false) {
     exit(0);
 }
 
-$oldReturn = "        return \$html . '</tbody></table></div></section>';";
-$newReturn = "        return \$html . '</tbody></table></div>' . \$this->renderStrugglingLearners(\$dashboard) . '</section>';";
-$updated = str_replace($oldReturn, $newReturn, $code);
-if ($updated === $code) {
-    fwrite(STDERR, "Patch failed: unable to locate analysis return line in {$file}\n");
+$pattern = "~(private function renderAnalysis\\(array \\$course\\): string\\s*\\{.*?return \\$html \\. '</tbody></table></div>)</section>';~s";
+$replacement = "$1' . \\$this->renderStrugglingLearners(\\$dashboard) . '</section>';";
+$updated = preg_replace($pattern, $replacement, $code, 1, $count);
+if (!is_string($updated) || $count !== 1) {
+    fwrite(STDERR, "Patch failed: unable to locate renderAnalysis final return line in {$file}\n");
     exit(1);
 }
 
@@ -142,9 +142,10 @@ $updated = preg_replace(
     '~    /\*\* @param array<string,mixed> \$course \*/\n    private function renderExpert~',
     $newMethod,
     $updated,
-    1
+    1,
+    $insertCount
 ) ?? $updated;
-if ($updated === $code || strpos($updated, 'renderStrugglingLearners(') === false) {
+if ($insertCount !== 1 || strpos($updated, 'renderStrugglingLearners(') === false) {
     fwrite(STDERR, "Patch failed: unable to insert renderStrugglingLearners method in {$file}\n");
     exit(1);
 }
@@ -162,4 +163,4 @@ if (file_put_contents($file, $updatedWithStyle) === false) {
     exit(1);
 }
 
-echo "Struggling learners patch applied to {$file}\n";
+echo "Struggling learners patch applied to Analysis only in {$file}\n";
