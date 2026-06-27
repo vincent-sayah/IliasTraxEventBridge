@@ -5,7 +5,7 @@
  *
  * - default view: Tableau de bord
  * - inner tabs order: Tableau de bord, Analyse, Expert, Configuration
- * - generated inner URLs do not preserve unsafe ILIAS cmd values
+ * - generated inner URLs preserve the stable ILIAS support route
  */
 
 $file = $argv[1] ?? '';
@@ -20,7 +20,7 @@ if (!is_string($code) || $code === '') {
     exit(1);
 }
 
-if (strpos($code, 'Clean xAPI navigation route') !== false) {
+if (strpos($code, 'Stable xAPI support route') !== false) {
     echo "Clean navigation patch already present in {$file}\n";
     exit(0);
 }
@@ -57,8 +57,9 @@ $newCurrentUrlWith = <<<'PHP'
     /** @param array<string,string> $params */
     private function currentUrlWith(array $params): string
     {
-        // Clean xAPI navigation route: preserve the valid course route already
-        // used to render the page, but never keep unsafe ILIAS command values.
+        // Stable xAPI support route: keep the ILIAS route that rendered the
+        // current xAPI screen. With Delos this must remain the Info/showSummary
+        // support route, otherwise inner tabs fall back to the course content.
         $current = $this->currentQueryArray();
         $current['baseClass'] = $current['baseClass'] ?? 'ilrepositorygui';
 
@@ -71,11 +72,9 @@ $newCurrentUrlWith = <<<'PHP'
             $current['itxeb_course_ref_id'] = (string) $courseRefId;
         }
 
-        unset($current['cmd']);
         foreach ($params as $key => $value) {
             $current[$key] = $value;
         }
-        unset($current['cmdClass'], $current['cmdNode'], $current['cmd']);
 
         return $this->currentPath() . '?' . http_build_query($current, '', '&');
     }
