@@ -65,6 +65,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
 
         $course = $this->resolver->resolveCourse($courseRefId);
+        if ($cmd === 'exportCourseExpertCsv') {
+            $this->sendExpertCsv($course);
+        }
+
         $html = $this->renderMessage()
             . $this->renderInnerTabs($courseRefId, $cmd)
             . $this->renderView($course, $cmd);
@@ -117,7 +121,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($cmd === 'showCourseAnalysis') {
             return $this->renderAnalysis($course);
         }
-        if ($cmd === 'showCourseExpert') {
+        if ($cmd === 'showCourseExpert' || $cmd === 'exportCourseExpertCsv') {
             return $this->renderExpert($course);
         }
         return $this->renderCourseSummary($course) . $this->renderConfigForm($course) . $this->renderBulkActions((int) ($course['course_ref_id'] ?? 0));
@@ -247,7 +251,15 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $rows = is_array($dashboard['expert_rows'] ?? null) ? $dashboard['expert_rows'] : [];
-        $html = '<section class="itxeb-cui-section"><h2>Traces détaillées</h2><p>Vue support des 200 dernières traces locales du cours. Les identités sont limitées au user_id ILIAS.</p>' . $this->renderPeriodSelector('showCourseExpert') . $this->renderAnalyticsWarning();
+        $courseRefId = (int) ($course['course_ref_id'] ?? 0);
+        $exportUrl = $this->currentUrlWith([
+            'itxeb_cui_cmd' => 'exportCourseExpertCsv',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+            'itxeb_period_days' => (string) $this->getPeriodDays(),
+        ]);
+        $html = '<section class="itxeb-cui-section"><h2>Traces détaillées</h2><p>Vue support des 200 dernières traces locales du cours. Les identités sont limitées au user_id ILIAS.</p>'
+            . $this->renderPeriodSelector('showCourseExpert') . $this->renderAnalyticsWarning()
+            . '<p><a class="btn btn-default itxeb-export-button" href="' . $this->esc($exportUrl) . '">Exporter CSV</a></p>';
         if (count($rows) === 0) {
             return $html . '<p><em>Aucune trace xAPI locale pour cette période.</em></p></section>';
         }
@@ -261,6 +273,54 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 . '<td>#' . $this->esc((string) ($row['outbox_id'] ?? 0)) . '<br><small>' . $this->esc((string) ($row['statement_uuid'] ?? '')) . '</small></td><td><small>' . $this->esc($this->shorten((string) ($row['last_error'] ?? ''), 180)) . '</small></td></tr>';
         }
         return $html . '</tbody></table></div></section>';
+    }
+
+    /** @param array<string,mixed> $course */
+    private function sendExpertCsv(array $course): void
+    {
+        $dashboard = $this->loadDashboard($course);
+        $rows = is_array($dashboard['expert_rows'] ?? null) ? $dashboard['expert_rows'] : [];
+        $courseRefId = (int) ($course['course_ref_id'] ?? 0);
+        $filename = 'itxeb_course_' . $courseRefId . '_expert_' . date('Ymd_His') . '.csv';
+
+        if (function_exists('ob_get_level')) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+        }
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        if ($out !== false) {
+            fputcsv($out, ['date', 'course_ref_id', 'user_id', 'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type', 'score_raw', 'completion', 'success', 'status', 'outbox_id', 'statement_uuid', 'last_error'], ';');
+            foreach ($rows as $row) {
+                fputcsv($out, [
+                    (string) ($row['created_at'] ?? ''),
+                    (string) $courseRefId,
+                    (string) ($row['user_id'] ?? 0),
+                    (string) ($row['verb_label'] ?? ''),
+                    (string) ($row['verb_id'] ?? ''),
+                    (string) ($row['object_title'] ?? ''),
+                    (string) ($row['ref_id'] ?? 0),
+                    (string) ($row['obj_id'] ?? 0),
+                    (string) ($row['obj_type'] ?? ''),
+                    $row['score_raw'] === null ? '' : (string) $row['score_raw'],
+                    $this->nullableBoolLabel($row['completion'] ?? null),
+                    $this->nullableBoolLabel($row['success'] ?? null),
+                    (string) ($row['status'] ?? ''),
+                    (string) ($row['outbox_id'] ?? 0),
+                    (string) ($row['statement_uuid'] ?? ''),
+                    (string) ($row['last_error'] ?? ''),
+                ], ';');
+            }
+            fclose($out);
+        }
+        exit;
     }
 
     /** @param array<string,mixed> $course */
@@ -504,7 +564,9 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function normalizeCommand(string $cmd): string
     {
-        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseExpert'], true) ? $cmd : 'showCourseTracking';
+        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseExpert', 'exportCourseExpertCsv'], true)
+            ? ($cmd === 'exportCourseExpertCsv' ? 'showCourseExpert' : $cmd)
+            : 'showCourseTracking';
     }
 
     private function nullableBoolLabel($value): string
@@ -546,6 +608,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function styles(): string
     {
-        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 1rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
+        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 1rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
     }
 }
