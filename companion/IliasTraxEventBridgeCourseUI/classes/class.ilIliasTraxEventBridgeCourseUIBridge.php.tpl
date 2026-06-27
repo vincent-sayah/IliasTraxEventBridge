@@ -103,12 +103,11 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
 
-        // Build a clean course route. Do not reuse the current cmdClass/cmdNode/cmd,
-        // otherwise Suivi xAPI can inherit ilInfoScreenGUI/edit or Parameters/edit.
+        // Clean fallback route. Do not set cmd=show: on ILIAS 10 this can call
+        // ilObjCourseGUI::showObject(), which does not exist on some versions.
         $params = [
             'baseClass' => 'ilrepositorygui',
             'ref_id' => (string) $courseRefId,
-            'cmd' => 'show',
             'itxeb_cui_cmd' => 'showCourseDashboard',
             'itxeb_course_ref_id' => (string) $courseRefId,
         ];
@@ -222,19 +221,6 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
         return '';
-    }
-
-    /** @return array<string,string> */
-    private function requestContainerToArray($source): array
-    {
-        $result = [];
-        foreach (['baseClass', 'ref_id', 'target', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
-            $value = $this->requestValue($source, $key);
-            if ($value !== '') {
-                $result[$key] = $value;
-            }
-        }
-        return $result;
     }
 
     private function checkAccess(string $permission, int $refId): bool
