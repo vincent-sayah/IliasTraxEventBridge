@@ -34,14 +34,14 @@ $new = <<<'PHP'
                 $failureSignalRate = round(($testFailed / max(1, $testAttempts)) * 100, 1);
                 if ($failureSignalRate >= 50.0) {
                     $signalText = 'échecs fréquents';
-                } elseif ($failureSignalRate >= 30.0 && $signalText === '') {
+                } elseif ($failureSignalRate >= 30.0) {
                     $signalText = 'à surveiller';
                 }
             }
             $signalClass = 'itxeb-signal';
             if ($signalText === 'échecs fréquents') {
                 $signalClass .= ' itxeb-signal-danger';
-            } elseif ($signalText === 'à surveiller') {
+            } elseif ($signalText === 'à surveiller' || $signalText === 'test difficile') {
                 $signalClass .= ' itxeb-signal-warning';
             }
             $html .= '<tr><td><span class="' . $this->esc($signalClass) . '">' . $this->esc($signalText) . '</span></td>'
