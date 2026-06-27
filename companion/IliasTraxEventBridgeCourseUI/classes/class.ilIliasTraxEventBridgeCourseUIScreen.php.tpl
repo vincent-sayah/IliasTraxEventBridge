@@ -53,6 +53,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($cmd === 'saveCourseTracking') {
             $this->save($courseRefId);
             $cmd = 'showCourseTracking';
+        } elseif ($this->postString('itxeb_dashboard_save') === '1') {
+            $course = $this->resolver->resolveCourse($courseRefId);
+            $this->saveDashboardPreferences($course);
+            $cmd = 'showCourseTracking';
         } elseif ($cmd === 'enableAllCourseTracking') {
             $this->setAll($courseRefId, true);
             $cmd = 'showCourseTracking';
@@ -93,6 +97,19 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $this->messageType = 'success';
     }
 
+    /** @param array<string,mixed> $course */
+    private function saveDashboardPreferences(array $course): void
+    {
+        $widgets = [];
+        $enabled = array_fill_keys($this->postStringArray('dashboard_widgets'), true);
+        foreach ($this->dashboardWidgetDefinitions() as $key => $label) {
+            $widgets[$key] = isset($enabled[$key]);
+        }
+        $this->repository->setDashboardWidgets((int) ($course['course_ref_id'] ?? 0), (int) ($course['course_obj_id'] ?? 0), $widgets, $this->getCurrentUserId());
+        $this->message = 'Préférences du tableau de bord enregistrées.';
+        $this->messageType = 'success';
+    }
+
     private function setAll(int $courseRefId, bool $enabled): void
     {
         $course = $this->resolver->resolveCourse($courseRefId);
@@ -124,7 +141,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($cmd === 'showCourseExpert' || $cmd === 'exportCourseExpertCsv') {
             return $this->renderExpert($course);
         }
-        return $this->renderCourseSummary($course) . $this->renderConfigForm($course) . $this->renderBulkActions((int) ($course['course_ref_id'] ?? 0));
+        return $this->renderCourseSummary($course) . $this->renderConfigForm($course) . $this->renderDashboardPreferencesForm($course) . $this->renderBulkActions((int) ($course['course_ref_id'] ?? 0));
     }
 
     /** @param array<string,mixed> $course */
@@ -161,6 +178,24 @@ class ilIliasTraxEventBridgeCourseUIScreen
             . $this->renderResourcesTable($course)
             . '<p><button class="btn btn-primary" type="submit">Enregistrer la configuration xAPI</button></p>'
             . '</form></section>';
+    }
+
+    /** @param array<string,mixed> $course */
+    private function renderDashboardPreferencesForm(array $course): string
+    {
+        $courseRefId = (int) ($course['course_ref_id'] ?? 0);
+        $widgets = $this->dashboardWidgets($courseRefId);
+        $html = '<section class="itxeb-cui-section"><h2>Personnalisation du tableau de bord</h2>'
+            . '<p>Choisir les blocs visibles dans l’onglet Tableau de bord pour ce cours. Les compteurs principaux restent toujours visibles.</p>'
+            . '<form method="post" action="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseTracking', 'itxeb_course_ref_id' => (string) $courseRefId])) . '">'
+            . '<input type="hidden" name="itxeb_cui_cmd" value="showCourseTracking">'
+            . '<input type="hidden" name="itxeb_dashboard_save" value="1">'
+            . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
+            . '<div class="itxeb-widget-grid">';
+        foreach ($this->dashboardWidgetDefinitions() as $key => $label) {
+            $html .= '<label class="itxeb-widget-choice"><input type="checkbox" name="dashboard_widgets[]" value="' . $this->esc($key) . '"' . (!empty($widgets[$key]) ? ' checked="checked"' : '') . '> ' . $this->esc($label) . '</label>';
+        }
+        return $html . '</div><p><button class="btn btn-default" type="submit">Enregistrer l’affichage du tableau de bord</button></p></form></section>';
     }
 
     /** @param array<string,mixed> $course */
@@ -207,7 +242,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $summary = is_array($dashboard['summary'] ?? null) ? $dashboard['summary'] : [];
-        return '<section class="itxeb-cui-section"><h2>Tableau de bord du cours</h2><p>Vue synthétique des traces xAPI générées par les ressources du cours.</p>'
+        $widgets = $this->dashboardWidgets((int) ($course['course_ref_id'] ?? 0));
+        $html = '<section class="itxeb-cui-section"><h2>Tableau de bord du cours</h2><p>Vue synthétique des traces xAPI générées par les ressources du cours.</p>'
             . $this->renderPeriodSelector('showCourseDashboard') . $this->renderResourceFilter($course, 'showCourseDashboard') . $this->renderAnalyticsWarning()
             . '<div class="itxeb-kpi-grid">'
             . $this->metricCard('Traces générées', (string) ($summary['total'] ?? 0), 'Volume xAPI')
@@ -217,14 +253,26 @@ class ilIliasTraxEventBridgeCourseUIScreen
             . $this->metricCard('Envoyées TRAX', (string) ($summary['sent'] ?? 0), 'status sent')
             . $this->metricCard('En erreur', (string) ($summary['failed'] ?? 0), 'À vérifier')
             . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
-            . '</div>'
-            . $this->renderPeriodComparison($course)
-            . $this->renderActivityByDay($dashboard)
-            . $this->renderVerbDistribution($dashboard)
-            . $this->renderTopResources($dashboard)
-            . $this->renderEnabledWithoutTraceResources($dashboard)
-            . $this->renderTechnicalStatus($dashboard)
-            . '</section>';
+            . '</div>';
+        if (!empty($widgets['comparison'])) {
+            $html .= $this->renderPeriodComparison($course);
+        }
+        if (!empty($widgets['activity_by_day'])) {
+            $html .= $this->renderActivityByDay($dashboard);
+        }
+        if (!empty($widgets['verb_distribution'])) {
+            $html .= $this->renderVerbDistribution($dashboard);
+        }
+        if (!empty($widgets['top_resources'])) {
+            $html .= $this->renderTopResources($dashboard);
+        }
+        if (!empty($widgets['enabled_without_trace'])) {
+            $html .= $this->renderEnabledWithoutTraceResources($dashboard);
+        }
+        if (!empty($widgets['technical_status'])) {
+            $html .= $this->renderTechnicalStatus($dashboard);
+        }
+        return $html . '</section>';
     }
 
     /** @param array<string,mixed> $course */
@@ -668,6 +716,22 @@ class ilIliasTraxEventBridgeCourseUIScreen
         return array_values(array_unique($values));
     }
 
+    /** @return array<int,string> */
+    private function postStringArray(string $key): array
+    {
+        $raw = $this->requestRawValue($_POST, $key);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $values = [];
+        foreach ($raw as $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                $values[] = trim((string) $value);
+            }
+        }
+        return array_values(array_unique($values));
+    }
+
     private function postString(string $key): string
     {
         return trim($this->requestValue($_POST, $key));
@@ -767,6 +831,32 @@ class ilIliasTraxEventBridgeCourseUIScreen
             : 'showCourseTracking';
     }
 
+    /** @return array<string,string> */
+    private function dashboardWidgetDefinitions(): array
+    {
+        return [
+            'comparison' => 'Comparaison entre périodes',
+            'activity_by_day' => 'Activité par jour',
+            'verb_distribution' => 'Actions xAPI',
+            'top_resources' => 'Top ressources',
+            'enabled_without_trace' => 'Ressources activées sans trace',
+            'technical_status' => 'État technique local',
+        ];
+    }
+
+    /** @return array<string,bool> */
+    private function dashboardWidgets(int $courseRefId): array
+    {
+        $defaults = [];
+        foreach ($this->dashboardWidgetDefinitions() as $key => $label) {
+            $defaults[$key] = true;
+        }
+        if (!$this->repository) {
+            return $defaults;
+        }
+        return array_merge($defaults, $this->repository->getDashboardWidgets($courseRefId));
+    }
+
     private function nullableBoolLabel($value): string
     {
         if ($value === true) {
@@ -806,6 +896,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function styles(): string
     {
-        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
+        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.4rem;margin:.7rem 0}#itxeb-course-ui-screen .itxeb-widget-choice{display:block;border:1px solid #ddd;background:#fff;border-radius:4px;padding:.45rem .55rem}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
     }
 }
