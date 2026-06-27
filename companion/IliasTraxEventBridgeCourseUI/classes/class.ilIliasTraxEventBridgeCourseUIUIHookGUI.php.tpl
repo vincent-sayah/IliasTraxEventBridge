@@ -4,7 +4,7 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIBridge.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
 
 /**
- * UIHook GUI for exposing course-level xAPI configuration.
+ * UIHook GUI for exposing course-level xAPI configuration and feedback.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -208,6 +208,9 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
         return in_array($cmd, [
             'showCourseTracking',
+            'showCourseDashboard',
+            'showCourseAnalysis',
+            'showCourseExpert',
             'saveCourseTracking',
             'enableAllCourseTracking',
             'disableAllCourseTracking',
