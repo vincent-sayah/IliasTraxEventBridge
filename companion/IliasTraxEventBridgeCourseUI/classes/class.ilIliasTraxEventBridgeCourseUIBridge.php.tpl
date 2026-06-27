@@ -103,13 +103,15 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
 
-        $params = $this->requestContainerToArray($_GET);
-        $params['baseClass'] = $params['baseClass'] ?? 'ilrepositorygui';
-        $params['cmdClass'] = $params['cmdClass'] ?? 'ilObjCourseGUI';
-        $params['cmd'] = 'edit';
-        $params['ref_id'] = (string) $courseRefId;
-        $params['itxeb_cui_cmd'] = 'showCourseTracking';
-        $params['itxeb_course_ref_id'] = (string) $courseRefId;
+        // Build a clean course route. Do not reuse the current cmdClass/cmdNode/cmd,
+        // otherwise Suivi xAPI can inherit ilInfoScreenGUI/edit or Parameters/edit.
+        $params = [
+            'baseClass' => 'ilrepositorygui',
+            'ref_id' => (string) $courseRefId,
+            'cmd' => 'show',
+            'itxeb_cui_cmd' => 'showCourseDashboard',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+        ];
 
         return $script . '?' . http_build_query($params, '', '&');
     }
@@ -226,7 +228,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
     private function requestContainerToArray($source): array
     {
         $result = [];
-        foreach (['baseClass', 'ref_id', 'target', 'cmdNode', 'cmdClass', 'cmd', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
+        foreach (['baseClass', 'ref_id', 'target', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
             $value = $this->requestValue($source, $key);
             if ($value !== '') {
                 $result[$key] = $value;
