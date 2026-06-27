@@ -2,6 +2,57 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.8.1 — documentation stable main et guide d’exploitation V0.8
+
+### Statut
+
+- Branche concernée : `main`.
+- Base : tag stable `v0.8.0`.
+- Type de release : documentation / exploitation uniquement.
+- Version plugin principal : inchangée, `0.8.0`.
+- Version plugin compagnon UIHook : inchangée, `0.1.1`.
+- Changement PHP : aucun.
+- Changement SQL : aucun.
+- Migration ILIAS : aucune nouvelle étape.
+
+### Objectif
+
+La V0.8.1 fige le rattrapage documentaire réalisé après la promotion de `v0.8.0` sur `main`.
+
+Elle rend cohérents tous les documents principaux avec l’état publié :
+
+```text
+main = stable publiée v0.8.0
+plugin principal = 0.8.0
+plugin compagnon = 0.1.1
+```
+
+### Documentation mise à jour
+
+- `README.md` : indication claire que `main` est la stable publiée V0.8.0.
+- `README_TECHNIQUE.md` : mise à jour complète de l’architecture technique V0.8.
+- `docs/VALIDATION.md` : remplacement du plan V0.7 par le plan de validation V0.8.0.
+- `docs/OPERATIONS.md` : mise à jour du guide d’exploitation avec outbox, diagnostic des refus, purge et companion.
+- `doc/README.md` : mise à jour de la documentation centrale historique.
+- `docs/RELEASE_0.8.0.md` : release marquée comme publiée et promue sur `main`.
+- `CHANGELOG.md` : ajout de cette entrée V0.8.1.
+
+### Contenu couvert
+
+- Installation stable depuis `main`.
+- Verrouillage possible sur le tag `v0.8.0`.
+- Installation du plugin compagnon via `scripts/install_course_ui_companion.sh`.
+- Contrôles Composer pour vérifier l’absence des warnings `Ambiguous class resolution` liés à `IliasTraxEventBridgeCourseUI`.
+- Plan de validation V0.8 complet.
+- Guide d’exploitation V0.8 complet.
+- Requêtes SQL utiles pour l’outbox, la configuration cours/ressources et le diagnostic des refus.
+
+### Compatibilité
+
+Cette release documentaire ne modifie pas le comportement applicatif.
+
+Une installation déjà validée en `v0.8.0` peut rester sur le tag `v0.8.0` pour le code applicatif, ou suivre `main` pour bénéficier de la documentation corrigée.
+
 ## v0.8.0 — supervision outbox et diagnostic des refus
 
 ### Statut
@@ -96,7 +147,6 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Branche `v0.7` créée depuis `main` / `v0.6.0` stable.
 - Version plugin portée à `0.7.0` pour ouvrir la série V0.7.
 - Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource.
-- `main` et `v0.6` restent les références stables V0.6.0.
 - Tag stable : `v0.7.0`.
 
 ### Objectif fonctionnel
@@ -119,8 +169,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Création de la table `evnt_evhk_itxeb_rcfg` pour stocker l'activation xAPI par ressource dans un cours.
 - Les noms de tables ont été raccourcis pour respecter la limite ILIAS de 22 caractères.
 - Ajout du repository `ilIliasTraxEventBridgeCourseTrackingRepository` pour lire et écrire ces configurations.
-- Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md` avec les requêtes de vérification et les tests SQL manuels.
-- Aucun filtrage xAPI n'est encore appliqué dans ce jalon : le comportement V0.6 reste inchangé jusqu'au lot de filtrage.
+- Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md`.
 
 ### Jalon 3 — résolution cours / ressources
 
@@ -128,9 +177,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Le resolver liste les ressources traçables contenues dans un cours à partir d'un `course_ref_id`.
 - Types préparés : `file`, `tst`, `blog`, `wiki`, `webr`, `mcst`, `frm`, `htlm`, `lm`, `sahs`.
 - Pour chaque ressource, le resolver prépare `ref_id`, `obj_id`, `obj_type`, famille, titre, chemin, état `configured` et état `enabled`.
-- Les états sont joints depuis `evnt_evhk_itxeb_rcfg` quand une configuration existe.
 - Ajout de `docs/V0.7_COURSE_RESOURCE_RESOLVER.md`.
-- Aucun écran cours et aucun filtrage xAPI ne sont encore appliqués dans ce jalon.
 
 ### Jalon 4 — interface de configuration cours
 
@@ -140,35 +187,29 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Les choix sont enregistrés dans `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
 - Les droits cours sont vérifiés avant écriture via les permissions `write`, `edit_permission` ou `manage_members`.
 - Ajout de `docs/V0.7_COURSE_TRACKING_UI.md`.
-- Le filtrage xAPI avant outbox reste prévu pour le jalon suivant.
 
 ### Jalon 4b — accès visible depuis l'administration du plugin
 
 - `ilIliasTraxEventBridgeCourseTrackingGUI` peut désormais être embarqué depuis un autre contrôleur GUI.
 - Ajout d'une section visible `Configuration xAPI par cours` dans l'écran d'administration du plugin.
 - L'administrateur peut saisir un `course_ref_id`, ouvrir l'écran de configuration xAPI du cours, enregistrer les choix, tout activer, tout désactiver ou réinitialiser le cours.
-- Les données sont toujours enregistrées dans `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
-- Cette étape rend l'écran testable dans ILIAS sans dépendre immédiatement d'une injection dans les paramètres natifs du cours.
-- L'intégration directe dans l'objet cours reste l'objectif fonctionnel, mais dépend des points d'extension disponibles pour un plugin EventHook sur ILIAS 10.
 - Ajout de `docs/V0.7_COURSE_TRACKING_ACCESS.md`.
-- Les formulaires d'accès cours utilisent `POST` pour préserver les paramètres `ilCtrl`.
 
 ### Jalon 5 — filtrage avant outbox
 
 - Ajout du filtrage effectif avant insertion dans `evnt_evhk_itxeb_out`.
 - Les événements EventHook ne génèrent un statement que si le cours est activé dans `evnt_evhk_itxeb_ccfg` et si la ressource est activée dans `evnt_evhk_itxeb_rcfg`.
 - Les consultations issues de `read_event` appliquent la même règle avant génération outbox.
-- Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron ; une consultation ultérieure pourra être traitée si `last_access` ou `read_count` évolue.
+- Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron.
 - La configuration est strictement opt-in : sans configuration explicite du cours et de la ressource, aucun statement xAPI n'est généré.
 - Ajout de `docs/V0.7_OUTBOX_FILTERING.md`.
 
 ### Jalon 6 — stabilisation documentaire V0.7
 
-- Alignement de `README.md` avec l'état V0.7 candidate : `main` reste stable V0.6.0, `v0.7` porte la candidate `0.7.0`.
-- Alignement de `README_TECHNIQUE.md` avec l'architecture V0.7 : nouvelles classes, tables `ccfg` / `rcfg`, flux de filtrage EventHook et `read_event`.
+- Alignement de `README.md` avec l'état V0.7.
+- Alignement de `README_TECHNIQUE.md` avec l'architecture V0.7.
 - Mise à jour de `docs/VALIDATION.md` pour remplacer le plan V0.6 par un plan V0.7 complet.
 - Ajout des critères de validation réels : cours activé, ressources activées envoyées, ressources désactivées refusées avant outbox.
-- Préparation de la suite : validation finale serveur/Windows, puis tag `v0.7.0` et promotion éventuelle de `main`.
 
 ## v0.6.0 — stable
 
@@ -188,18 +229,18 @@ Toutes les évolutions notables du plugin sont listées ici.
 - Ajout de `result.duration` au format ISO 8601 lorsque `spent_seconds` est disponible et supérieur à zéro.
 - Ajout de descriptions xAPI sur les activités objet/cours pour rendre les statements plus lisibles dans TRAX.
 - Ajout d'extensions de diagnostic outbox dans `context.extensions` : `outbox_id`, `outbox_table`, `event_log_id`, `statement_uuid`, `event_record_source`, `source_table` et `deduplication_key`.
-- Ajout d'une section admin `Supervision V0.6` dans l'écran de configuration du plugin, calculée sur les 200 dernières lignes outbox : statuts, événements, objets, familles xAPI, types d'interaction, sources techniques, dernières clés de diagnostic et dernières erreurs.
-- Ajout d'un bloc admin `Exploitation / maintenance` avec compteurs total, 24h, 7j, `sent`, `generated`, `failed`, erreurs à inspecter et retry épuisé.
-- Ajout du guide `docs/OPERATIONS.md` pour l'exploitation SQL et les diagnostics serveur.
-- Ajout du guide `docs/V0.6_STABILISATION.md` pour préparer et rejouer la stabilisation V0.6.
-- Mise à jour du plan de validation V0.6 avec les contrôles SQL complets : familles xAPI, métriques `read_event`, diagnostics outbox, wording bilingue, envoi TRAX et absence de traces parasites.
+- Ajout d'une section admin `Supervision V0.6` dans l'écran de configuration du plugin.
+- Ajout d'un bloc admin `Exploitation / maintenance`.
+- Ajout du guide `docs/OPERATIONS.md`.
+- Ajout du guide `docs/V0.6_STABILISATION.md`.
+- Mise à jour du plan de validation V0.6.
 
 ### Changé
 
-- Les consultations issues de `read_event` utilisent désormais des verbes plus précis selon le type d'objet : lecture de blog/wiki/module, visite de lien web, visionnage de mediacast, interaction forum, lancement SCORM.
+- Les consultations issues de `read_event` utilisent désormais des verbes plus précis selon le type d'objet.
 - Le téléchargement de fichier utilise un verbe xAPI dédié `downloaded` au lieu du libellé générique `experienced`.
-- Les statements de test conservent les verbes `attempted`, `passed` et `failed`, mais avec un wording plus explicite (`a commencé le test`, `a réussi le test`, `a échoué au test`).
-- Le contexte des tests utilise désormais `source_event = test_tracking_status` dans le JSON xAPI, en cohérence avec l'outbox.
+- Les statements de test conservent les verbes `attempted`, `passed` et `failed`, mais avec un wording plus explicite.
+- Le contexte des tests utilise désormais `source_event = test_tracking_status` dans le JSON xAPI.
 - Les statements sont enrichis au moment de l'insertion outbox afin d'y inclure l'identifiant technique local `outbox_id` sans modifier le schéma SQL.
 - Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
 - L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.
