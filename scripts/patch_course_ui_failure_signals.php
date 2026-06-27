@@ -19,8 +19,8 @@ if (!is_string($code) || $code === '') {
     exit(1);
 }
 
-if (strpos($code, 'échecs fréquents') !== false && strpos($code, '$signalText =') !== false) {
-    echo "Failure signal patch already present in {$file}\n";
+if (strpos($code, 'itxeb-signal-danger') !== false && strpos($code, '$signalClass =') !== false) {
+    echo "Failure signal color patch already present in {$file}\n";
     exit(0);
 }
 
@@ -38,7 +38,13 @@ $new = <<<'PHP'
                     $signalText = 'à surveiller';
                 }
             }
-            $html .= '<tr><td><span class="itxeb-signal">' . $this->esc($signalText) . '</span></td>'
+            $signalClass = 'itxeb-signal';
+            if ($signalText === 'échecs fréquents') {
+                $signalClass .= ' itxeb-signal-danger';
+            } elseif ($signalText === 'à surveiller') {
+                $signalClass .= ' itxeb-signal-warning';
+            }
+            $html .= '<tr><td><span class="' . $this->esc($signalClass) . '">' . $this->esc($signalText) . '</span></td>'
 PHP;
 
 $updated = str_replace($old, $new, $code);
@@ -47,9 +53,17 @@ if ($updated === $code) {
     exit(1);
 }
 
-if (file_put_contents($file, $updated) === false) {
+$styleOld = '#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}';
+$styleNew = '#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-signal-warning{border-color:#f0ad4e;background:#fcf8e3;color:#8a6d3b;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal-danger{border-color:#d9534f;background:#f2dede;color:#a94442;font-weight:bold}';
+$updatedWithStyle = str_replace($styleOld, $styleNew, $updated);
+if ($updatedWithStyle === $updated) {
+    fwrite(STDERR, "Patch failed: unable to locate signal style in {$file}\n");
+    exit(1);
+}
+
+if (file_put_contents($file, $updatedWithStyle) === false) {
     fwrite(STDERR, "Unable to write target file: {$file}\n");
     exit(1);
 }
 
-echo "Failure signal patch applied to {$file}\n";
+echo "Failure signal color patch applied to {$file}\n";
