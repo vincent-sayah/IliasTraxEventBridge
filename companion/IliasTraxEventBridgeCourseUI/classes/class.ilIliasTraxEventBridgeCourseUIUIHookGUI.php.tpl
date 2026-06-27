@@ -30,16 +30,17 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
         if ($this->isCourseUiCommandRequest()) {
             $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
+            $html = $this->replaceCenterColumnContent($a_par['html'], $screen->handle());
             return [
                 'mode' => ilUIHookPluginGUI::REPLACE,
-                'html' => $this->replaceCenterColumnContent($a_par['html'], $screen->handle()),
+                'html' => $this->injectCourseMainTabIntoHtml($html),
             ];
         }
 
         if ($this->isReadyForCourseContext()) {
             return [
                 'mode' => ilUIHookPluginGUI::REPLACE,
-                'html' => $this->injectSubtabIntoHtml($a_par['html']),
+                'html' => $this->injectCourseMainTabIntoHtml($a_par['html']),
             ];
         }
 
@@ -47,45 +48,16 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
     }
 
     /**
+     * Top-level tab injection is handled through getHTML(), because it is more
+     * stable across ILIAS 10 screens than trying to hook different tab objects.
+     *
      * @param string $a_comp
      * @param string $a_part
      * @param array<string,mixed> $a_par
      */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        if ($a_part !== 'sub_tabs' || !isset($a_par['tabs']) || !is_object($a_par['tabs'])) {
-            return;
-        }
-
-        $this->modifySubTabs($a_par['tabs']);
-    }
-
-    private function modifySubTabs($tabs): void
-    {
-        if (!$this->isReadyForCourseContext()) {
-            return;
-        }
-
-        $url = $this->getContextualConfigurationUrl();
-        if ($url === '') {
-            return;
-        }
-
-        if (method_exists($tabs, 'addSubTab')) {
-            $tabs->addSubTab('itxeb_course_xapi_settings', 'Suivi xAPI', $url);
-        } elseif (method_exists($tabs, 'addSubTabTarget')) {
-            $tabs->addSubTabTarget('Suivi xAPI', $url, '', '', '', 'itxeb_course_xapi_settings');
-        } else {
-            return;
-        }
-
-        if ($this->isCourseUiCommandRequest()) {
-            if (method_exists($tabs, 'setSubTabActive')) {
-                $tabs->setSubTabActive('itxeb_course_xapi_settings');
-            } elseif (method_exists($tabs, 'activateSubTab')) {
-                $tabs->activateSubTab('itxeb_course_xapi_settings');
-            }
-        }
+        // Intentionally empty: do not add Suivi xAPI as a Parameters subtab.
     }
 
     /** @return array<string,mixed> */
@@ -111,9 +83,9 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         return (string) ($context['configuration_url'] ?? '');
     }
 
-    private function injectSubtabIntoHtml(string $html): string
+    private function injectCourseMainTabIntoHtml(string $html): string
     {
-        if ($html === '' || strpos($html, 'itxeb_course_xapi_settings') !== false || strpos($html, 'Suivi xAPI') !== false) {
+        if ($html === '' || strpos($html, 'itxeb_course_xapi_main_tab') !== false) {
             return $html;
         }
 
@@ -122,13 +94,17 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             return $html;
         }
 
-        $li = '<li id="subtab_itxeb_course_xapi_settings"><a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a></li>';
-        $anchor = '<a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a>';
+        $active = $this->isCourseUiCommandRequest();
+        $liClass = $active ? ' class="active"' : '';
+        $aClass = $active ? ' class="active"' : '';
+        $li = '<li id="tab_itxeb_course_xapi_main"' . $liClass . '><a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a></li>';
+        $anchor = '<a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a>';
 
+        // Preferred position: immediately after the main course tab "Membres".
         foreach ([
-            '/(<li[^>]*>\s*<a[^>]*>\s*Multi-Linguisme\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Multilinguisme\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Multilingualism\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Membres\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Members\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Participants\s*<\/a>\s*<\/li>)/iu',
         ] as $pattern) {
             $newHtml = preg_replace($pattern, '$1' . $li, $html, 1, $count);
             if (is_string($newHtml) && $count > 0) {
@@ -136,10 +112,23 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             }
         }
 
+        // Fallback: place it just before Parameters/Settings if Members was not found.
         foreach ([
-            '/(<a[^>]*>\s*Multi-Linguisme\s*<\/a>)/iu',
-            '/(<a[^>]*>\s*Multilinguisme\s*<\/a>)/iu',
-            '/(<a[^>]*>\s*Multilingualism\s*<\/a>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Paramètres\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Settings\s*<\/a>\s*<\/li>)/iu',
+            '/(<li[^>]*>\s*<a[^>]*>\s*Réglages\s*<\/a>\s*<\/li>)/iu',
+        ] as $pattern) {
+            $newHtml = preg_replace($pattern, $li . '$1', $html, 1, $count);
+            if (is_string($newHtml) && $count > 0) {
+                return $newHtml;
+            }
+        }
+
+        // Last fallback for variants without <li>: add the link after a Members anchor.
+        foreach ([
+            '/(<a[^>]*>\s*Membres\s*<\/a>)/iu',
+            '/(<a[^>]*>\s*Members\s*<\/a>)/iu',
+            '/(<a[^>]*>\s*Participants\s*<\/a>)/iu',
         ] as $pattern) {
             $newHtml = preg_replace($pattern, '$1 ' . $anchor, $html, 1, $count);
             if (is_string($newHtml) && $count > 0) {
@@ -147,7 +136,8 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             }
         }
 
-        $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;"><a id="itxeb_course_xapi_settings" href="' . $url . '">Suivi xAPI</a></div>';
+        // Last resort: visible link before the central form/content.
+        $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;"><a id="itxeb_course_xapi_main_tab" href="' . $url . '">Suivi xAPI</a></div>';
         $newHtml = preg_replace('/(<form\b)/i', $fallback . '$1', $html, 1, $count);
         return is_string($newHtml) && $count > 0 ? $newHtml : $html . $fallback;
     }
@@ -213,10 +203,11 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             'showCourseExpert',
             'exportCourseExpertCsv',
             'saveCourseTracking',
+            'saveDashboardPreferences',
             'enableAllCourseTracking',
             'disableAllCourseTracking',
             'resetCourseTracking',
-        ], true);
+        ], true) || $this->requestValue($_POST, 'itxeb_dashboard_save') === '1';
     }
 
     private function requestValue($source, string $key): string
