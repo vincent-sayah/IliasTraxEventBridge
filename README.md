@@ -35,6 +35,10 @@ Branche de préparation V0.9.1 : **`v0.9-feedback-dashboard`**, plugin principal
 ## Nouveautés V0.9.1 — feedback cours
 
 La V0.9.1 ajoute une interface de feedback cours dans le compagnon UIHook.
+![Écran de configuration du suivi Xapi](docs/images/suivi_xapi_configuration.png)
+![Écran tableau de bord du suivi Xapi](docs/images/suivi_xapi_tableau_bord.png)
+![Écran analyse du suivi Xapi](docs/images/suivi_xapi_analyse.png)
+![Écran expert du suivi Xapi](docs/images/suivi_xapi_expert.png)
 
 ### Accès cours
 
