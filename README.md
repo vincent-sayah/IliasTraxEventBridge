@@ -2,7 +2,7 @@
 
 Plugin ILIAS 10 EventHook pour transformer certains événements ILIAS en statements xAPI et les envoyer vers un LRS xAPI, notamment TRAX 3, via une outbox locale.
 
-Version finalisée sur la branche `v0.8-outbox-supervision` : **0.8.0**.
+Version stable publiée : **v0.8.0** sur `main`, plugin version **0.8.0**.
 
 Plugin compagnon UIHook : **IliasTraxEventBridgeCourseUI 0.1.1**.
 
@@ -10,8 +10,8 @@ Plugin compagnon UIHook : **IliasTraxEventBridgeCourseUI 0.1.1**.
 
 | Branche | Rôle | État |
 |---|---|---|
-| `main` | Stable publiée par défaut | À promouvoir après validation/tag V0.8 si souhaité |
-| `v0.8-outbox-supervision` | Finalisation V0.8 | Validée fonctionnellement, prête pour tag `v0.8.0` |
+| `main` | Stable publiée par défaut | Stable `v0.8.0` |
+| `v0.8-outbox-supervision` | Branche de développement V0.8 | Clôturée après tag `v0.8.0` et promotion sur `main` |
 | `v0.7.1-course-object-ui` | Maintenance V0.7.1 | Stable taguée `v0.7.1` |
 | `v0.7` | Maintenance V0.7 | Stable taguée `v0.7.0` |
 | `v0.6` | Maintenance V0.6 | Stable taguée `v0.6.0` |
@@ -67,7 +67,7 @@ Sans configuration explicite du cours et de la ressource, aucune trace xAPI n'es
 | Consultation module web dans un cours | `read_event` | `repository_object_access` | `read` / `repository_learning_module_access` |
 | Consultation module SCORM dans un cours | `read_event` | `repository_object_access` | `launched` / `repository_scorm_access` |
 
-## Installation / mise à jour V0.8
+## Installation stable V0.8.0
 
 ### Plugin principal EventHook
 
@@ -81,15 +81,12 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-# Installation neuve
-git clone https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+# Installation neuve depuis la stable main
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 cd "$PLUGIN_NAME"
-git checkout v0.8.0
 
-# ou mise à jour d'une installation existante
-# cd "$EVENTHOOK_DIR/$PLUGIN_NAME"
-# git fetch origin --prune --tags
-# git checkout v0.8.0
+# Pour verrouiller exactement la release stable
+git checkout v0.8.0
 
 grep -n '\$version' plugin.php
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
