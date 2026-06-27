@@ -19,18 +19,29 @@ if (!is_string($code) || $code === '') {
     exit(1);
 }
 
-if (strpos($code, 'renderStrugglingLearners(') !== false) {
+if (strpos($code, 'private function renderStrugglingLearners(') !== false) {
     echo "Struggling learners patch already present in {$file}\n";
     exit(0);
 }
 
-$pattern = "~(private function renderAnalysis\\(array \\$course\\): string\\s*\\{.*?return \\$html \\. '</tbody></table></div>)</section>';~s";
-$replacement = "$1' . \\$this->renderStrugglingLearners(\\$dashboard) . '</section>';";
-$updated = preg_replace($pattern, $replacement, $code, 1, $count);
-if (!is_string($updated) || $count !== 1) {
-    fwrite(STDERR, "Patch failed: unable to locate renderAnalysis final return line in {$file}\n");
+$analysisStart = strpos($code, 'private function renderAnalysis(array $course): string');
+$expertStart = strpos($code, 'private function renderExpert(array $course): string');
+if ($analysisStart === false || $expertStart === false || $expertStart <= $analysisStart) {
+    fwrite(STDERR, "Patch failed: unable to locate renderAnalysis/renderExpert boundaries in {$file}\n");
     exit(1);
 }
+
+$beforeAnalysis = substr($code, 0, $analysisStart);
+$analysisBlock = substr($code, $analysisStart, $expertStart - $analysisStart);
+$afterAnalysis = substr($code, $expertStart);
+
+$analysisReturn = "        return \$html . '</tbody></table></div></section>';";
+$analysisReturnPatched = "        return \$html . '</tbody></table></div>' . \$this->renderStrugglingLearners(\$dashboard) . '</section>';";
+if (strpos($analysisBlock, $analysisReturn) === false) {
+    fwrite(STDERR, "Patch failed: unable to locate renderAnalysis final return in {$file}\n");
+    exit(1);
+}
+$analysisBlock = str_replace($analysisReturn, $analysisReturnPatched, $analysisBlock);
 
 $newMethod = <<<'PHP'
 /** @param array<string,mixed> $dashboard */
@@ -135,20 +146,10 @@ $newMethod = <<<'PHP'
     }
 
     /** @param array<string,mixed> $course */
-    private function renderExpert
+    
 PHP;
 
-$updated = preg_replace(
-    '~    /\*\* @param array<string,mixed> \$course \*/\n    private function renderExpert~',
-    $newMethod,
-    $updated,
-    1,
-    $insertCount
-) ?? $updated;
-if ($insertCount !== 1 || strpos($updated, 'renderStrugglingLearners(') === false) {
-    fwrite(STDERR, "Patch failed: unable to insert renderStrugglingLearners method in {$file}\n");
-    exit(1);
-}
+$updated = $beforeAnalysis . $analysisBlock . $newMethod . $afterAnalysis;
 
 $styleOld = '#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}';
 $styleNew = '#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}';
