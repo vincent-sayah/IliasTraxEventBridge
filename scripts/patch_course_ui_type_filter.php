@@ -78,7 +78,7 @@ $newFilterCourseResources = <<<'PHP'
 private function filterCourseResources(array $course): array
     {
         $selectedRefId = $this->getSelectedResourceRefId();
-        $selectedObjectType = $this->getSelectedObjectType();
+        $selectedObjectType = $selectedRefId > 0 ? '' : $this->getSelectedObjectType();
         $resources = is_array($course['resources'] ?? null) ? $course['resources'] : [];
 
         if ($selectedRefId <= 0 && $selectedObjectType === '') {
@@ -121,8 +121,10 @@ private function renderResourceFilter(array $course, string $cmd): string
             return '';
         }
         $selected = $this->getSelectedResourceRefId();
-        $selectedObjectType = $this->getSelectedObjectType();
+        $selectedObjectType = $selected > 0 ? '' : $this->getSelectedObjectType();
         $objectTypes = $this->availableObjectTypes($course);
+        $typeDisabled = $selected > 0;
+        $typeDisabledAttr = $typeDisabled ? ' disabled="disabled"' : '';
         $html = '<form class="itxeb-resource-filter" method="get" action="' . $this->esc($this->currentPath()) . '">'
             . $this->hiddenCurrentQuery(['itxeb_cui_cmd', 'itxeb_course_ref_id', 'itxeb_period_days', 'itxeb_filter_ref_id', 'itxeb_filter_obj_type'])
             . '<input type="hidden" name="itxeb_cui_cmd" value="' . $this->esc($cmd) . '">'
@@ -142,12 +144,16 @@ private function renderResourceFilter(array $course, string $cmd): string
             $label .= ' — ' . (string) ($resource['obj_type'] ?? '') . ' — ref_id ' . $refId;
             $html .= '<option value="' . $this->esc((string) $refId) . '"' . ($selected === $refId ? ' selected="selected"' : '') . '>' . $this->esc($label) . '</option>';
         }
-        $html .= '</select></label> <label class="itxeb-type-filter"><strong>Type :</strong> <select name="itxeb_filter_obj_type">'
+        $html .= '</select></label> <label class="itxeb-type-filter"><strong>Type :</strong> <select name="itxeb_filter_obj_type"' . $typeDisabledAttr . '>'
             . '<option value=""' . ($selectedObjectType === '' ? ' selected="selected"' : '') . '>Tous les types</option>';
         foreach ($objectTypes as $type => $label) {
             $html .= '<option value="' . $this->esc($type) . '"' . ($selectedObjectType === $type ? ' selected="selected"' : '') . '>' . $this->esc($label) . '</option>';
         }
-        return $html . '</select></label> <button class="btn btn-default" type="submit">Filtrer</button></form>';
+        $html .= '</select></label>';
+        if ($typeDisabled) {
+            $html .= ' <small class="itxeb-filter-help">Type ignoré : une ressource précise est sélectionnée.</small>';
+        }
+        return $html . ' <button class="btn btn-default" type="submit">Filtrer</button></form>';
     }
 
     /** @param array<int,string> $excludedKeys */
@@ -167,6 +173,9 @@ $code = requireReplacement(
 $newMethods = <<<'PHP'
 private function getSelectedObjectType(): string
     {
+        if ($this->getSelectedResourceRefId() > 0) {
+            return '';
+        }
         $value = trim($this->requestValue($_GET, 'itxeb_filter_obj_type'));
         if ($value === '') {
             $value = trim($this->requestValue($_POST, 'itxeb_filter_obj_type'));
@@ -228,7 +237,7 @@ $code = requireReplacement(
     $code,
     str_replace(
         '#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}',
-        '#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}',
+        '#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}#itxeb-course-ui-screen .itxeb-filter-help{color:#666;margin-left:.35rem}',
         $code
     ),
     'add type filter style'
