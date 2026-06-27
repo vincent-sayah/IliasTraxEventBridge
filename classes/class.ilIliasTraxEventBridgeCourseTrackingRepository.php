@@ -42,9 +42,32 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
 
     public function dashboardPreferencesAvailable(): bool
     {
+        $this->ensureDashboardPreferencesSchema();
         return $this->courseTableExists()
             && method_exists($this->db, 'tableColumnExists')
             && $this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_widgets_json');
+    }
+
+    private function ensureDashboardPreferencesSchema(): void
+    {
+        if (!$this->courseTableExists() || !method_exists($this->db, 'tableColumnExists') || !method_exists($this->db, 'addTableColumn')) {
+            return;
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_widgets_json')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_widgets_json', [
+                'type' => 'clob', 'notnull' => false,
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_updated_at')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_updated_at', [
+                'type' => 'text', 'length' => 19, 'notnull' => true, 'default' => '',
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_updated_by')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_updated_by', [
+                'type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0,
+            ]);
+        }
     }
 
     /** @return array<string,mixed> */
@@ -54,8 +77,9 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
             return [];
         }
 
+        $hasDashboardColumns = $this->dashboardPreferencesAvailable();
         $columns = 'course_ref_id, course_obj_id, enabled, created_at, updated_at, updated_by';
-        if ($this->dashboardPreferencesAvailable()) {
+        if ($hasDashboardColumns) {
             $columns .= ', dashboard_widgets_json, dashboard_updated_at, dashboard_updated_by';
         }
 
