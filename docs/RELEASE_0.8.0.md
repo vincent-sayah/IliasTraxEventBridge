@@ -2,10 +2,18 @@
 
 ## Statut
 
-Version finalisée sur la branche :
+Release publiée : **v0.8.0**.
+
+Branche stable par défaut :
 
 ```text
-v0.8-outbox-supervision
+main
+```
+
+Tag stable :
+
+```text
+v0.8.0
 ```
 
 Version du plugin principal :
@@ -26,6 +34,8 @@ Base fonctionnelle :
 v0.7.1
 ```
 
+La branche de développement `v0.8-outbox-supervision` est clôturée. Son contenu a été tagué en `v0.8.0` puis promu sur `main`.
+
 ## Objectif de la V0.8
 
 La V0.8 ajoute une couche d'exploitation autour de l'outbox et du filtrage V0.7.1.
@@ -36,7 +46,7 @@ Le comportement métier reste :
 statement xAPI autorisé = cours activé ET ressource activée
 ```
 
-La V0.8 permet maintenant de diagnostiquer pourquoi une trace n'a pas été générée, tout en évitant que ce diagnostic soit actif en permanence sur une plateforme volumineuse.
+La V0.8 permet de diagnostiquer pourquoi une trace n'a pas été générée, tout en évitant que ce diagnostic soit actif en permanence sur une plateforme volumineuse.
 
 ## Lots livrés
 
@@ -123,20 +133,23 @@ Ambiguous class resolution
 
 concernant les classes `IliasTraxEventBridgeCourseUI`.
 
-## Installation / mise à jour depuis une installation existante
+## Installation stable depuis main
 
-### 1. Mettre à jour le plugin principal
+### 1. Installer le plugin principal
 
 ```bash
 sudo -i
 
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+export ILIAS_ROOT="/var/www/ilias"
+export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
+export PLUGIN_NAME="IliasTraxEventBridge"
 
-git fetch origin --prune --tags
-git switch v0.8-outbox-supervision
-git pull --ff-only origin v0.8-outbox-supervision
+mkdir -p "$EVENTHOOK_DIR"
+cd "$EVENTHOOK_DIR"
 
-git log --oneline --decorate -8
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+cd "$PLUGIN_NAME"
+
 grep -n '\$version' plugin.php
 ```
 
@@ -146,7 +159,16 @@ Résultat attendu :
 $version = "0.8.0";
 ```
 
-### 2. Installer / régénérer le plugin compagnon UIHook
+### 2. Verrouiller exactement la release stable
+
+Pour figer l'installation sur le tag publié :
+
+```bash
+git fetch origin --prune --tags
+git checkout v0.8.0
+```
+
+### 3. Installer / régénérer le plugin compagnon UIHook
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
@@ -160,7 +182,7 @@ Le script génère les fichiers PHP du compagnon dans :
 /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
 ```
 
-### 3. Contrôles syntaxe
+### 4. Contrôles syntaxe
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
@@ -172,7 +194,7 @@ find /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserI
 
 Résultat attendu pour le dossier source `companion/` : aucune ligne PHP.
 
-### 4. Rebuild ILIAS
+### 5. Rebuild ILIAS
 
 ```bash
 cd /var/www/ilias
@@ -194,7 +216,7 @@ Ambiguous class resolution, "ilIliasTraxEventBridgeCourseUIUIHookGUI" ...
 
 Des warnings ILIAS indépendants peuvent rester, notamment ceux liés aux exemples `scripts/PHP-CS-Fixer`.
 
-### 5. Mise à jour plugin ILIAS
+### 6. Mise à jour plugin ILIAS
 
 Dans ILIAS :
 
@@ -213,6 +235,26 @@ Contrôle SQL :
 ```sql
 SHOW TABLES LIKE 'evnt_evhk_itxeb_dlog';
 DESCRIBE evnt_evhk_itxeb_dlog;
+```
+
+## Mise à jour d'une installation existante
+
+```bash
+sudo -i
+
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+git fetch origin --prune --tags
+git checkout v0.8.0
+
+grep -n '\$version' plugin.php
+find . -name "*.php" -print0 | xargs -0 -n1 php -l
+bash scripts/install_course_ui_companion.sh
+
+cd /var/www/ilias
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
+systemctl restart httpd
 ```
 
 ## Validation fonctionnelle
@@ -306,21 +348,19 @@ Lot 2 — purge du diagnostic : OK
 Lot 3 — installation du compagnon par templates .php.tpl : OK
 Lot 3 — suppression des warnings Composer Ambiguous class resolution : OK
 Lot 3 — Paramètres > Suivi xAPI toujours fonctionnel : OK
+Tag v0.8.0 publié : OK
+main promu sur v0.8.0 : OK
 ```
 
 ## Documentation liée
 
 ```text
+README.md
+README_TECHNIQUE.md
+CHANGELOG.md
+docs/VALIDATION.md
+docs/OPERATIONS.md
 docs/V0.8_LOT1_DENY_LOG.md
 docs/V0.8_LOT2_DENY_SUPERVISION.md
 docs/V0.8_LOT3_COMPANION_PACKAGING.md
-```
-
-## Tag recommandé
-
-Après validation finale du serveur :
-
-```bash
-git tag -a v0.8.0 -m "Release v0.8.0 - outbox supervision and deny diagnostics"
-git push origin v0.8.0
 ```
