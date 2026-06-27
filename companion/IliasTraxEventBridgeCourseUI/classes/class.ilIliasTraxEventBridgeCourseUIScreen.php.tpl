@@ -218,6 +218,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             . $this->metricCard('En erreur', (string) ($summary['failed'] ?? 0), 'À vérifier')
             . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
             . '</div>'
+            . $this->renderPeriodComparison($course)
             . $this->renderActivityByDay($dashboard)
             . $this->renderVerbDistribution($dashboard)
             . $this->renderTopResources($dashboard)
@@ -409,6 +410,77 @@ class ilIliasTraxEventBridgeCourseUIScreen
             $html .= '<input type="hidden" name="' . $this->esc($key) . '" value="' . $this->esc((string) $value) . '">';
         }
         return $html;
+    }
+
+    /** @param array<string,mixed> $course */
+    private function renderPeriodComparison(array $course): string
+    {
+        if (!$this->analytics) {
+            return '';
+        }
+        $days = $this->getPeriodDays();
+        if ($days > 180) {
+            return '<section class="itxeb-cui-section"><h3>Comparaison entre périodes</h3><p><em>Comparaison non affichée pour 365 jours : la fenêtre locale maximale du MVP est 365 jours.</em></p></section>';
+        }
+
+        $extended = $this->analytics->buildForCourse($this->filterCourseResources($course), $days * 2);
+        $byDay = is_array($extended['by_day'] ?? null) ? $extended['by_day'] : [];
+
+        $todayStart = strtotime(date('Y-m-d 00:00:00'));
+        if ($todayStart === false) {
+            return '';
+        }
+        $currentStart = (int) $todayStart - (($days - 1) * 86400);
+        $previousStart = $currentStart - ($days * 86400);
+
+        $currentTotal = 0;
+        $previousTotal = 0;
+        foreach ($byDay as $day => $count) {
+            $dayTs = strtotime((string) $day . ' 00:00:00');
+            if ($dayTs === false) {
+                continue;
+            }
+            if ($dayTs >= $currentStart) {
+                $currentTotal += (int) $count;
+            } elseif ($dayTs >= $previousStart && $dayTs < $currentStart) {
+                $previousTotal += (int) $count;
+            }
+        }
+
+        $delta = $currentTotal - $previousTotal;
+        $currentAverage = round($currentTotal / max(1, $days), 2);
+        $previousAverage = round($previousTotal / max(1, $days), 2);
+        $trend = $this->formatTrend($delta, $previousTotal);
+
+        return '<section class="itxeb-cui-section"><h3>Comparaison entre périodes</h3>'
+            . '<p>Comparaison du volume de traces de la période sélectionnée avec la période précédente de même durée.</p>'
+            . '<table class="itxeb-cui-table itxeb-comparison-table"><thead><tr><th>Indicateur</th><th>Période actuelle</th><th>Période précédente</th><th>Évolution</th></tr></thead><tbody>'
+            . '<tr><td>Traces xAPI</td><td>' . $this->esc((string) $currentTotal) . '</td><td>' . $this->esc((string) $previousTotal) . '</td><td>' . $this->esc($trend) . '</td></tr>'
+            . '<tr><td>Moyenne/jour</td><td>' . $this->esc((string) $currentAverage) . '</td><td>' . $this->esc((string) $previousAverage) . '</td><td>' . $this->esc($this->formatSignedNumber(round($currentAverage - $previousAverage, 2))) . '</td></tr>'
+            . '</tbody></table></section>';
+    }
+
+    private function formatTrend(int $delta, int $previousTotal): string
+    {
+        $absolute = $this->formatSignedNumber($delta);
+        if ($previousTotal <= 0) {
+            return $delta === 0 ? 'stable' : $absolute . ' trace(s)';
+        }
+        $percent = round(($delta / $previousTotal) * 100, 1);
+        return $absolute . ' trace(s) (' . $this->formatSignedNumber($percent) . ' %)';
+    }
+
+    private function formatSignedNumber($value): string
+    {
+        if (!is_numeric($value)) {
+            return '0';
+        }
+        $number = (float) $value;
+        if (abs($number) < 0.0001) {
+            return '0';
+        }
+        $formatted = (floor($number) == $number) ? (string) (int) $number : (string) $number;
+        return $number > 0 ? '+' . $formatted : $formatted;
     }
 
     /** @param array<string,mixed> $dashboard */
@@ -734,6 +806,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function styles(): string
     {
-        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
+        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}</style>';
     }
 }
