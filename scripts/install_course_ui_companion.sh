@@ -6,6 +6,11 @@ HTTPD_USER="${HTTPD_USER:-apache}"
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$PLUGIN_ROOT/companion/IliasTraxEventBridgeCourseUI"
 TARGET_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
+CLEAN_NAV_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_clean_navigation.php"
+TYPE_FILTER_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_type_filter.php"
+SUCCESS_RATE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_success_rates.php"
+FAILURE_SIGNAL_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_failure_signals.php"
+STRUGGLING_LEARNERS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_struggling_learners.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -36,6 +41,36 @@ while IFS= read -r -d '' template; do
   mkdir -p "$TARGET_DIR/$(dirname "$target_rel")"
   cp "$template" "$TARGET_DIR/$target_rel"
 done < <(find "$SOURCE_DIR/classes" -type f -name '*.php.tpl' -print0)
+
+if [[ -f "$CLEAN_NAV_PATCHER" ]]; then
+  php "$CLEAN_NAV_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Clean navigation patcher not found, skipping: $CLEAN_NAV_PATCHER"
+fi
+
+if [[ -f "$TYPE_FILTER_PATCHER" ]]; then
+  php "$TYPE_FILTER_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Type filter patcher not found, skipping: $TYPE_FILTER_PATCHER"
+fi
+
+if [[ -f "$SUCCESS_RATE_PATCHER" ]]; then
+  php "$SUCCESS_RATE_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Success rate patcher not found, skipping: $SUCCESS_RATE_PATCHER"
+fi
+
+if [[ -f "$FAILURE_SIGNAL_PATCHER" ]]; then
+  php "$FAILURE_SIGNAL_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Failure signal patcher not found, skipping: $FAILURE_SIGNAL_PATCHER"
+fi
+
+if [[ -f "$STRUGGLING_LEARNERS_PATCHER" ]]; then
+  php "$STRUGGLING_LEARNERS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "Struggling learners patcher not found, skipping: $STRUGGLING_LEARNERS_PATCHER"
+fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
 find "$TARGET_DIR" -type f -exec chmod 644 {} \;

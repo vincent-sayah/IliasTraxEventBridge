@@ -3,8 +3,8 @@
 /**
  * V0.7 course/resource xAPI tracking configuration repository.
  *
- * This repository only stores and reads the explicit course/resource decisions.
- * It does not apply filtering yet; filtering is introduced in a later V0.7 lot.
+ * This repository stores the explicit course/resource decisions and the V0.9
+ * course dashboard display preferences.
  */
 class ilIliasTraxEventBridgeCourseTrackingRepository
 {
@@ -40,6 +40,36 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
         return $this->courseTableExists() && $this->resourceTableExists();
     }
 
+    public function dashboardPreferencesAvailable(): bool
+    {
+        $this->ensureDashboardPreferencesSchema();
+        return $this->courseTableExists()
+            && method_exists($this->db, 'tableColumnExists')
+            && $this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_widgets_json');
+    }
+
+    private function ensureDashboardPreferencesSchema(): void
+    {
+        if (!$this->courseTableExists() || !method_exists($this->db, 'tableColumnExists') || !method_exists($this->db, 'addTableColumn')) {
+            return;
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_widgets_json')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_widgets_json', [
+                'type' => 'clob', 'notnull' => false,
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_updated_at')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_updated_at', [
+                'type' => 'text', 'length' => 19, 'notnull' => true, 'default' => '',
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'dashboard_updated_by')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'dashboard_updated_by', [
+                'type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0,
+            ]);
+        }
+    }
+
     /** @return array<string,mixed> */
     public function getCourseConfig(int $courseRefId): array
     {
@@ -47,9 +77,15 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
             return [];
         }
 
+        $hasDashboardColumns = $this->dashboardPreferencesAvailable();
+        $columns = 'course_ref_id, course_obj_id, enabled, created_at, updated_at, updated_by';
+        if ($hasDashboardColumns) {
+            $columns .= ', dashboard_widgets_json, dashboard_updated_at, dashboard_updated_by';
+        }
+
         $set = $this->db->query(
-            'SELECT course_ref_id, course_obj_id, enabled, created_at, updated_at, updated_by '
-            . 'FROM ' . self::COURSE_TABLE
+            'SELECT ' . $columns
+            . ' FROM ' . self::COURSE_TABLE
             . ' WHERE course_ref_id = ' . $courseRefId
         );
         $row = $this->db->fetchAssoc($set);
@@ -98,6 +134,60 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
             'updated_at' => ['text', $now],
             'updated_by' => ['integer', $updatedBy],
         ]);
+    }
+
+    /** @return array<string,bool> */
+    public function getDashboardWidgets(int $courseRefId): array
+    {
+        if ($courseRefId <= 0 || !$this->dashboardPreferencesAvailable()) {
+            return [];
+        }
+        $config = $this->getCourseConfig($courseRefId);
+        $json = (string) ($config['dashboard_widgets_json'] ?? '');
+        if (trim($json) === '') {
+            return [];
+        }
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $result = [];
+        foreach ($decoded as $key => $value) {
+            if (is_string($key)) {
+                $result[$key] = (bool) $value;
+            }
+        }
+        return $result;
+    }
+
+    /** @param array<string,bool> $widgets */
+    public function setDashboardWidgets(int $courseRefId, int $courseObjId, array $widgets, int $updatedBy = 0): void
+    {
+        if ($courseRefId <= 0 || !$this->courseTableExists()) {
+            return;
+        }
+
+        if (!$this->isCourseConfigured($courseRefId)) {
+            $this->setCourseEnabled($courseRefId, $courseObjId, false, $updatedBy);
+        }
+
+        if (!$this->dashboardPreferencesAvailable()) {
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $json = json_encode($widgets, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($json)) {
+            $json = '{}';
+        }
+
+        $this->db->manipulate(
+            'UPDATE ' . self::COURSE_TABLE
+            . ' SET dashboard_widgets_json = ' . $this->db->quote($json, 'text')
+            . ', dashboard_updated_at = ' . $this->db->quote($now, 'text')
+            . ', dashboard_updated_by = ' . max(0, $updatedBy)
+            . ' WHERE course_ref_id = ' . $courseRefId
+        );
     }
 
     /** @return array<int,array<string,mixed>> */

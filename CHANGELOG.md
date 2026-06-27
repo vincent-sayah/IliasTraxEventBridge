@@ -2,6 +2,92 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.9.1 — feedback cours, dashboard pédagogique et navigation Delos
+
+### Statut
+
+- Branche concernée : `v0.9-feedback-dashboard`.
+- Base : `main` stable `v0.8.0`.
+- Version plugin principal : `0.9.1`.
+- Version plugin compagnon UIHook : `0.2.1`.
+- Statut : validée fonctionnellement avant merge `main` et tag `v0.9.1`.
+
+### Objectif
+
+La V0.9.1 ajoute un feedback pédagogique et technique directement dans l'objet cours ILIAS.
+
+Elle complète la configuration xAPI par cours avec des vues d'analyse exploitables par un formateur, un pilote de cours ou un administrateur.
+
+### Navigation ILIAS 10.8 / Delos
+
+- Déplacement de l'accès `Suivi xAPI` dans la barre principale du cours.
+- Compatibilité validée avec ILIAS 10.8 et le thème par défaut Delos.
+- Correction de la route du lien `Suivi xAPI` : utilisation de la route support officielle `Info / showSummary`, puis remplacement du contenu central par l'écran xAPI.
+- Correction des liens internes `Tableau de bord`, `Analyse`, `Expert`, `Configuration` afin de rester dans l'écran xAPI.
+- Suppression des essais non retenus basés sur un pilotage fragile des sous-onglets natifs.
+
+### Vues ajoutées
+
+L'écran `Suivi xAPI` contient désormais :
+
+```text
+Tableau de bord | Analyse | Expert | Configuration
+```
+
+- `Tableau de bord` : synthèse de l'activité xAPI du cours.
+- `Analyse` : vue pédagogique par ressource.
+- `Expert` : traces locales détaillées et export CSV.
+- `Configuration` : activation du cours, activation des ressources et personnalisation du dashboard.
+
+### Tableau de bord
+
+- Compteurs principaux : traces, traces envoyées, erreurs, apprenants actifs, ressources tracées, tests, score moyen.
+- Comparaison avec la période précédente.
+- Activité par jour.
+- Répartition des actions xAPI.
+- Top ressources.
+- Ressources activées sans trace.
+- État technique local de l'outbox.
+- Personnalisation des widgets visibles par cours.
+- Persistance des préférences dashboard dans `evnt_evhk_itxeb_ccfg`.
+
+### Analyse pédagogique
+
+- Filtre période : 7, 30, 90, 365 jours.
+- Filtre par ressource.
+- Filtre par type d'objet.
+- Le filtre type est désactivé et ignoré lorsqu'une ressource précise est sélectionnée.
+- Taux réussite / échec par test.
+- Signal `à surveiller` lorsque le taux d'échec atteint le seuil d'alerte.
+- Signal `échecs fréquents` lorsque le taux d'échec est élevé.
+- Code couleur : orange pour `à surveiller`, rouge pour `échecs fréquents`.
+- Bloc `Apprenants en difficulté`, anonymisé.
+
+### Vue Expert
+
+- Table détaillée des traces locales.
+- Export CSV UTF-8 avec BOM et séparateur `;`.
+- Export tenant compte des filtres période, ressource et type.
+- Ajout des colonnes de contexte : `course_ref_id`, `filter_ref_id`, `filter_obj_type`, `verb`, ressource, score, completion, success, statut outbox, UUID statement et dernière erreur.
+
+### Données et limites
+
+- La V0.9.1 exploite l'outbox locale `evnt_evhk_itxeb_out` et les statements JSON déjà générés.
+- La V0.9.1 ne requête pas encore directement TRAX/LRS.
+- L'interrogation directe TRAX/LRS est prévue après merge/tag V0.9.1.
+- L'export PDF est prévu après l'interrogation directe TRAX/LRS.
+
+### Installation compagnon V0.9.1
+
+Pour ILIAS 10.8 / Delos :
+
+```bash
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
+```
+
+Le nom du wrapper est conservé pour compatibilité historique, mais son contenu applique désormais les correctifs de navigation Delos stabilisés.
+
 ## v0.8.1 — documentation stable main et guide d’exploitation V0.8
 
 ### Statut
@@ -217,30 +303,3 @@ Une installation déjà validée en `v0.8.0` peut rester sur le tag `v0.8.0` pou
 
 - Version stable V0.6.0 taguée après validation serveur et Windows.
 - Branches `main` et `v0.6` alignées sur la stable V0.6.0.
-- Branche `v0.5` conservée pour maintenance historique V0.5.5.
-- Version plugin : `0.6.0`.
-
-### Ajouté
-
-- Enrichissement des statements xAPI avec `object_title`, `object_url`, `course_title` et `course_url` quand les informations ILIAS sont disponibles.
-- Ajout du cours parent dans `context.contextActivities.parent` pour relier les consultations, fichiers et tests au cours ILIAS.
-- Ajout de `read_event_first_access` dans les records xAPI issus de `read_event`, en complément de `read_count`, `spent_seconds` et `read_event_last_access`.
-- Classification V0.6 des statements via les extensions `statement_family`, `interaction_type` et `repository_object_family` pour faciliter les analyses TRAX.
-- Ajout de `result.duration` au format ISO 8601 lorsque `spent_seconds` est disponible et supérieur à zéro.
-- Ajout de descriptions xAPI sur les activités objet/cours pour rendre les statements plus lisibles dans TRAX.
-- Ajout d'extensions de diagnostic outbox dans `context.extensions` : `outbox_id`, `outbox_table`, `event_log_id`, `statement_uuid`, `event_record_source`, `source_table` et `deduplication_key`.
-- Ajout d'une section admin `Supervision V0.6` dans l'écran de configuration du plugin.
-- Ajout d'un bloc admin `Exploitation / maintenance`.
-- Ajout du guide `docs/OPERATIONS.md`.
-- Ajout du guide `docs/V0.6_STABILISATION.md`.
-- Mise à jour du plan de validation V0.6.
-
-### Changé
-
-- Les consultations issues de `read_event` utilisent désormais des verbes plus précis selon le type d'objet.
-- Le téléchargement de fichier utilise un verbe xAPI dédié `downloaded` au lieu du libellé générique `experienced`.
-- Les statements de test conservent les verbes `attempted`, `passed` et `failed`, mais avec un wording plus explicite.
-- Le contexte des tests utilise désormais `source_event = test_tracking_status` dans le JSON xAPI.
-- Les statements sont enrichis au moment de l'insertion outbox afin d'y inclure l'identifiant technique local `outbox_id` sans modifier le schéma SQL.
-- Les descriptions xAPI `en-US` sont maintenant réellement anglophones, distinctes des descriptions `fr-FR`.
-- L'écran d'administration affiche désormais la série V0.6 et expose une vue de supervision opérationnelle sans requête SQL manuelle.

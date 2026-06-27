@@ -103,13 +103,14 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
 
-        $params = $this->requestContainerToArray($_GET);
-        $params['baseClass'] = $params['baseClass'] ?? 'ilrepositorygui';
-        $params['cmdClass'] = $params['cmdClass'] ?? 'ilObjCourseGUI';
-        $params['cmd'] = 'edit';
-        $params['ref_id'] = (string) $courseRefId;
-        $params['itxeb_cui_cmd'] = 'showCourseTracking';
-        $params['itxeb_course_ref_id'] = (string) $courseRefId;
+        // Clean fallback route. Do not set cmd=show: on ILIAS 10 this can call
+        // ilObjCourseGUI::showObject(), which does not exist on some versions.
+        $params = [
+            'baseClass' => 'ilrepositorygui',
+            'ref_id' => (string) $courseRefId,
+            'itxeb_cui_cmd' => 'showCourseDashboard',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+        ];
 
         return $script . '?' . http_build_query($params, '', '&');
     }
@@ -220,19 +221,6 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
         return '';
-    }
-
-    /** @return array<string,string> */
-    private function requestContainerToArray($source): array
-    {
-        $result = [];
-        foreach (['baseClass', 'ref_id', 'target', 'cmdNode', 'cmdClass', 'cmd', 'itxeb_cui_cmd', 'itxeb_course_ref_id'] as $key) {
-            $value = $this->requestValue($source, $key);
-            if ($value !== '') {
-                $result[$key] = $value;
-            }
-        }
-        return $result;
     }
 
     private function checkAccess(string $permission, int $refId): bool
