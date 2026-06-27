@@ -5,7 +5,7 @@
  *
  * - default view: Tableau de bord
  * - inner tabs order: Tableau de bord, Analyse, Expert, Configuration
- * - generated inner URLs do not preserve ILIAS cmdClass/cmdNode/cmd from the current screen
+ * - generated inner URLs do not preserve unsafe ILIAS cmd values
  */
 
 $file = $argv[1] ?? '';
@@ -57,10 +57,10 @@ $newCurrentUrlWith = <<<'PHP'
     /** @param array<string,string> $params */
     private function currentUrlWith(array $params): string
     {
-        // Clean xAPI navigation route: never preserve the current ILIAS command
-        // stack, otherwise links can inherit ilInfoScreenGUI/edit or Parameters/edit.
-        $current = [];
-        $current['baseClass'] = 'ilrepositorygui';
+        // Clean xAPI navigation route: preserve the valid course route already
+        // used to render the page, but never keep unsafe ILIAS command values.
+        $current = $this->currentQueryArray();
+        $current['baseClass'] = $current['baseClass'] ?? 'ilrepositorygui';
 
         $courseRefId = (int) ($params['itxeb_course_ref_id'] ?? 0);
         if ($courseRefId <= 0) {
@@ -71,11 +71,11 @@ $newCurrentUrlWith = <<<'PHP'
             $current['itxeb_course_ref_id'] = (string) $courseRefId;
         }
 
-        $current['cmd'] = 'show';
+        unset($current['cmd']);
         foreach ($params as $key => $value) {
             $current[$key] = $value;
         }
-        unset($current['cmdClass'], $current['cmdNode']);
+        unset($current['cmdClass'], $current['cmdNode'], $current['cmd']);
 
         return $this->currentPath() . '?' . http_build_query($current, '', '&');
     }
