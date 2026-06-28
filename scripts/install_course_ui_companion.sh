@@ -12,7 +12,7 @@ SUCCESS_RATE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_success_rates.php"
 FAILURE_SIGNAL_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_failure_signals.php"
 STRUGGLING_LEARNERS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_struggling_learners.php"
 LRS_DIRECT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_direct_summary.php"
-EMPTY_OUTBOX_NOTICE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_empty_outbox_local_notice.php"
+LRS_PRIMARY_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_primary_views.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -80,10 +80,10 @@ else
   echo "LRS direct patcher not found, skipping: $LRS_DIRECT_PATCHER"
 fi
 
-if [[ -f "$EMPTY_OUTBOX_NOTICE_PATCHER" ]]; then
-  php "$EMPTY_OUTBOX_NOTICE_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+if [[ -f "$LRS_PRIMARY_PATCHER" ]]; then
+  php "$LRS_PRIMARY_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 else
-  echo "Empty outbox notice patcher not found, skipping: $EMPTY_OUTBOX_NOTICE_PATCHER"
+  echo "LRS primary views patcher not found, skipping: $LRS_PRIMARY_PATCHER"
 fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
