@@ -43,10 +43,17 @@ $new = <<<'PHP'
         $localSummary = is_array($local['summary'] ?? null) ? $local['summary'] : [];
         $localTotal = (int) ($localSummary['total'] ?? 0);
         $localSent = (int) ($localSummary['sent'] ?? 0);
+        $localComparable = $localTotal > 0 || $localSent > 0;
         $s = $this->lrsSummary->build($course, $this->getPeriodDays());
         $lrsReturned = (int) ($s['returned'] ?? 0);
         $delta = $localSent - $lrsReturned;
-        $coherence = !empty($s['available']) ? ($delta === 0 ? 'cohérent' : ($delta > 0 ? 'écart local > LRS' : 'écart LRS > local')) : 'LRS indisponible';
+        $deltaLabel = (string) $delta;
+        if (!$localComparable && $lrsReturned > 0) {
+            $coherence = 'non comparable - outbox locale vide';
+            $deltaLabel = '-';
+        } else {
+            $coherence = !empty($s['available']) ? ($delta === 0 ? 'cohérent' : ($delta > 0 ? 'écart local > LRS' : 'écart LRS > local')) : 'LRS indisponible';
+        }
         $activity = (string) ($s['activity_id'] ?? '');
         $more = (string) ($s['more'] ?? '');
         $pages = (int) ($s['pages'] ?? 0);
@@ -59,10 +66,13 @@ $new = <<<'PHP'
             . $this->metricCard('Local générées', (string) $localTotal, 'outbox locale')
             . $this->metricCard('Local envoyées', (string) $localSent, 'status sent')
             . $this->metricCard('TRAX retournées', (string) $lrsReturned, 'GET /statements')
-            . $this->metricCard('Écart', (string) $delta, $coherence)
+            . $this->metricCard('Écart', $deltaLabel, $coherence)
             . $this->metricCard('Pages LRS', (string) $pages, $paginationStatus)
-            . '</div>'
-            . '<div style="display:grid;grid-template-columns:minmax(210px,260px) minmax(0,1fr);gap:0;border:1px solid #ddd;margin-top:12px">'
+            . '</div>';
+        if (!$localComparable && $lrsReturned > 0) {
+            $html .= '<div class="itxeb-cui-alert" style="margin-top:12px">L\'outbox locale est vide. TRAX contient encore des statements historiques : la comparaison local / TRAX est donc informative, pas une incohérence.</div>';
+        }
+        $html .= '<div style="display:grid;grid-template-columns:minmax(210px,260px) minmax(0,1fr);gap:0;border:1px solid #ddd;margin-top:12px">'
             . '<div style="font-weight:600;padding:8px 10px;border-bottom:1px solid #ddd;background:#f8f8f8">Statut comparaison</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">' . $this->esc($coherence) . '</div>'
             . '<div style="font-weight:600;padding:8px 10px;border-bottom:1px solid #ddd;background:#f8f8f8">Pagination LRS</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">' . $this->esc($paginationStatus . ' - ' . $pages . ' page(s) lue(s)') . '</div>'
             . '<div style="font-weight:600;padding:8px 10px;border-bottom:1px solid #ddd;background:#f8f8f8">More LRS restant</div><div style="padding:8px 10px;border-bottom:1px solid #ddd;overflow-wrap:anywhere">' . $this->esc($more === '' ? '-' : $this->shorten($more, 220)) . '</div>'
@@ -97,50 +107,26 @@ $new = <<<'PHP'
         $refs = array_values(array_unique(array_merge(array_keys($localByRef), array_keys($lrsByRef))));
         sort($refs);
         if (count($refs) > 0 || count($lrsNoRef) > 0) {
-            $html .= '<h4>Comparaison local / TRAX par ressource</h4><div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr><th>Ressource</th><th style="width:90px">Type</th><th style="width:80px">ref_id</th><th style="width:95px">Local</th><th style="width:95px">Envoyées</th><th style="width:95px">TRAX</th><th style="width:85px">Écart</th><th style="width:130px">Statut</th></tr></thead><tbody>';
+            $html .= '<h4>Comparaison local / TRAX par ressource</h4><div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr><th>Ressource</th><th style="width:90px">Type</th><th style="width:80px">ref_id</th><th style="width:95px">Local</th><th style="width:95px">Envoyées</th><th style="width:95px">TRAX</th><th style="width:85px">Écart</th><th style="width:150px">Statut</th></tr></thead><tbody>';
             foreach ($refs as $ref) {
                 $localResource = $localByRef[$ref] ?? []; $lrsResource = $lrsByRef[$ref] ?? [];
                 $localCount = (int) ($localResource['traces'] ?? 0); $localSentCount = (int) ($localResource['sent'] ?? 0); $lrsCount = (int) ($lrsResource['count'] ?? 0);
                 $resourceDelta = $localSentCount - $lrsCount;
-                $status = $resourceDelta === 0 ? 'cohérent' : ($lrsCount === 0 && $localSentCount > 0 ? 'absent TRAX' : ($resourceDelta > 0 ? 'local > TRAX' : 'TRAX > local'));
+                $resourceDeltaLabel = (string) $resourceDelta;
+                if (!$localComparable && $lrsCount > 0) {
+                    $status = 'historique TRAX';
+                    $resourceDeltaLabel = '-';
+                } else {
+                    $status = $resourceDelta === 0 ? 'cohérent' : ($lrsCount === 0 && $localSentCount > 0 ? 'absent TRAX' : ($resourceDelta > 0 ? 'local > TRAX' : 'TRAX > local'));
+                }
                 $title = (string) ($localResource['title'] ?? ($lrsResource['title'] ?? ('ref_id ' . $ref)));
                 $type = (string) ($localResource['obj_type'] ?? ($lrsResource['obj_type'] ?? ''));
                 $objectId = (string) ($lrsResource['object_id'] ?? '');
-                $html .= '<tr><td><strong>' . $this->esc($title) . '</strong>' . ($objectId !== '' ? '<br><small style="overflow-wrap:anywhere">' . $this->esc($objectId) . '</small>' : '') . '</td><td>' . $this->esc($type) . '</td><td>' . $this->esc((string) $ref) . '</td><td>' . $this->esc((string) $localCount) . '</td><td>' . $this->esc((string) $localSentCount) . '</td><td>' . $this->esc((string) $lrsCount) . '</td><td>' . $this->esc((string) $resourceDelta) . '</td><td>' . $this->esc($status) . '</td></tr>';
+                $html .= '<tr><td><strong>' . $this->esc($title) . '</strong>' . ($objectId !== '' ? '<br><small style="overflow-wrap:anywhere">' . $this->esc($objectId) . '</small>' : '') . '</td><td>' . $this->esc($type) . '</td><td>' . $this->esc((string) $ref) . '</td><td>' . $this->esc((string) $localCount) . '</td><td>' . $this->esc((string) $localSentCount) . '</td><td>' . $this->esc((string) $lrsCount) . '</td><td>' . $this->esc($resourceDeltaLabel) . '</td><td>' . $this->esc($status) . '</td></tr>';
             }
             foreach (array_slice($lrsNoRef, 0, 10) as $resource) {
-                $html .= '<tr><td><strong>' . $this->esc((string) ($resource['title'] ?? 'Ressource TRAX sans ref_id')) . '</strong><br><small style="overflow-wrap:anywhere">' . $this->esc((string) ($resource['object_id'] ?? ($resource['key'] ?? ''))) . '</small></td><td>' . $this->esc((string) ($resource['obj_type'] ?? '')) . '</td><td>0</td><td>0</td><td>0</td><td>' . $this->esc((string) ($resource['count'] ?? 0)) . '</td><td>' . $this->esc('-' . (string) ($resource['count'] ?? 0)) . '</td><td>TRAX sans ref_id</td></tr>';
-            }
-            $html .= '</tbody></table></div>';
-        }
-        $localUuidRows = [];
-        foreach ((is_array($local['expert_rows'] ?? null) ? $local['expert_rows'] : []) as $row) {
-            $uuid = trim((string) ($row['statement_uuid'] ?? ''));
-            if ($uuid !== '' && (string) ($row['status'] ?? '') === 'sent') {
-                $localUuidRows[$uuid] = $row;
-            }
-        }
-        $lrsUuidRows = is_array($s['statement_ids'] ?? null) ? $s['statement_ids'] : [];
-        $missingInTrax = array_diff(array_keys($localUuidRows), array_keys($lrsUuidRows));
-        $extraInTrax = array_diff(array_keys($lrsUuidRows), array_keys($localUuidRows));
-        $html .= '<h4>Divergence par statement UUID</h4>'
-            . '<div class="itxeb-kpi-grid">'
-            . $this->metricCard('UUID locaux envoyés', (string) count($localUuidRows), 'fenêtre expert locale')
-            . $this->metricCard('UUID TRAX', (string) count($lrsUuidRows), 'pages LRS lues')
-            . $this->metricCard('Absents TRAX', (string) count($missingInTrax), 'local envoyé non retrouvé')
-            . $this->metricCard('En plus TRAX', (string) count($extraInTrax), 'non retrouvé localement')
-            . '</div>';
-        if (count($missingInTrax) === 0 && count($extraInTrax) === 0) {
-            $html .= '<p><strong>Comparaison UUID cohérente sur les données lues.</strong></p>';
-        } else {
-            $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr><th>Écart</th><th>Statement UUID</th><th>Ressource</th><th>Verbe</th></tr></thead><tbody>';
-            foreach (array_slice($missingInTrax, 0, 20) as $uuid) {
-                $row = $localUuidRows[$uuid] ?? [];
-                $html .= '<tr><td>local envoyé absent TRAX</td><td><code>' . $this->esc((string) $uuid) . '</code></td><td>' . $this->esc((string) ($row['object_title'] ?? '')) . '<br><small>ref_id ' . $this->esc((string) ($row['ref_id'] ?? 0)) . '</small></td><td>' . $this->esc((string) ($row['verb_label'] ?? ($row['verb_id'] ?? ''))) . '</td></tr>';
-            }
-            foreach (array_slice($extraInTrax, 0, 20) as $uuid) {
-                $row = $lrsUuidRows[$uuid] ?? [];
-                $html .= '<tr><td>TRAX non retrouvé localement</td><td><code>' . $this->esc((string) $uuid) . '</code></td><td>' . $this->esc((string) ($row['title'] ?? '')) . '<br><small>ref_id ' . $this->esc((string) ($row['ref_id'] ?? 0)) . '</small></td><td>' . $this->esc((string) ($row['verb_label'] ?? ($row['verb_id'] ?? ''))) . '</td></tr>';
+                $status = !$localComparable ? 'historique TRAX sans ref_id' : 'TRAX sans ref_id';
+                $html .= '<tr><td><strong>' . $this->esc((string) ($resource['title'] ?? 'Ressource TRAX sans ref_id')) . '</strong><br><small style="overflow-wrap:anywhere">' . $this->esc((string) ($resource['object_id'] ?? ($resource['key'] ?? ''))) . '</small></td><td>' . $this->esc((string) ($resource['obj_type'] ?? '')) . '</td><td>0</td><td>0</td><td>0</td><td>' . $this->esc((string) ($resource['count'] ?? 0)) . '</td><td>-</td><td>' . $this->esc($status) . '</td></tr>';
             }
             $html .= '</tbody></table></div>';
         }
