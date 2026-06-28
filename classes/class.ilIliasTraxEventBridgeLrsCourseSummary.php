@@ -45,6 +45,7 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'pagination_limit_reached' => false,
             'pagination_error' => '',
             'by_verb' => [],
+            'by_resource' => [],
         ];
 
         if ($activity === '') {
@@ -91,6 +92,9 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         }
 
         uasort($summary['by_verb'], static function (array $a, array $b): int {
+            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
+        });
+        uasort($summary['by_resource'], static function (array $a, array $b): int {
             return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
         });
 
@@ -141,6 +145,14 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 $summary['by_verb'][$verbId] = ['verb_id' => $verbId, 'label' => $this->verbLabel($statement, $verbId), 'count' => 0];
             }
             $summary['by_verb'][$verbId]['count']++;
+
+            $resource = $this->resourceInfo($statement);
+            $resourceKey = (string) ($resource['key'] ?? 'unknown');
+            if (!isset($summary['by_resource'][$resourceKey])) {
+                $summary['by_resource'][$resourceKey] = $resource;
+                $summary['by_resource'][$resourceKey]['count'] = 0;
+            }
+            $summary['by_resource'][$resourceKey]['count']++;
         }
     }
 
@@ -154,6 +166,52 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             return $base . '/xapi/activity/course/obj/' . $courseObjId;
         }
         return '';
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function resourceInfo(array $statement): array
+    {
+        $extensions = is_array($statement['context']['extensions'] ?? null) ? $statement['context']['extensions'] : [];
+        $refId = $this->extensionValue($extensions, '/ref_id');
+        $objId = $this->extensionValue($extensions, '/obj_id');
+        $objType = $this->extensionValue($extensions, '/obj_type');
+
+        $objectId = is_scalar($statement['object']['id'] ?? null) ? (string) $statement['object']['id'] : '';
+        $key = is_numeric($refId) && (int) $refId > 0 ? 'ref:' . (int) $refId : ($objectId !== '' ? $objectId : 'unknown');
+
+        return [
+            'key' => $key,
+            'ref_id' => is_numeric($refId) ? (int) $refId : 0,
+            'obj_id' => is_numeric($objId) ? (int) $objId : 0,
+            'obj_type' => is_scalar($objType) ? (string) $objType : '',
+            'title' => $this->resourceTitle($statement, $key),
+            'object_id' => $objectId,
+        ];
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function resourceTitle(array $statement, string $fallback): string
+    {
+        $name = $statement['object']['definition']['name'] ?? [];
+        if (is_array($name)) {
+            foreach (['fr-FR', 'fr', 'en-US', 'en'] as $locale) {
+                if (isset($name[$locale]) && is_scalar($name[$locale]) && trim((string) $name[$locale]) !== '') {
+                    return (string) $name[$locale];
+                }
+            }
+        }
+        return $fallback;
+    }
+
+    /** @param array<string,mixed> $extensions */
+    private function extensionValue(array $extensions, string $suffix)
+    {
+        foreach ($extensions as $key => $value) {
+            if (is_string($key) && substr($key, -strlen($suffix)) === $suffix) {
+                return $value;
+            }
+        }
+        return null;
     }
 
     /** @param array<string,mixed> $statement */
