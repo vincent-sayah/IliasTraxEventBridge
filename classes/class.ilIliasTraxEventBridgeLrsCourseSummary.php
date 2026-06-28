@@ -46,7 +46,6 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'pagination_error' => '',
             'by_verb' => [],
             'by_resource' => [],
-            'statement_ids' => [],
         ];
 
         if ($activity === '') {
@@ -154,19 +153,6 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 $summary['by_resource'][$resourceKey]['count'] = 0;
             }
             $summary['by_resource'][$resourceKey]['count']++;
-
-            $statementId = is_scalar($statement['id'] ?? null) ? trim((string) $statement['id']) : '';
-            if ($statementId !== '') {
-                $summary['statement_ids'][$statementId] = [
-                    'uuid' => $statementId,
-                    'ref_id' => (int) ($resource['ref_id'] ?? 0),
-                    'obj_type' => (string) ($resource['obj_type'] ?? ''),
-                    'title' => (string) ($resource['title'] ?? ''),
-                    'object_id' => (string) ($resource['object_id'] ?? ''),
-                    'verb_id' => $verbId,
-                    'verb_label' => $this->verbLabel($statement, $verbId),
-                ];
-            }
         }
     }
 
