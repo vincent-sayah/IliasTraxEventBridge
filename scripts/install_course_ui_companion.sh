@@ -11,6 +11,7 @@ TYPE_FILTER_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_type_filter.php"
 SUCCESS_RATE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_success_rates.php"
 FAILURE_SIGNAL_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_failure_signals.php"
 STRUGGLING_LEARNERS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_struggling_learners.php"
+LRS_DIRECT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_direct_summary.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -70,6 +71,12 @@ if [[ -f "$STRUGGLING_LEARNERS_PATCHER" ]]; then
   php "$STRUGGLING_LEARNERS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 else
   echo "Struggling learners patcher not found, skipping: $STRUGGLING_LEARNERS_PATCHER"
+fi
+
+if [[ -f "$LRS_DIRECT_PATCHER" ]]; then
+  php "$LRS_DIRECT_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "LRS direct patcher not found, skipping: $LRS_DIRECT_PATCHER"
 fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
