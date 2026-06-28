@@ -4,7 +4,10 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeLrsReadClient.php';
 
 /**
- * Minimal read-only LRS summary for one ILIAS course.
+ * Read-only LRS analytics for one ILIAS course.
+ *
+ * This class is the source for the course xAPI dashboard, analysis and expert
+ * views. The local outbox remains a technical sending queue only.
  */
 class ilIliasTraxEventBridgeLrsCourseSummary
 {
@@ -31,6 +34,7 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $days = max(1, min(365, $days));
         $activity = $this->courseActivityId($courseRefId, $courseObjId);
         $since = gmdate('Y-m-d\TH:i:s\Z', time() - ($days * 86400));
+        $allowedResources = $this->allowedResources($course);
 
         $summary = [
             'available' => false,
@@ -44,9 +48,51 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'pagination_complete' => true,
             'pagination_limit_reached' => false,
             'pagination_error' => '',
+            'learners' => [],
+            'scores' => [],
+            'summary' => [
+                'total' => 0,
+                'sent' => 0,
+                'failed' => 0,
+                'active_learners' => 0,
+                'resources_total' => count($allowedResources),
+                'resources_with_traces' => 0,
+                'avg_score_raw' => null,
+                'tests_attempted' => 0,
+                'tests_passed' => 0,
+                'tests_failed' => 0,
+            ],
+            'by_day' => [],
             'by_verb' => [],
+            'by_status' => [],
             'by_resource' => [],
+            'expert_rows' => [],
         ];
+
+        foreach ($allowedResources as $refId => $resource) {
+            $summary['by_resource']['ref:' . $refId] = [
+                'key' => 'ref:' . $refId,
+                'ref_id' => $refId,
+                'obj_id' => (int) ($resource['obj_id'] ?? 0),
+                'obj_type' => (string) ($resource['obj_type'] ?? ''),
+                'resource_family' => (string) ($resource['resource_family'] ?? ''),
+                'title' => (string) ($resource['title'] ?? ('ref_id ' . $refId)),
+                'path' => (string) ($resource['path'] ?? ''),
+                'object_id' => '',
+                'enabled' => !empty($resource['enabled']),
+                'count' => 0,
+                'traces' => 0,
+                'learners' => [],
+                'learners_count' => 0,
+                'last_at' => '',
+                'avg_score_raw' => null,
+                'scores' => [],
+                'test_attempts' => 0,
+                'test_passed' => 0,
+                'test_failed' => 0,
+                'signal' => !empty($resource['enabled']) ? 'activée sans trace' : 'désactivée',
+            ];
+        }
 
         if ($activity === '') {
             $summary['error'] = 'Activité cours xAPI introuvable.';
@@ -64,9 +110,9 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'limit' => 100,
         ]);
 
-        $this->consumeResult($summary, $result, true);
+        $this->consumeResult($summary, $result, true, $allowedResources);
         if (!$summary['available']) {
-            return $summary;
+            return $this->finalize($summary);
         }
 
         $maxPages = 5;
@@ -80,7 +126,7 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             }
             $seenMore[$more] = true;
             $next = $this->client->queryMore($more);
-            $this->consumeResult($summary, $next, false);
+            $this->consumeResult($summary, $next, false, $allowedResources);
             if ((string) ($summary['pagination_error'] ?? '') !== '') {
                 break;
             }
@@ -91,18 +137,27 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             $summary['pagination_limit_reached'] = true;
         }
 
-        uasort($summary['by_verb'], static function (array $a, array $b): int {
-            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
-        });
-        uasort($summary['by_resource'], static function (array $a, array $b): int {
-            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
-        });
-
-        return $summary;
+        return $this->finalize($summary);
     }
 
-    /** @param array<string,mixed> $summary */
-    private function consumeResult(array &$summary, ilIliasTraxEventBridgeHttpResult $result, bool $firstPage): void
+    /** @param array<string,mixed> $course @return array<int,array<string,mixed>> */
+    private function allowedResources(array $course): array
+    {
+        $resources = [];
+        foreach ((array) ($course['resources'] ?? []) as $resource) {
+            if (!is_array($resource)) {
+                continue;
+            }
+            $refId = (int) ($resource['ref_id'] ?? 0);
+            if ($refId > 0) {
+                $resources[$refId] = $resource;
+            }
+        }
+        return $resources;
+    }
+
+    /** @param array<string,mixed> $summary @param array<int,array<string,mixed>> $allowedResources */
+    private function consumeResult(array &$summary, ilIliasTraxEventBridgeHttpResult $result, bool $firstPage, array $allowedResources): void
     {
         $summary['http_status'] = $result->getHttpStatus();
         if (!$result->isSuccess()) {
@@ -133,27 +188,152 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $statements = is_array($json['statements'] ?? null) ? $json['statements'] : [];
         $summary['available'] = true;
         $summary['pages'] = (int) ($summary['pages'] ?? 0) + 1;
-        $summary['returned'] = (int) ($summary['returned'] ?? 0) + count($statements);
         $summary['more'] = is_scalar($json['more'] ?? null) ? (string) $json['more'] : '';
 
         foreach ($statements as $statement) {
             if (!is_array($statement)) {
                 continue;
             }
-            $verbId = (string) ($statement['verb']['id'] ?? 'unknown');
-            if (!isset($summary['by_verb'][$verbId])) {
-                $summary['by_verb'][$verbId] = ['verb_id' => $verbId, 'label' => $this->verbLabel($statement, $verbId), 'count' => 0];
-            }
-            $summary['by_verb'][$verbId]['count']++;
-
             $resource = $this->resourceInfo($statement);
-            $resourceKey = (string) ($resource['key'] ?? 'unknown');
-            if (!isset($summary['by_resource'][$resourceKey])) {
-                $summary['by_resource'][$resourceKey] = $resource;
-                $summary['by_resource'][$resourceKey]['count'] = 0;
+            $refId = (int) ($resource['ref_id'] ?? 0);
+            if (count($allowedResources) > 0 && $refId > 0 && !isset($allowedResources[$refId])) {
+                continue;
             }
-            $summary['by_resource'][$resourceKey]['count']++;
+            $this->addStatement($summary, $statement, $resource);
         }
+    }
+
+    /** @param array<string,mixed> $summary */
+    private function addStatement(array &$summary, array $statement, array $resource): void
+    {
+        $summary['returned'] = (int) ($summary['returned'] ?? 0) + 1;
+
+        $timestamp = (string) ($statement['timestamp'] ?? ($statement['stored'] ?? ''));
+        $day = $this->dayFromTimestamp($timestamp);
+        $summary['by_day'][$day] = (int) ($summary['by_day'][$day] ?? 0) + 1;
+
+        $actorKey = $this->actorKey($statement);
+        if ($actorKey !== '') {
+            $summary['learners'][$actorKey] = true;
+        }
+
+        $verbId = (string) ($statement['verb']['id'] ?? 'unknown');
+        if (!isset($summary['by_verb'][$verbId])) {
+            $summary['by_verb'][$verbId] = ['verb_id' => $verbId, 'label' => $this->verbLabel($statement, $verbId), 'count' => 0];
+        }
+        $summary['by_verb'][$verbId]['count']++;
+
+        $key = (string) ($resource['key'] ?? 'unknown');
+        if (!isset($summary['by_resource'][$key])) {
+            $summary['by_resource'][$key] = $resource + [
+                'count' => 0,
+                'traces' => 0,
+                'learners' => [],
+                'learners_count' => 0,
+                'last_at' => '',
+                'avg_score_raw' => null,
+                'scores' => [],
+                'test_attempts' => 0,
+                'test_passed' => 0,
+                'test_failed' => 0,
+                'signal' => 'utilisée',
+                'enabled' => true,
+                'resource_family' => '',
+                'path' => '',
+            ];
+        }
+        $summary['by_resource'][$key]['count']++;
+        $summary['by_resource'][$key]['traces']++;
+        if ($actorKey !== '') {
+            $summary['by_resource'][$key]['learners'][$actorKey] = true;
+        }
+        if ($timestamp !== '' && ((string) ($summary['by_resource'][$key]['last_at'] ?? '') === '' || strcmp($timestamp, (string) $summary['by_resource'][$key]['last_at']) > 0)) {
+            $summary['by_resource'][$key]['last_at'] = $timestamp;
+        }
+
+        $score = $this->scoreRaw($statement);
+        if ($score !== null) {
+            $summary['scores'][] = $score;
+            $summary['by_resource'][$key]['scores'][] = $score;
+        }
+
+        $success = $this->successValue($statement);
+        $verbLabel = $this->verbLabel($statement, $verbId);
+        if ($this->isTestStatement($resource, $verbId)) {
+            if (strpos($verbId, 'attempted') !== false) {
+                $summary['summary']['tests_attempted']++;
+                $summary['by_resource'][$key]['test_attempts']++;
+            }
+            if ($success === true || strpos($verbId, 'passed') !== false) {
+                $summary['summary']['tests_passed']++;
+                $summary['by_resource'][$key]['test_passed']++;
+            }
+            if ($success === false || strpos($verbId, 'failed') !== false) {
+                $summary['summary']['tests_failed']++;
+                $summary['by_resource'][$key]['test_failed']++;
+            }
+        }
+
+        $summary['expert_rows'][] = [
+            'created_at' => $timestamp,
+            'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),
+            'verb_label' => $verbLabel,
+            'verb_id' => $verbId,
+            'object_title' => (string) ($resource['title'] ?? ''),
+            'ref_id' => (int) ($resource['ref_id'] ?? 0),
+            'obj_id' => (int) ($resource['obj_id'] ?? 0),
+            'obj_type' => (string) ($resource['obj_type'] ?? ''),
+            'score_raw' => $score,
+            'completion' => $this->completionValue($statement),
+            'success' => $success,
+            'status' => 'TRAX',
+            'outbox_id' => 0,
+            'statement_uuid' => is_scalar($statement['id'] ?? null) ? (string) $statement['id'] : '',
+            'last_error' => '',
+        ];
+    }
+
+    /** @param array<string,mixed> $summary @return array<string,mixed> */
+    private function finalize(array $summary): array
+    {
+        ksort($summary['by_day']);
+        uasort($summary['by_verb'], static function (array $a, array $b): int {
+            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
+        });
+        foreach ($summary['by_resource'] as &$resource) {
+            $resource['learners_count'] = count((array) ($resource['learners'] ?? []));
+            $scores = (array) ($resource['scores'] ?? []);
+            $resource['avg_score_raw'] = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : null;
+            $traces = (int) ($resource['traces'] ?? 0);
+            if ($traces > 0) {
+                $resource['signal'] = 'utilisée';
+            } elseif (!empty($resource['enabled'])) {
+                $resource['signal'] = 'aucune trace TRAX';
+            } else {
+                $resource['signal'] = 'désactivée';
+            }
+            unset($resource['learners'], $resource['scores']);
+        }
+        unset($resource);
+        uasort($summary['by_resource'], static function (array $a, array $b): int {
+            return (int) ($b['traces'] ?? 0) <=> (int) ($a['traces'] ?? 0);
+        });
+        usort($summary['expert_rows'], static function (array $a, array $b): int {
+            return strcmp((string) ($b['created_at'] ?? ''), (string) ($a['created_at'] ?? ''));
+        });
+        $summary['expert_rows'] = array_slice($summary['expert_rows'], 0, 200);
+
+        $summary['summary']['total'] = (int) ($summary['returned'] ?? 0);
+        $summary['summary']['sent'] = (int) ($summary['returned'] ?? 0);
+        $summary['summary']['failed'] = 0;
+        $summary['summary']['active_learners'] = count((array) ($summary['learners'] ?? []));
+        $summary['summary']['resources_with_traces'] = count(array_filter($summary['by_resource'], static function (array $r): bool {
+            return (int) ($r['traces'] ?? 0) > 0;
+        }));
+        $scores = (array) ($summary['scores'] ?? []);
+        $summary['summary']['avg_score_raw'] = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : null;
+        unset($summary['learners'], $summary['scores']);
+        return $summary;
     }
 
     private function courseActivityId(int $courseRefId, int $courseObjId): string
@@ -163,19 +343,18 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             return $base . '/xapi/activity/course/ref/' . $courseRefId;
         }
         if ($courseObjId > 0) {
-            return $base . '/xapi/activity/course/obj/' . $courseObjId;
+            return $base . '/xapi/activity/course/obj/' . max(0, $courseObjId);
         }
         return '';
     }
 
-    /** @param array<string,mixed> $statement */
+    /** @param array<string,mixed> $statement @return array<string,mixed> */
     private function resourceInfo(array $statement): array
     {
         $extensions = is_array($statement['context']['extensions'] ?? null) ? $statement['context']['extensions'] : [];
         $refId = $this->extensionValue($extensions, '/ref_id');
         $objId = $this->extensionValue($extensions, '/obj_id');
         $objType = $this->extensionValue($extensions, '/obj_type');
-
         $objectId = is_scalar($statement['object']['id'] ?? null) ? (string) $statement['object']['id'] : '';
         $key = is_numeric($refId) && (int) $refId > 0 ? 'ref:' . (int) $refId : ($objectId !== '' ? $objectId : 'unknown');
 
@@ -184,8 +363,11 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'ref_id' => is_numeric($refId) ? (int) $refId : 0,
             'obj_id' => is_numeric($objId) ? (int) $objId : 0,
             'obj_type' => is_scalar($objType) ? (string) $objType : '',
+            'resource_family' => is_scalar($objType) ? (string) $objType : '',
             'title' => $this->resourceTitle($statement, $key),
+            'path' => '',
             'object_id' => $objectId,
+            'enabled' => true,
         ];
     }
 
@@ -228,5 +410,57 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $parts = preg_split('/[\/#]/', $verbId);
         $last = is_array($parts) ? end($parts) : false;
         return is_string($last) && $last !== '' ? $last : $verbId;
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function actorKey(array $statement): string
+    {
+        $name = $statement['actor']['account']['name'] ?? '';
+        if (is_scalar($name) && trim((string) $name) !== '') {
+            return 'account:' . (string) $name;
+        }
+        $mbox = $statement['actor']['mbox'] ?? '';
+        if (is_scalar($mbox) && trim((string) $mbox) !== '') {
+            return 'mbox:' . (string) $mbox;
+        }
+        return '';
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function scoreRaw(array $statement): ?float
+    {
+        $raw = $statement['result']['score']['raw'] ?? null;
+        if (is_numeric($raw)) {
+            return (float) $raw;
+        }
+        $scaled = $statement['result']['score']['scaled'] ?? null;
+        return is_numeric($scaled) ? round(((float) $scaled) * 100, 2) : null;
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function successValue(array $statement): ?bool
+    {
+        return is_bool($statement['result']['success'] ?? null) ? (bool) $statement['result']['success'] : null;
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function completionValue(array $statement): ?bool
+    {
+        return is_bool($statement['result']['completion'] ?? null) ? (bool) $statement['result']['completion'] : null;
+    }
+
+    /** @param array<string,mixed> $resource */
+    private function isTestStatement(array $resource, string $verbId): bool
+    {
+        return (string) ($resource['obj_type'] ?? '') === 'tst'
+            || strpos($verbId, 'passed') !== false
+            || strpos($verbId, 'failed') !== false
+            || strpos($verbId, 'attempted') !== false;
+    }
+
+    private function dayFromTimestamp(string $timestamp): string
+    {
+        $ts = strtotime($timestamp);
+        return $ts === false ? 'inconnue' : gmdate('Y-m-d', $ts);
     }
 }
