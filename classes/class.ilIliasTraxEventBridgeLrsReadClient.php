@@ -34,6 +34,20 @@ class ilIliasTraxEventBridgeLrsReadClient
         return $this->request($this->appendQuery($endpoint, $params));
     }
 
+    public function queryMore(string $more): ilIliasTraxEventBridgeHttpResult
+    {
+        if (!$this->config->isTraxConfigured()) {
+            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Configuration TRAX incomplète.');
+        }
+
+        $url = $this->normalizeMoreUrl($more);
+        if ($url === '') {
+            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'URL more LRS vide ou invalide.');
+        }
+
+        return $this->request($url);
+    }
+
     /** @param array<string,string|int|bool|float|null> $params */
     private function appendQuery(string $url, array $params): string
     {
@@ -50,6 +64,35 @@ class ilIliasTraxEventBridgeLrsReadClient
         }
 
         return $url . (strpos($url, '?') === false ? '?' : '&') . http_build_query($clean, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    private function normalizeMoreUrl(string $more): string
+    {
+        $more = trim($more);
+        if ($more === '') {
+            return '';
+        }
+
+        if (preg_match('~^https?://~i', $more)) {
+            return $more;
+        }
+
+        if (strpos($more, '/') !== 0) {
+            $more = '/' . $more;
+        }
+
+        $endpoint = $this->config->getStatementsEndpoint();
+        $parts = parse_url($endpoint);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return '';
+        }
+
+        $base = (string) $parts['scheme'] . '://' . (string) $parts['host'];
+        if (isset($parts['port'])) {
+            $base .= ':' . (string) $parts['port'];
+        }
+
+        return $base . $more;
     }
 
     private function request(string $url): ilIliasTraxEventBridgeHttpResult
