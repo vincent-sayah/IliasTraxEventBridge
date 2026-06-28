@@ -40,6 +40,10 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'since' => $since,
             'returned' => 0,
             'more' => '',
+            'pages' => 0,
+            'pagination_complete' => true,
+            'pagination_limit_reached' => false,
+            'pagination_error' => '',
             'by_verb' => [],
         ];
 
@@ -59,21 +63,73 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'limit' => 100,
         ]);
 
+        $this->consumeResult($summary, $result, true);
+        if (!$summary['available']) {
+            return $summary;
+        }
+
+        $maxPages = 5;
+        $seenMore = [];
+        while ((string) ($summary['more'] ?? '') !== '' && (int) ($summary['pages'] ?? 0) < $maxPages) {
+            $more = (string) $summary['more'];
+            if (isset($seenMore[$more])) {
+                $summary['pagination_complete'] = false;
+                $summary['pagination_error'] = 'Boucle détectée dans le champ more LRS.';
+                break;
+            }
+            $seenMore[$more] = true;
+            $next = $this->client->queryMore($more);
+            $this->consumeResult($summary, $next, false);
+            if ((string) ($summary['pagination_error'] ?? '') !== '') {
+                break;
+            }
+        }
+
+        if ((string) ($summary['more'] ?? '') !== '' && (int) ($summary['pages'] ?? 0) >= $maxPages) {
+            $summary['pagination_complete'] = false;
+            $summary['pagination_limit_reached'] = true;
+        }
+
+        uasort($summary['by_verb'], static function (array $a, array $b): int {
+            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
+        });
+
+        return $summary;
+    }
+
+    /** @param array<string,mixed> $summary */
+    private function consumeResult(array &$summary, ilIliasTraxEventBridgeHttpResult $result, bool $firstPage): void
+    {
         $summary['http_status'] = $result->getHttpStatus();
         if (!$result->isSuccess()) {
-            $summary['error'] = $result->getShortMessage();
-            return $summary;
+            if ($firstPage) {
+                $summary['available'] = false;
+                $summary['error'] = $result->getShortMessage();
+            } else {
+                $summary['pagination_complete'] = false;
+                $summary['pagination_error'] = $result->getShortMessage();
+                $summary['more'] = '';
+            }
+            return;
         }
 
         $json = json_decode($result->getBody(), true);
         if (!is_array($json)) {
-            $summary['error'] = 'Réponse JSON LRS invalide.';
-            return $summary;
+            if ($firstPage) {
+                $summary['available'] = false;
+                $summary['error'] = 'Réponse JSON LRS invalide.';
+            } else {
+                $summary['pagination_complete'] = false;
+                $summary['pagination_error'] = 'Réponse JSON LRS invalide sur une page more.';
+                $summary['more'] = '';
+            }
+            return;
         }
 
         $statements = is_array($json['statements'] ?? null) ? $json['statements'] : [];
         $summary['available'] = true;
-        $summary['returned'] = count($statements);
+        $summary['pages'] = (int) ($summary['pages'] ?? 0) + 1;
+        $summary['returned'] = (int) ($summary['returned'] ?? 0) + count($statements);
         $summary['more'] = is_scalar($json['more'] ?? null) ? (string) $json['more'] : '';
 
         foreach ($statements as $statement) {
@@ -86,12 +142,6 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             }
             $summary['by_verb'][$verbId]['count']++;
         }
-
-        uasort($summary['by_verb'], static function (array $a, array $b): int {
-            return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
-        });
-
-        return $summary;
     }
 
     private function courseActivityId(int $courseRefId, int $courseObjId): string
