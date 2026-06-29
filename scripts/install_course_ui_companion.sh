@@ -17,6 +17,7 @@ OUTBOX_TECH_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_outbox_technical_confi
 LRS_DIAG_CONFIG_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_diagnostics_config.php"
 LRS_ANALYSIS_DETAILS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_analysis_details.php"
 PDF_EXPORT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_export.php"
+PDF_WKHTMLTOPDF_PATHS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_wkhtmltopdf_paths.php"
 PDF_ROUTE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_route.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
@@ -113,6 +114,12 @@ if [[ -f "$PDF_EXPORT_PATCHER" ]]; then
   php "$PDF_EXPORT_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 else
   echo "PDF export patcher not found, skipping: $PDF_EXPORT_PATCHER"
+fi
+
+if [[ -f "$PDF_WKHTMLTOPDF_PATHS_PATCHER" ]]; then
+  php "$PDF_WKHTMLTOPDF_PATHS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "PDF wkhtmltopdf paths patcher not found, skipping: $PDF_WKHTMLTOPDF_PATHS_PATCHER"
 fi
 
 if [[ -f "$PDF_ROUTE_PATCHER" ]]; then
