@@ -2,12 +2,14 @@
 
 Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS en statements xAPI, de les envoyer vers un LRS xAPI comme TRAX 3, puis d'afficher un suivi xAPI de cours alimenté directement par TRAX/LRS.
 
-## Version stable
+## Version stable officielle
 
 | Élément | Valeur |
 |---|---|
 | Version stable | `0.10.1` |
-| Branche | `v0.10-lrs-direct-read` |
+| Branche stable officielle | `main` |
+| Tag stable | `v0.10.1` |
+| Branche de développement V0.10 | `v0.10-lrs-direct-read` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
@@ -16,19 +18,26 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 | Source pédagogique du suivi xAPI | TRAX/LRS |
 | Rôle de l'outbox locale | File technique d'envoi uniquement |
 
-La V0.10.1 reprend la V0.10.0 et ajoute la correction stable du fichier `sql/dbupdate.php` : le marqueur ILIAS `<#1>` est présent au début du fichier de migration, ce qui sécurise l'installation depuis une ancienne version ou après désinstallation.
+La V0.10.1 est maintenant promue sur `main`. Pour une installation stable, utiliser `main` ou le tag `v0.10.1`.
 
-## Documentation
+Correction importante V0.10.1 : le fichier `sql/dbupdate.php` commence par le marqueur ILIAS `<#1>`, ce qui sécurise l'installation depuis une ancienne version ou après désinstallation.
 
-| Document | Contenu |
+## Documentation complète
+
+Le dossier `docs/` contient maintenant un index dédié : [`docs/README.md`](docs/README.md).
+
+| Document | Rôle |
 |---|---|
-| [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation complète, mise à jour, reconstruction ILIAS, installation du plugin compagnon, contrôles et dépannage. |
-| [`docs/FONCTIONNEL.md`](docs/FONCTIONNEL.md) | Documentation fonctionnelle : objectif, utilisateurs, parcours cours, vues Tableau de bord / Analyse / Expert / Configuration. |
-| [`docs/TECHNIQUE.md`](docs/TECHNIQUE.md) | Architecture technique : EventHook, UIHook, outbox, TRAX/LRS, tables SQL, flux de lecture et d'envoi. |
+| [`docs/README.md`](docs/README.md) | Index général de toute la documentation. |
+| [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation complète, mise à jour, reconstruction ILIAS, plugin compagnon, contrôles et dépannage. |
+| [`docs/FONCTIONNEL.md`](docs/FONCTIONNEL.md) | Documentation fonctionnelle : objectifs, utilisateurs, parcours cours, vues Tableau de bord / Analyse / Expert / Configuration. |
+| [`docs/TECHNIQUE.md`](docs/TECHNIQUE.md) | Documentation technique : architecture, EventHook, UIHook, outbox, TRAX/LRS, tables SQL, flux de lecture et d'envoi. |
 | [`docs/EXPLOITATION.md`](docs/EXPLOITATION.md) | Exploitation : supervision, cron, tests LRS, requêtes SQL utiles, purge et analyse d'incident. |
 | [`docs/DEVELOPPEUR.md`](docs/DEVELOPPEUR.md) | Documentation développeur : classes principales, conventions, migrations, contrôles avant livraison. |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap à jour : V0.11, V0.12, IA d'analyse des traces, API keys IA, sécurité et gouvernance. |
+| [`docs/IA_ANALYSE_TRACES.md`](docs/IA_ANALYSE_TRACES.md) | Cadrage détaillé de l'analyse des traces xAPI par IA. |
 | [`docs/RELEASE_0.10.1.md`](docs/RELEASE_0.10.1.md) | Note de version stable V0.10.1. |
-| [`docs/V0.10_LRS_DIRECT_READ.md`](docs/V0.10_LRS_DIRECT_READ.md) | Détail de la décision d'architecture V0.10 : lecture directe TRAX/LRS. |
+| [`docs/V0.10_LRS_DIRECT_READ.md`](docs/V0.10_LRS_DIRECT_READ.md) | Décision d'architecture V0.10 : lecture directe TRAX/LRS. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
 ## Principe d'architecture V0.10.1
@@ -109,7 +118,7 @@ Tableau de bord | Analyse | Expert | Configuration
 
 ![Écran expert du suivi xAPI](docs/images/suivi_xapi_expert.png)
 
-## Installation rapide
+## Installation rapide depuis main
 
 ```bash
 sudo -i
@@ -121,7 +130,7 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-git clone -b v0.10-lrs-direct-read --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 cd "$PLUGIN_NAME"
 
 grep -n '\$version' plugin.php
@@ -156,7 +165,7 @@ systemctl restart httpd
 systemctl restart php-fpm
 ```
 
-Puis installer / mettre à jour les plugins dans ILIAS :
+Puis installer ou mettre à jour les plugins dans ILIAS :
 
 ```text
 Administration > Plugins > IliasTraxEventBridge > Installer ou Mettre à jour
@@ -260,6 +269,19 @@ itxeb_send_outbox_to_trax
 | Consultation module web dans un cours | `read_event` | `repository_object_access` | `read` / `repository_learning_module_access` |
 | Consultation module SCORM dans un cours | `read_event` | `repository_object_access` | `launched` / `repository_scorm_access` |
 
+## Roadmap
+
+La roadmap à jour est disponible ici : [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Axes principaux envisagés :
+
+- V0.11 : durcissement exploitation, diagnostics et packaging.
+- V0.12 : enrichissement pédagogique des tableaux de bord.
+- V0.13 : analyse IA optionnelle des traces xAPI avec clé API IA configurable.
+- V0.14 : gouvernance, anonymisation avancée et historisation durable.
+
+Le cadrage détaillé de l'analyse IA est disponible ici : [`docs/IA_ANALYSE_TRACES.md`](docs/IA_ANALYSE_TRACES.md).
+
 ## Requêtes SQL utiles
 
 Outbox récente :
@@ -295,9 +317,7 @@ ORDER BY id DESC
 LIMIT 30;
 ```
 
-## Livraison stable V0.10.1
-
-Contrôles recommandés avant tag :
+## Contrôles de livraison stable
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
@@ -316,11 +336,4 @@ $version = '0.10.1';
 sql/dbupdate.php commence par <#1>
 aucune erreur PHP
 working tree clean
-```
-
-Tag conseillé :
-
-```bash
-git tag -a v0.10.1 -m "Release stable v0.10.1"
-git push origin v0.10.1
 ```
