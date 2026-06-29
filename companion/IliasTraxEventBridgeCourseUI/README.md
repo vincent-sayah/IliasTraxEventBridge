@@ -2,28 +2,59 @@
 
 Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
+## Version documentée
+
+| Élément | Valeur |
+|---|---|
+| Version stable projet | `0.10.1` |
+| Branche stable | `main` |
+| Tag stable | `v0.10.1` |
+| Plugin principal | `IliasTraxEventBridge` |
+| Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
+| Type | UIHook ILIAS |
+
 ## Objectif
 
-Ce plugin expose la configuration xAPI directement depuis l'objet cours ILIAS :
+Ce plugin compagnon ajoute l'accès au suivi xAPI directement dans l'objet cours ILIAS.
+
+Accès attendu en V0.10.1 :
 
 ```text
-Cours > Paramètres > Suivi xAPI
+Cours > Suivi xAPI
+```
+
+L'écran `Suivi xAPI` expose quatre vues :
+
+```text
+Tableau de bord | Analyse | Expert | Configuration
 ```
 
 Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
 - la captation EventHook ;
-- l'outbox ;
+- la génération des statements xAPI ;
+- l'outbox locale ;
 - le cron ;
-- l'envoi vers le LRS configuré ;
-- les tables `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg` ;
-- le filtrage avant outbox.
+- l'envoi vers TRAX/LRS ;
+- la lecture directe TRAX/LRS ;
+- les tables `evnt_evhk_itxeb_*` ;
+- le filtrage avant outbox ;
+- la configuration globale TRAX/LRS.
 
-Ce plugin compagnon est uniquement responsable de l'entrée UI dans le cours.
+Le plugin compagnon est responsable de l'intégration UI dans le cours et de l'affichage des vues de suivi.
 
-## Packaging V0.8
+## Rôle des vues
 
-À partir de la V0.8, les fichiers PHP du compagnon ne sont plus stockés directement dans le dossier source `companion/`.
+| Vue | Rôle |
+|---|---|
+| Tableau de bord | Synthèse pédagogique alimentée par TRAX/LRS. |
+| Analyse | Analyse des ressources, verbes retournés par TRAX, ressources retournées par TRAX. |
+| Expert | Statements TRAX détaillés et export CSV. |
+| Configuration | Activation cours / ressources, préférences dashboard, diagnostic LRS, supervision outbox. |
+
+## Packaging
+
+Les fichiers PHP du compagnon ne sont pas stockés directement comme fichiers actifs dans le dossier source `companion/`.
 
 Ils sont stockés sous forme de templates :
 
@@ -39,7 +70,7 @@ Objectif : éviter que Composer voie deux copies des mêmes classes lorsque :
 2. le compagnon est installé dans UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI.
 ```
 
-Avant la V0.8, cela produisait des warnings du type :
+Sans ce packaging, Composer peut produire des warnings du type :
 
 ```text
 Ambiguous class resolution, "ilIliasTraxEventBridgeCourseUIPlugin" was found in both ...
@@ -55,12 +86,13 @@ Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
 sudo -i
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 
-bash scripts/install_course_ui_companion.sh
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
 
 cd /var/www/ilias
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
 systemctl restart httpd
+systemctl restart php-fpm
 ```
 
 Variables optionnelles :
@@ -73,7 +105,7 @@ HTTPD_USER=apache
 Exemple avec variables explicites :
 
 ```bash
-ILIAS_ROOT=/var/www/ilias HTTPD_USER=apache bash scripts/install_course_ui_companion.sh
+ILIAS_ROOT=/var/www/ilias HTTPD_USER=apache bash scripts/install_course_ui_companion_with_standalone_fix.sh
 ```
 
 ## Chemin d'installation cible
@@ -103,79 +135,73 @@ Les éventuels warnings ILIAS génériques sur `scripts/PHP-CS-Fixer/example` so
 
 ## Conditions d'affichage
 
-Le sous-onglet `Suivi xAPI` est affiché si les conditions suivantes sont réunies :
+Le lien ou l'onglet `Suivi xAPI` est affiché si les conditions suivantes sont réunies :
 
-- cours détecté ;
-- utilisateur autorisé à gérer le cours ;
-- plugin principal disponible ;
-- classes de configuration V0.7 disponibles ;
-- URL contextualisée disponible.
+- un cours est détecté ;
+- l'utilisateur a les droits nécessaires sur le cours ;
+- le plugin principal est installé ;
+- les classes de configuration sont disponibles ;
+- la route de cours est exploitable ;
+- le plugin compagnon est installé et actif.
 
-## URL du sous-onglet
+## Navigation
 
-Le sous-onglet conserve le contexte de l'onglet `Paramètres` du cours, notamment :
-
-```text
-cmd=edit
-cmdClass=ilObjCourseGUI
-ref_id=<course_ref_id>
-```
-
-Il ajoute les paramètres spécifiques au plugin compagnon :
+En V0.10.1, l'objectif est de donner un accès direct :
 
 ```text
-itxeb_cui_cmd=showCourseTracking
-itxeb_course_ref_id=<course_ref_id>
+Cours > Suivi xAPI
 ```
 
-Cette construction permet à ILIAS de reconstruire normalement la page du cours, puis au plugin compagnon de remplacer uniquement le contenu central.
+Selon la version exacte d'ILIAS 10 et le thème actif, le compagnon peut s'appuyer techniquement sur une route existante du cours, puis remplacer le contenu central par l'écran xAPI.
 
 ## Validation visuelle
 
 1. Ouvrir un cours avec un utilisateur qui peut gérer le cours.
-2. Ouvrir l'onglet `Paramètres` du cours.
-3. Vérifier la présence du sous-onglet `Suivi xAPI`.
-4. Cliquer sur `Suivi xAPI`.
-5. Vérifier que le contenu s'affiche dans la zone centrale ILIAS.
-6. Vérifier que les onglets du cours restent visibles.
-7. Cocher `Activer les traces xAPI pour ce cours`.
-8. Cocher une ou plusieurs ressources.
-9. Cliquer sur `Enregistrer la configuration xAPI`.
-10. Vérifier le message de succès.
-11. Vérifier en SQL que les tables sont modifiées.
+2. Vérifier la présence de l'accès `Suivi xAPI`.
+3. Cliquer sur `Suivi xAPI`.
+4. Vérifier l'affichage des vues `Tableau de bord`, `Analyse`, `Expert`, `Configuration`.
+5. Ouvrir `Configuration`.
+6. Cocher `Activer les traces xAPI pour ce cours`.
+7. Cocher une ou plusieurs ressources.
+8. Cliquer sur `Enregistrer la configuration xAPI`.
+9. Vérifier le message de succès.
+10. Générer une activité sur une ressource.
+11. Vérifier les vues alimentées par TRAX/LRS.
 
-SQL de contrôle :
+## SQL de contrôle
+
+Configuration du cours :
 
 ```sql
 SELECT *
 FROM evnt_evhk_itxeb_ccfg
 WHERE course_ref_id = 194;
+```
 
+Configuration des ressources :
+
+```sql
 SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
 FROM evnt_evhk_itxeb_rcfg
 WHERE course_ref_id = 194
 ORDER BY ref_id;
 ```
 
-## Validation outbox réalisée
+Outbox récente :
 
-Configuration validée sur le cours `194` :
-
-```text
-Cours activé : oui
-Ressources activées : file ref_id 196, htlm ref_id 207
-Autres ressources : désactivées
+```sql
+SELECT id, event_type, ref_id, obj_id, obj_type, status, created_at, sent_at, last_error
+FROM evnt_evhk_itxeb_out
+ORDER BY id DESC
+LIMIT 20;
 ```
 
-Outbox validée :
+## Documentation associée
 
-```text
-file_downloaded / file / ref_id 196 / status sent
-repository_object_access / htlm / ref_id 207 / status sent
-```
-
-## Version
-
-Plugin compagnon : `0.1.1`.
-
-Cette version accompagne `IliasTraxEventBridge` `0.8.0`.
+- [`../../README.md`](../../README.md) : README racine du projet.
+- [`../../docs/README.md`](../../docs/README.md) : index documentaire.
+- [`../../docs/FONCTIONNEL.md`](../../docs/FONCTIONNEL.md) : documentation fonctionnelle.
+- [`../../docs/TECHNIQUE.md`](../../docs/TECHNIQUE.md) : documentation technique.
+- [`../../docs/INSTALLATION.md`](../../docs/INSTALLATION.md) : installation complète.
+- [`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) : roadmap projet.
+- [`../../docs/IA_ANALYSE_TRACES.md`](../../docs/IA_ANALYSE_TRACES.md) : cadrage futur IA.
