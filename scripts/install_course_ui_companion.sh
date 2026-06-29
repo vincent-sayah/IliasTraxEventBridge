@@ -14,6 +14,7 @@ STRUGGLING_LEARNERS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_struggling_lea
 LRS_DIRECT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_direct_summary.php"
 LRS_PRIMARY_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_primary_views.php"
 OUTBOX_TECH_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_outbox_technical_config.php"
+LRS_DIAG_CONFIG_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_diagnostics_config.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -91,6 +92,12 @@ if [[ -f "$OUTBOX_TECH_PATCHER" ]]; then
   php "$OUTBOX_TECH_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 else
   echo "Outbox technical config patcher not found, skipping: $OUTBOX_TECH_PATCHER"
+fi
+
+if [[ -f "$LRS_DIAG_CONFIG_PATCHER" ]]; then
+  php "$LRS_DIAG_CONFIG_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+else
+  echo "LRS diagnostics config patcher not found, skipping: $LRS_DIAG_CONFIG_PATCHER"
 fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
