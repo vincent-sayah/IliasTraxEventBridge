@@ -153,6 +153,18 @@ if (strpos($updated, 'LRS primary period comparison') === false) {
 
 $updated = str_replace("        if (!empty(\$widgets['technical_status'])) {\n            \$html .= \$this->renderTechnicalStatus(\$dashboard);\n        }\n", "", $updated);
 $updated = str_replace("            'technical_status' => 'État technique local',\n", "", $updated);
+
+$updated = preg_replace(
+    '/\n    \/\*\* @param array<string,mixed> \$dashboard \*\/\n    private function renderTechnicalStatus\(array \$dashboard\): string\n    \{.*?\n    \}\n\n/s',
+    "\n",
+    $updated,
+    1
+);
+if (!is_string($updated)) {
+    fwrite(STDERR, "Unable to remove renderTechnicalStatus from {$file}\n");
+    exit(1);
+}
+
 $updated = str_replace('Classe analytics V0.9 indisponible.', 'Lecture TRAX/LRS indisponible.', $updated);
 $updated = str_replace('Table outbox absente : evnt_evhk_itxeb_out.', 'Lecture TRAX/LRS indisponible.', $updated);
 $updated = str_replace('Vue synthétique des traces xAPI générées par les ressources du cours.', 'Vue synthétique des statements xAPI présents dans TRAX pour ce cours.', $updated);
@@ -165,6 +177,11 @@ $updated = str_replace('Envoyées TRAX', 'Retournées TRAX', $updated);
 $updated = str_replace('status sent', 'GET /statements', $updated);
 $updated = str_replace('Ressources activées sans trace', 'Ressources sans statement TRAX', $updated);
 $updated = str_replace('aucune trace locale', 'aucun statement TRAX', $updated);
+
+if (strpos($updated, 'État technique local') !== false) {
+    fwrite(STDERR, "Technical local status text still present in {$file}\n");
+    exit(1);
+}
 
 if (file_put_contents($file, $updated) === false) {
     fwrite(STDERR, "Cannot write {$file}\n");
