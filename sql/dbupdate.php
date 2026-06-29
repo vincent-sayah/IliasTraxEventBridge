@@ -1,3 +1,4 @@
+<#1>
 <?php
 /** @var ilDBInterface $ilDB */
 if (!$ilDB->tableExists('evnt_evhk_itxeb_log')) {
