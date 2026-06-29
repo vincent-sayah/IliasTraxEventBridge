@@ -63,22 +63,82 @@ $method = <<<'PHP'
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
-            $pdf = (string) $dompdf->output();
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            header('Content-Length: ' . strlen($pdf));
-            echo $pdf;
-            exit;
+            $this->sendPdfBytes((string) $dompdf->output(), $filename);
+        }
+
+        $wkhtmltopdf = $this->findWkhtmltopdfBinary();
+        if ($wkhtmltopdf !== '') {
+            $pdf = $this->renderPdfWithWkhtmltopdf($wkhtmltopdf, $html);
+            if ($pdf !== '') {
+                $this->sendPdfBytes($pdf, $filename);
+            }
         }
 
         header('Content-Type: text/html; charset=UTF-8');
         echo '<!doctype html><html><head><meta charset="utf-8"><title>Export PDF indisponible</title></head><body>'
             . '<h1>Export PDF indisponible</h1>'
-            . '<p>La librairie Dompdf n’est pas disponible sur ce serveur. Installer dompdf/dompdf côté ILIAS ou ajouter un moteur PDF serveur.</p>'
+            . '<p>Aucun moteur PDF serveur disponible : Dompdf absent et wkhtmltopdf introuvable ou en erreur.</p>'
             . '<p>Le rapport HTML ci-dessous est généré depuis TRAX/LRS et peut être imprimé en PDF depuis le navigateur.</p>'
             . $html
             . '</body></html>';
         exit;
+    }
+
+    private function sendPdfBytes(string $pdf, string $filename): void
+    {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($pdf));
+        echo $pdf;
+        exit;
+    }
+
+    private function findWkhtmltopdfBinary(): string
+    {
+        foreach (['/usr/local/bin/wkhtmltopdf', '/usr/bin/wkhtmltopdf', '/bin/wkhtmltopdf'] as $candidate) {
+            if (is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+        if (function_exists('shell_exec')) {
+            $found = trim((string) @shell_exec('command -v wkhtmltopdf 2>/dev/null'));
+            if ($found !== '' && is_file($found) && is_executable($found)) {
+                return $found;
+            }
+        }
+        return '';
+    }
+
+    private function renderPdfWithWkhtmltopdf(string $binary, string $html): string
+    {
+        $input = tempnam(sys_get_temp_dir(), 'itxeb_pdf_');
+        $output = tempnam(sys_get_temp_dir(), 'itxeb_pdf_');
+        if (!is_string($input) || !is_string($output)) {
+            return '';
+        }
+        $htmlFile = $input . '.html';
+        $pdfFile = $output . '.pdf';
+        @unlink($input);
+        @unlink($output);
+        if (file_put_contents($htmlFile, $html) === false) {
+            return '';
+        }
+        $cmd = escapeshellarg($binary)
+            . ' --encoding utf-8 --quiet --disable-local-file-access '
+            . escapeshellarg($htmlFile) . ' ' . escapeshellarg($pdfFile) . ' 2>&1';
+        $result = 1;
+        $lines = [];
+        @exec($cmd, $lines, $result);
+        $pdf = '';
+        if ($result === 0 && is_file($pdfFile)) {
+            $bytes = file_get_contents($pdfFile);
+            if (is_string($bytes)) {
+                $pdf = $bytes;
+            }
+        }
+        @unlink($htmlFile);
+        @unlink($pdfFile);
+        return $pdf;
     }
 
     /** @param array<string,mixed> $course @param array<string,mixed> $dashboard */
@@ -159,7 +219,7 @@ if ($updated2 === $updated) {
 }
 $updated = $updated2;
 
-if (strpos($updated, 'exportCourseDashboardPdf') === false || strpos($updated, 'sendDashboardPdf') === false || strpos($updated, 'Export PDF') === false) {
+if (strpos($updated, 'exportCourseDashboardPdf') === false || strpos($updated, 'sendDashboardPdf') === false || strpos($updated, 'findWkhtmltopdfBinary') === false || strpos($updated, 'Export PDF') === false) {
     fwrite(STDERR, "PDF export patch incomplete in {$file}\n");
     exit(1);
 }
