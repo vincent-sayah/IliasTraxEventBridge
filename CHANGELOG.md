@@ -2,6 +2,206 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.10.0 — suivi xAPI alimenté par TRAX/LRS
+
+### Statut
+
+- Branche concernée : `v0.10-lrs-direct-read`.
+- Base : V0.9.1 feedback dashboard.
+- Version plugin principal : `0.10.0`.
+- Source fonctionnelle du suivi xAPI : TRAX/LRS.
+- Rôle de l'outbox locale : file technique d'envoi uniquement.
+- Statut : validée fonctionnellement avant tag `v0.10.0`.
+
+### Décision d'architecture
+
+La V0.10.0 stabilise la séparation suivante :
+
+```text
+Outbox locale = file technique d'envoi
+TRAX/LRS      = source officielle du suivi xAPI pédagogique
+```
+
+L'outbox locale `evnt_evhk_itxeb_out` reste utilisée pour générer, envoyer, rejouer et superviser les statements xAPI. Elle n'est plus utilisée comme source fonctionnelle des vues pédagogiques, car elle peut être purgée en exploitation.
+
+### Nouveautés principales
+
+- Lecture directe des statements depuis TRAX/LRS via `GET /statements`.
+- Tableau de bord alimenté par TRAX/LRS.
+- Analyse des ressources alimentée par TRAX/LRS.
+- Vue Expert alimentée par TRAX/LRS.
+- Export CSV Expert alimenté par TRAX/LRS.
+- Comparaison entre périodes calculée depuis TRAX/LRS.
+- Export PDF du tableau de bord basé sur TRAX/LRS.
+- Supervision technique de l'outbox déplacée dans l'onglet `Configuration`.
+- Diagnostic `TRAX / LRS direct` déplacé dans l'onglet `Configuration`.
+- Détails `Verbes retournés par TRAX` et `Ressources retournées par TRAX` déplacés dans l'onglet `Analyse`.
+
+### Tableau de bord
+
+Le tableau de bord devient une vue pédagogique.
+
+Il affiche notamment :
+
+- statements TRAX ;
+- apprenants actifs ;
+- ressources utilisées ;
+- score moyen ;
+- ressources sans statement TRAX ;
+- pages LRS lues ;
+- activité par jour ;
+- répartition des actions xAPI ;
+- top ressources ;
+- comparaison entre périodes ;
+- bouton `Export PDF`.
+
+Les blocs techniques suivants ne sont plus affichés dans le tableau de bord :
+
+- `État technique local` ;
+- diagnostic complet `TRAX / LRS direct` ;
+- statuts outbox `generated`, `sending`, `sent`, `failed`.
+
+### Analyse
+
+L'onglet `Analyse` contient les données fonctionnelles issues de TRAX/LRS :
+
+- analyse des ressources ;
+- apprenants en difficulté, affichés sous forme anonymisée ;
+- verbes retournés par TRAX ;
+- ressources retournées par TRAX.
+
+### Expert
+
+La vue `Expert` affiche les statements retournés par TRAX/LRS.
+
+Changements principaux :
+
+- la source affichée est `TRAX` ;
+- le `Statement ID` est affiché ;
+- les anciennes colonnes locales `Outbox` et `Erreur` ont été retirées ;
+- l'export CSV ne dépend plus de l'outbox locale.
+
+### Configuration
+
+L'onglet `Configuration` regroupe désormais les fonctions techniques :
+
+- activation xAPI du cours ;
+- activation xAPI des ressources ;
+- préférences du tableau de bord ;
+- supervision technique de l'envoi xAPI ;
+- diagnostic de lecture directe TRAX/LRS.
+
+La section `Supervision technique de l’envoi xAPI` affiche uniquement l'état de la file locale :
+
+```text
+generated
+sending
+sent
+failed
+other
+```
+
+Cette section ne sert pas au suivi pédagogique.
+
+### Export PDF
+
+Un bouton `Export PDF` est ajouté dans le tableau de bord.
+
+Le rapport contient :
+
+- cours ;
+- `course_ref_id` ;
+- période ;
+- filtre ressource ;
+- filtre type ;
+- synthèse KPI ;
+- activité par jour ;
+- actions xAPI ;
+- ressources.
+
+Le moteur PDF est sélectionné dans cet ordre :
+
+```text
+1. Dompdf si disponible côté Composer
+2. wkhtmltopdf si disponible côté serveur
+3. rapport HTML imprimable si aucun moteur PDF n'est disponible
+```
+
+Le paquet `wkhtmltopdf-opt` est supporté, y compris lorsque le binaire est installé dans :
+
+```text
+/opt/wkhtmltopdf/bin/wkhtmltopdf
+```
+
+### Robustesse validée
+
+Les validations suivantes ont été réalisées :
+
+- purge de `evnt_evhk_itxeb_out` sans perte d'affichage pédagogique ;
+- filtres période / ressource / type ;
+- export CSV Expert ;
+- indisponibilité ou mauvaise configuration LRS sans erreur PHP fatale ;
+- export PDF avec moteur `wkhtmltopdf` ;
+- séparation stricte entre suivi pédagogique TRAX/LRS et supervision technique locale.
+
+### Fichiers et scripts importants
+
+- `classes/class.ilIliasTraxEventBridgeLrsReadClient.php`
+- `classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php`
+- `docs/V0.10_LRS_DIRECT_READ.md`
+- `scripts/patch_course_ui_lrs_direct_summary.php`
+- `scripts/patch_course_ui_lrs_primary_views.php`
+- `scripts/patch_course_ui_outbox_technical_config.php`
+- `scripts/patch_course_ui_lrs_diagnostics_config.php`
+- `scripts/patch_course_ui_lrs_analysis_details.php`
+- `scripts/patch_course_ui_pdf_export.php`
+- `scripts/patch_course_ui_pdf_route.php`
+- `scripts/patch_course_ui_pdf_wkhtmltopdf_paths.php`
+
+### Installation / mise à jour V0.10.0
+
+```bash
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+git fetch origin
+git checkout v0.10-lrs-direct-read
+git pull origin v0.10-lrs-direct-read
+
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
+```
+
+Puis :
+
+```bash
+cd /var/www/ilias
+
+sudo -u apache composer du
+sudo -u apache php cli/setup.php build --yes
+
+systemctl restart httpd
+```
+
+### Vérifications avant tag
+
+```bash
+cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+
+find . -name "*.php" -print0 | xargs -0 -n1 php -l
+
+grep -n "\$version" plugin.php
+
+git status
+git log --oneline -10
+```
+
+Résultat attendu :
+
+```text
+$version = '0.10.0';
+aucune erreur PHP
+working tree clean
+```
+
 ## v0.9.1 — feedback cours, dashboard pédagogique et navigation Delos
 
 ### Statut
@@ -110,7 +310,6 @@ Elle rend cohérents tous les documents principaux avec l’état publié :
 ```text
 main = stable publiée v0.8.0
 plugin principal = 0.8.0
-plugin compagnon = 0.1.1
 ```
 
 ### Documentation mise à jour
@@ -216,90 +415,3 @@ Une installation déjà validée en `v0.8.0` peut rester sur le tag `v0.8.0` pou
 - Ajout d'un bouton flottant `TRAX / xAPI` dans l'objet cours.
 - Le bouton apparaît uniquement si un cours est détecté et si l'utilisateur a le droit de gérer le cours.
 - Le bouton pointe vers l'URL contextualisée du cours.
-
-### Lot 5 — écran complet depuis l'objet cours
-
-- Ajout de `ilIliasTraxEventBridgeCourseUIScreen` dans le plugin compagnon.
-- Le bouton `TRAX / xAPI` ouvre maintenant un panneau complet de configuration depuis l'objet cours.
-- L'écran affiche le résumé du cours, l'activation xAPI du cours et les ressources traçables.
-- Actions prises en charge : `showCourseTracking`, `saveCourseTracking`, `enableAllCourseTracking`, `disableAllCourseTracking`, `resetCourseTracking`.
-- Les choix sont enregistrés dans les tables V0.7 existantes `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
-- La saisie manuelle du `course_ref_id` n'est plus nécessaire depuis l'objet cours.
-
-## v0.7.0 — stable
-
-### Statut
-
-- Branche `v0.7` créée depuis `main` / `v0.6.0` stable.
-- Version plugin portée à `0.7.0` pour ouvrir la série V0.7.
-- Objectif principal : permettre le pilotage des traces xAPI par cours et par ressource.
-- Tag stable : `v0.7.0`.
-
-### Objectif fonctionnel
-
-- Permettre à un administrateur ou responsable de cours d'activer ou désactiver les traces xAPI pour son cours.
-- Permettre de choisir quelles ressources du cours génèrent des statements xAPI.
-- Filtrer les événements avant insertion dans l'outbox quand le cours ou la ressource n'est pas autorisé.
-- Conserver les statements enrichis V0.6 pour les ressources explicitement activées.
-
-### Jalon 1 — ouverture V0.7
-
-- Création de la branche `v0.7`.
-- Ouverture de la version plugin `0.7.0`.
-- Ajout de `docs/V0.7_DEV_PLAN.md` pour cadrer le modèle de données, l'interface cours, les permissions et les règles de filtrage.
-
-### Jalon 2 — tables de configuration cours / ressources
-
-- Ajout de la migration SQL `#5` dans `sql/dbupdate.php`.
-- Création de la table `evnt_evhk_itxeb_ccfg` pour stocker l'activation xAPI par cours.
-- Création de la table `evnt_evhk_itxeb_rcfg` pour stocker l'activation xAPI par ressource dans un cours.
-- Les noms de tables ont été raccourcis pour respecter la limite ILIAS de 22 caractères.
-- Ajout du repository `ilIliasTraxEventBridgeCourseTrackingRepository` pour lire et écrire ces configurations.
-- Ajout de `docs/V0.7_COURSE_TRACKING_CONFIG.md`.
-
-### Jalon 3 — résolution cours / ressources
-
-- Ajout de `ilIliasTraxEventBridgeCourseResourceResolver`.
-- Le resolver liste les ressources traçables contenues dans un cours à partir d'un `course_ref_id`.
-- Types préparés : `file`, `tst`, `blog`, `wiki`, `webr`, `mcst`, `frm`, `htlm`, `lm`, `sahs`.
-- Pour chaque ressource, le resolver prépare `ref_id`, `obj_id`, `obj_type`, famille, titre, chemin, état `configured` et état `enabled`.
-- Ajout de `docs/V0.7_COURSE_RESOURCE_RESOLVER.md`.
-
-### Jalon 4 — interface de configuration cours
-
-- Ajout de `ilIliasTraxEventBridgeCourseTrackingGUI`.
-- L'interface permet d'afficher le résumé d'un cours, l'état d'activation xAPI du cours et les ressources traçables retournées par le resolver.
-- Actions disponibles : `show`, `save`, `enableAll`, `disableAll`, `resetCourse`.
-- Les choix sont enregistrés dans `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg`.
-- Les droits cours sont vérifiés avant écriture via les permissions `write`, `edit_permission` ou `manage_members`.
-- Ajout de `docs/V0.7_COURSE_TRACKING_UI.md`.
-
-### Jalon 4b — accès visible depuis l'administration du plugin
-
-- `ilIliasTraxEventBridgeCourseTrackingGUI` peut désormais être embarqué depuis un autre contrôleur GUI.
-- Ajout d'une section visible `Configuration xAPI par cours` dans l'écran d'administration du plugin.
-- L'administrateur peut saisir un `course_ref_id`, ouvrir l'écran de configuration xAPI du cours, enregistrer les choix, tout activer, tout désactiver ou réinitialiser le cours.
-- Ajout de `docs/V0.7_COURSE_TRACKING_ACCESS.md`.
-
-### Jalon 5 — filtrage avant outbox
-
-- Ajout du filtrage effectif avant insertion dans `evnt_evhk_itxeb_out`.
-- Les événements EventHook ne génèrent un statement que si le cours est activé dans `evnt_evhk_itxeb_ccfg` et si la ressource est activée dans `evnt_evhk_itxeb_rcfg`.
-- Les consultations issues de `read_event` appliquent la même règle avant génération outbox.
-- Les consultations `read_event` refusées par la configuration sont marquées traitées dans `evnt_evhk_itxeb_read` afin d'éviter une boucle cron.
-- La configuration est strictement opt-in : sans configuration explicite du cours et de la ressource, aucun statement xAPI n'est généré.
-- Ajout de `docs/V0.7_OUTBOX_FILTERING.md`.
-
-### Jalon 6 — stabilisation documentaire V0.7
-
-- Alignement de `README.md` avec l'état V0.7.
-- Alignement de `README_TECHNIQUE.md` avec l'architecture V0.7.
-- Mise à jour de `docs/VALIDATION.md` pour remplacer le plan V0.6 par un plan V0.7 complet.
-- Ajout des critères de validation réels : cours activé, ressources activées envoyées, ressources désactivées refusées avant outbox.
-
-## v0.6.0 — stable
-
-### Statut
-
-- Version stable V0.6.0 taguée après validation serveur et Windows.
-- Branches `main` et `v0.6` alignées sur la stable V0.6.0.
