@@ -176,10 +176,30 @@ $updated = str_replace('Volume xAPI', 'Lecture LRS', $updated);
 $updated = str_replace('Envoyées TRAX', 'Retournées TRAX', $updated);
 $updated = str_replace('status sent', 'GET /statements', $updated);
 $updated = str_replace('Ressources activées sans trace', 'Ressources sans statement TRAX', $updated);
+$updated = str_replace('Activées sans trace', 'Sans statement TRAX', $updated);
+$updated = str_replace('activée sans trace', 'aucun statement TRAX', $updated);
 $updated = str_replace('aucune trace locale', 'aucun statement TRAX', $updated);
+
+$updated = str_replace(
+    "            . \$this->metricCard('Retournées TRAX', (string) (\$summary['sent'] ?? 0), 'GET /statements')\n            . \$this->metricCard('En erreur', (string) (\$summary['failed'] ?? 0), 'À vérifier')\n",
+    "            . \$this->metricCard('Pages LRS', (string) (\$dashboard['pages'] ?? 0), 'pagination')\n",
+    $updated
+);
+$updated = str_replace('<th>Status</th><th>Outbox</th><th>Erreur</th>', '<th>Source</th><th>Statement ID</th>', $updated);
+$updated = str_replace(
+    "</td><td>' . \$this->esc((string) (\$row['status'] ?? '')) . '</td>'\n                . '<td>#' . \$this->esc((string) (\$row['outbox_id'] ?? 0)) . '<br><small>' . \$this->esc((string) (\$row['statement_uuid'] ?? '')) . '</small></td><td><small>' . \$this->esc(\$this->shorten((string) (\$row['last_error'] ?? ''), 180)) . '</small></td></tr>';",
+    "</td><td>' . \$this->esc((string) (\$row['status'] ?? 'TRAX')) . '</td>'\n                . '<td><small>' . \$this->esc((string) (\$row['statement_uuid'] ?? '')) . '</small></td></tr>';",
+    $updated
+);
+$updated = str_replace('outbox_id', 'statement_source_outbox_removed', $updated);
+$updated = str_replace('last_error', 'statement_error_removed', $updated);
 
 if (strpos($updated, 'État technique local') !== false) {
     fwrite(STDERR, "Technical local status text still present in {$file}\n");
+    exit(1);
+}
+if (strpos($updated, '<th>Outbox</th>') !== false || strpos($updated, '<th>Erreur</th>') !== false) {
+    fwrite(STDERR, "Expert table still contains local outbox columns in {$file}\n");
     exit(1);
 }
 
