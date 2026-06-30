@@ -34,6 +34,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             case 'saveConfig': $this->saveConfig(); break;
             case 'testTraxConnection': $this->testTraxConnection(); break;
             case 'testLrsRead': $this->testLrsRead(); break;
+            case 'testLrsWrite': $this->testLrsWrite(); break;
             case 'sendGenerated': $this->sendGenerated(); break;
             case 'resetFailed': $this->resetFailed(); break;
             case 'configureCourseTracking': $this->handleCourseTracking('show'); break;
@@ -108,7 +109,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . $rows
             . '</tbody></table>'
             . '<p><strong>Diagnostic serveur :</strong> pour un contrôle plus complet côté AlmaLinux, lancer <code>bash scripts/diagnostic_itxeb.sh</code> depuis le dossier du plugin.</p>'
-            . '<p><strong>Tests applicatifs :</strong> utiliser les boutons <code>Tester connexion TRAX</code> et <code>Tester lecture TRAX/LRS</code> dans la section configuration.</p>'
+            . '<p><strong>Tests applicatifs :</strong> utiliser les boutons <code>Tester connexion TRAX</code>, <code>Tester lecture TRAX/LRS</code> et <code>Créer un statement test TRAX/LRS</code> dans la section configuration.</p>'
             . '<p><strong>Documentation :</strong> consulter <code>docs/DIAGNOSTIC.md</code> et <code>docs/ROLLBACK.md</code>.</p>'
             . '</section>';
     }
@@ -167,7 +168,8 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= $this->passwordRow('Secret client TRAX', 'trax_password', 'Laisser vide pour conserver le secret.');
         return $html . '</table><p><button class="btn btn-primary" type="submit">Enregistrer</button></p></form>'
             . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')).'"><p><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p></form>'
-            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsRead')).'"><p><button class="btn btn-default" type="submit">Tester lecture TRAX/LRS</button> <span class="small">Effectue uniquement un <code>GET /statements?limit=1</code>, sans créer de trace.</span></p></form></section>';
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsRead')).'"><p><button class="btn btn-default" type="submit">Tester lecture TRAX/LRS</button> <span class="small">Effectue uniquement un <code>GET /statements?limit=1</code>, sans créer de trace.</span></p></form>'
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsWrite')).'"><p><button class="btn btn-warning" type="submit">Créer un statement test TRAX/LRS</button> <span class="small"><strong>Attention :</strong> crée volontairement un statement xAPI de diagnostic dans TRAX/LRS.</span></p></form></section>';
     }
 
     private function renderSendActions(): string
@@ -300,6 +302,83 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
         $this->success('Lecture TRAX/LRS réussie : HTTP '.$r->getHttpStatus().' ; '.$count.' statement(s) retourné(s) avec limit=1.');
         $this->ctrl->redirect($this, 'configure');
+    }
+
+    private function testLrsWrite(): void
+    {
+        $statement = $this->buildDiagnosticStatement();
+        $statementId = is_string($statement['id'] ?? null) ? (string)$statement['id'] : '';
+        $r = (new ilIliasTraxEventBridgeTraxClient($this->config))->sendStatements([$statement]);
+
+        if ($r->isSuccess()) {
+            $this->success('Statement test TRAX/LRS créé : HTTP '.$r->getHttpStatus().' ; id '.$statementId.'.');
+        } else {
+            $this->failure('Création du statement test TRAX/LRS échouée : '.$r->getShortMessage());
+        }
+
+        $this->ctrl->redirect($this, 'configure');
+    }
+
+    /** @return array<string,mixed> */
+    private function buildDiagnosticStatement(): array
+    {
+        $id = $this->uuidV4();
+        $baseUrl = trim($this->config->getIliasBaseUrl());
+        $homePage = preg_match('~^https?://~i', $baseUrl) ? rtrim($baseUrl, '/') : 'https://example.invalid/itxeb';
+        $objectId = $homePage . '/xapi/diagnostic/write-test/' . $id;
+
+        return [
+            'id' => $id,
+            'actor' => [
+                'account' => [
+                    'homePage' => $homePage,
+                    'name' => 'itxeb-diagnostic'
+                ],
+                'name' => 'IliasTraxEventBridge diagnostic'
+            ],
+            'verb' => [
+                'id' => 'http://adlnet.gov/expapi/verbs/experienced',
+                'display' => [
+                    'en-US' => 'experienced',
+                    'fr-FR' => 'a testé'
+                ]
+            ],
+            'object' => [
+                'id' => $objectId,
+                'definition' => [
+                    'name' => [
+                        'fr-FR' => 'Statement de diagnostic IliasTraxEventBridge',
+                        'en-US' => 'IliasTraxEventBridge diagnostic statement'
+                    ],
+                    'description' => [
+                        'fr-FR' => 'Statement créé volontairement par le test d’écriture V0.11 du plugin IliasTraxEventBridge.',
+                        'en-US' => 'Statement intentionally created by the V0.11 write diagnostic test of IliasTraxEventBridge.'
+                    ],
+                    'type' => 'https://w3id.org/xapi/acrossx/activities/diagnostic'
+                ],
+                'objectType' => 'Activity'
+            ],
+            'context' => [
+                'extensions' => [
+                    $homePage . '/xapi/extensions/itxeb_diagnostic' => true,
+                    $homePage . '/xapi/extensions/itxeb_version' => '0.11.0',
+                    $homePage . '/xapi/extensions/itxeb_test_type' => 'admin_write_diagnostic'
+                ]
+            ],
+            'timestamp' => gmdate('c')
+        ];
+    }
+
+    private function uuidV4(): string
+    {
+        try {
+            $data = random_bytes(16);
+            $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+            $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+            return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+        } catch (Throwable $e) {
+            return str_replace('.', '-', uniqid('itxeb-', true));
+        }
     }
 
     private function sendGenerated(): void
