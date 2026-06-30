@@ -16,6 +16,7 @@ Permettre à un administrateur technique de vérifier rapidement :
 - la présence des tables SQL ;
 - l'état de l'outbox ;
 - la configuration TRAX/LRS ;
+- la lecture TRAX/LRS ;
 - le cron ILIAS ;
 - les erreurs récentes.
 
@@ -177,7 +178,7 @@ Exemples de causes possibles :
 - utilisateur non exploitable ;
 - événement hors périmètre.
 
-## 10. Vérifier TRAX/LRS
+## 10. Vérifier TRAX/LRS depuis l'administration du plugin
 
 Dans ILIAS :
 
@@ -185,7 +186,26 @@ Dans ILIAS :
 Administration > Plugins > IliasTraxEventBridge > Configurer
 ```
 
-Contrôler :
+La V0.11 ajoute une section :
+
+```text
+Santé / Diagnostic V0.11
+```
+
+Cette section contrôle notamment :
+
+- version plugin ;
+- marqueur `<#1>` dans `sql/dbupdate.php` ;
+- plugin compagnon UIHook ;
+- script serveur `scripts/diagnostic_itxeb.sh` ;
+- endpoint TRAX/LRS ;
+- cron plugin ;
+- diagnostic des refus ;
+- outbox failed ;
+- retry épuisé ;
+- tables SQL `evnt_evhk_itxeb_*`.
+
+Contrôler aussi les paramètres :
 
 - endpoint TRAX/LRS ;
 - identifiant xAPI ;
@@ -198,7 +218,41 @@ Contrôler :
 
 Ne jamais afficher ou copier le secret TRAX dans un ticket ou une documentation publique.
 
-## 11. Vérifier la lecture LRS
+## 11. Tester la lecture TRAX/LRS
+
+La V0.11 ajoute un bouton :
+
+```text
+Administration > Plugins > IliasTraxEventBridge > Configurer > Tester lecture TRAX/LRS
+```
+
+Ce test est non destructif.
+
+Il exécute uniquement :
+
+```text
+GET /statements?limit=1
+```
+
+Il ne crée aucun statement xAPI.
+
+Résultat attendu :
+
+```text
+Lecture TRAX/LRS réussie : HTTP 200 ; 0 ou 1 statement(s) retourné(s) avec limit=1.
+```
+
+Si le test échoue, contrôler :
+
+- endpoint `/statements` ;
+- identifiant xAPI ;
+- secret xAPI ;
+- droit de lecture du compte xAPI ;
+- connectivité réseau entre ILIAS et TRAX ;
+- certificat TLS si HTTPS interne ;
+- logs TRAX/LRS.
+
+## 12. Vérifier la lecture LRS depuis le cours
 
 Depuis l'interface de cours :
 
@@ -214,7 +268,7 @@ Contrôler :
 - période analysée ;
 - pagination éventuelle.
 
-## 12. Vérifier le cron ILIAS
+## 13. Vérifier le cron ILIAS
 
 Dans ILIAS :
 
@@ -241,7 +295,7 @@ Vérifier :
 - prochaine exécution ;
 - erreurs éventuelles.
 
-## 13. Logs utiles
+## 14. Logs utiles
 
 Selon installation :
 
@@ -262,7 +316,7 @@ Puis rechercher :
 grep -RniE "IliasTraxEventBridge|itxeb|xapi|TRAX|LRS|exception|error" /var/www/ilias 2>/dev/null | tail -100
 ```
 
-## 14. Symptômes fréquents
+## 15. Symptômes fréquents
 
 ### Plugin non visible
 
@@ -321,7 +375,18 @@ Contrôler :
 - erreurs HTTP ;
 - certificat TLS si HTTPS interne.
 
-## 15. Script de diagnostic V0.11
+### Test lecture TRAX/LRS en échec
+
+Contrôler :
+
+- compte xAPI autorisé en lecture ;
+- endpoint complet `/statements` ;
+- réponse HTTP ;
+- proxy ou pare-feu ;
+- certificat TLS ;
+- logs côté TRAX/LRS.
+
+## 16. Script de diagnostic V0.11
 
 La V0.11 prévoit un script :
 
@@ -338,7 +403,7 @@ bash scripts/diagnostic_itxeb.sh
 
 Le script ne doit pas modifier la base de données.
 
-## 16. Informations à fournir dans un ticket incident
+## 17. Informations à fournir dans un ticket incident
 
 Inclure :
 
@@ -349,6 +414,7 @@ Inclure :
 - sortie de `head -5 sql/dbupdate.php` ;
 - sortie de `php -l` ;
 - état du cron ;
+- résultat du bouton `Tester lecture TRAX/LRS` ;
 - extrait d'erreur sans secret ;
 - statut outbox agrégé ;
 - symptômes observés.
