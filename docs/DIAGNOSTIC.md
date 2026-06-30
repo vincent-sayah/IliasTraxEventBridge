@@ -17,6 +17,7 @@ Permettre à un administrateur technique de vérifier rapidement :
 - l'état de l'outbox ;
 - la configuration TRAX/LRS ;
 - la lecture TRAX/LRS ;
+- l'écriture TRAX/LRS avec un statement de diagnostic contrôlé ;
 - le cron ILIAS ;
 - les erreurs récentes.
 
@@ -252,7 +253,51 @@ Si le test échoue, contrôler :
 - certificat TLS si HTTPS interne ;
 - logs TRAX/LRS.
 
-## 12. Vérifier la lecture LRS depuis le cours
+## 12. Tester l'écriture TRAX/LRS
+
+La V0.11 ajoute un bouton :
+
+```text
+Administration > Plugins > IliasTraxEventBridge > Configurer > Créer un statement test TRAX/LRS
+```
+
+Attention : ce test est volontairement destructif au sens métier, car il crée une trace de diagnostic dans TRAX/LRS.
+
+Il envoie un seul statement xAPI avec :
+
+- un UUID unique ;
+- un acteur technique `itxeb-diagnostic` ;
+- le verbe xAPI `experienced` ;
+- un objet de type diagnostic ;
+- une extension `itxeb_diagnostic = true` ;
+- une extension `itxeb_version = 0.11.0` ;
+- une extension `itxeb_test_type = admin_write_diagnostic`.
+
+Résultat attendu :
+
+```text
+Statement test TRAX/LRS créé : HTTP 200 ou HTTP 204 ; id <uuid>.
+```
+
+Selon le LRS, la réponse peut être `200`, `204` ou un autre code 2xx.
+
+Si le test échoue, contrôler :
+
+- endpoint `/statements` ;
+- identifiant xAPI ;
+- secret xAPI ;
+- droit d'écriture du compte xAPI ;
+- format accepté par le LRS ;
+- logs TRAX/LRS.
+
+Pour retrouver la trace dans TRAX/LRS, chercher les extensions :
+
+```text
+itxeb_diagnostic = true
+itxeb_test_type = admin_write_diagnostic
+```
+
+## 13. Vérifier la lecture LRS depuis le cours
 
 Depuis l'interface de cours :
 
@@ -268,7 +313,7 @@ Contrôler :
 - période analysée ;
 - pagination éventuelle.
 
-## 13. Vérifier le cron ILIAS
+## 14. Vérifier le cron ILIAS
 
 Dans ILIAS :
 
@@ -295,7 +340,7 @@ Vérifier :
 - prochaine exécution ;
 - erreurs éventuelles.
 
-## 14. Logs utiles
+## 15. Logs utiles
 
 Selon installation :
 
@@ -316,7 +361,7 @@ Puis rechercher :
 grep -RniE "IliasTraxEventBridge|itxeb|xapi|TRAX|LRS|exception|error" /var/www/ilias 2>/dev/null | tail -100
 ```
 
-## 15. Symptômes fréquents
+## 16. Symptômes fréquents
 
 ### Plugin non visible
 
@@ -386,7 +431,19 @@ Contrôler :
 - certificat TLS ;
 - logs côté TRAX/LRS.
 
-## 16. Script de diagnostic V0.11
+### Test écriture TRAX/LRS en échec
+
+Contrôler :
+
+- compte xAPI autorisé en écriture ;
+- endpoint complet `/statements` ;
+- réponse HTTP ;
+- format JSON du statement ;
+- proxy ou pare-feu ;
+- certificat TLS ;
+- logs côté TRAX/LRS.
+
+## 17. Script de diagnostic V0.11
 
 La V0.11 prévoit un script :
 
@@ -403,7 +460,7 @@ bash scripts/diagnostic_itxeb.sh
 
 Le script ne doit pas modifier la base de données.
 
-## 17. Informations à fournir dans un ticket incident
+## 18. Informations à fournir dans un ticket incident
 
 Inclure :
 
@@ -415,6 +472,7 @@ Inclure :
 - sortie de `php -l` ;
 - état du cron ;
 - résultat du bouton `Tester lecture TRAX/LRS` ;
+- résultat du bouton `Créer un statement test TRAX/LRS`, si utilisé ;
 - extrait d'erreur sans secret ;
 - statut outbox agrégé ;
 - symptômes observés.
