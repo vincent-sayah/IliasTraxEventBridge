@@ -109,7 +109,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . $rows
             . '</tbody></table>'
             . '<p><strong>Diagnostic serveur :</strong> pour un contrôle plus complet côté AlmaLinux, lancer <code>bash scripts/diagnostic_itxeb.sh</code> depuis le dossier du plugin.</p>'
-            . '<p><strong>Tests applicatifs :</strong> utiliser les boutons <code>Tester connexion TRAX</code>, <code>Tester lecture TRAX/LRS</code> et <code>Créer un statement test TRAX/LRS</code> dans la section configuration.</p>'
+            . '<p><strong>Tests applicatifs :</strong> utiliser les boutons <code>Tester connexion TRAX</code>, <code>Tester lecture TRAX/LRS</code> et <code>Créer un statement test TRAX/LRS</code> dans la section configuration. Les résultats restent affichés dans le bloc <code>Diagnostics TRAX / cron</code>.</p>'
             . '<p><strong>Documentation :</strong> consulter <code>docs/DIAGNOSTIC.md</code> et <code>docs/ROLLBACK.md</code>.</p>'
             . '</section>';
     }
@@ -123,6 +123,8 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= '<tr><td>Endpoint statements</td><td><code>'.$this->esc($this->config->getStatementsEndpoint()).'</code></td></tr></table>';
         $html .= '<h3>Diagnostics TRAX / cron</h3><table class="std itxeb-state-table">'
             . $this->diagRow('Dernier test connexion', $this->config->getLastTraxTestAt(), $this->config->getLastTraxTestSuccess(), $this->config->getLastTraxTestHttpStatus(), $this->config->getLastTraxTestMessage())
+            . $this->diagRow('Dernier test lecture TRAX/LRS', $this->config->getLastLrsReadAt(), $this->config->getLastLrsReadSuccess(), $this->config->getLastLrsReadHttpStatus(), $this->config->getLastLrsReadMessage())
+            . $this->diagRow('Dernier test écriture TRAX/LRS', $this->config->getLastLrsWriteAt(), $this->config->getLastLrsWriteSuccess(), $this->config->getLastLrsWriteHttpStatus(), $this->config->getLastLrsWriteMessage())
             . $this->diagRow('Dernier envoi manuel', $this->config->getLastTraxSendAt(), $this->config->getLastTraxSendSuccess(), $this->config->getLastTraxSendHttpStatus(), $this->config->getLastTraxSendMessage())
             . $this->diagRow('Dernier cron', $this->config->getLastCronAt(), $this->config->getLastCronSuccess(), $this->config->getLastCronHttpStatus(), $this->config->getLastCronMessage())
             . '</table><p><a class="btn btn-default" href="'.$this->esc($this->ctrl->getLinkTarget($this, 'clearLog')).'">Vider le journal debug</a> '
@@ -289,7 +291,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $r = (new ilIliasTraxEventBridgeLrsReadClient($this->config))->queryStatements(['limit' => 1]);
         if (!$r->isSuccess()) {
-            $this->failure('Lecture TRAX/LRS échouée : '.$r->getShortMessage());
+            $message = 'Lecture TRAX/LRS échouée : '.$r->getShortMessage();
+            $this->config->setLastLrsReadResult(false, $r->getHttpStatus(), $message);
+            $this->failure($message);
             $this->ctrl->redirect($this, 'configure');
             return;
         }
@@ -300,7 +304,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             $count = count($decoded['statements']);
         }
 
-        $this->success('Lecture TRAX/LRS réussie : HTTP '.$r->getHttpStatus().' ; '.$count.' statement(s) retourné(s) avec limit=1.');
+        $message = 'Lecture TRAX/LRS réussie : HTTP '.$r->getHttpStatus().' ; '.$count.' statement(s) retourné(s) avec limit=1.';
+        $this->config->setLastLrsReadResult(true, $r->getHttpStatus(), $message);
+        $this->success($message);
         $this->ctrl->redirect($this, 'configure');
     }
 
@@ -311,9 +317,13 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $r = (new ilIliasTraxEventBridgeTraxClient($this->config))->sendStatements([$statement]);
 
         if ($r->isSuccess()) {
-            $this->success('Statement test TRAX/LRS créé : HTTP '.$r->getHttpStatus().' ; id '.$statementId.'.');
+            $message = 'Statement test TRAX/LRS créé : HTTP '.$r->getHttpStatus().' ; id '.$statementId.'.';
+            $this->config->setLastLrsWriteResult(true, $r->getHttpStatus(), $message);
+            $this->success($message);
         } else {
-            $this->failure('Création du statement test TRAX/LRS échouée : '.$r->getShortMessage());
+            $message = 'Création du statement test TRAX/LRS échouée : '.$r->getShortMessage();
+            $this->config->setLastLrsWriteResult(false, $r->getHttpStatus(), $message);
+            $this->failure($message);
         }
 
         $this->ctrl->redirect($this, 'configure');
