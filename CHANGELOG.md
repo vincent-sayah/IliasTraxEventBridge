@@ -22,6 +22,7 @@ La V0.11 prépare une version plus robuste pour l'exploitation : installation pl
 - `docs/V0.11_DIAGNOSTIC_EXPLOITATION.md` : cadrage V0.11.
 - `docs/DIAGNOSTIC.md` : procédure de diagnostic exploitation.
 - `docs/ROLLBACK.md` : procédure de retour arrière.
+- `docs/VALIDATION_0.11.md` : procédure complète de validation sur VM ILIAS.
 - `docs/README.md` mis à jour pour rendre les nouveaux documents visibles.
 
 ### Ajouts techniques réalisés
@@ -32,12 +33,12 @@ La V0.11 prépare une version plus robuste pour l'exploitation : installation pl
 - Ajout d'un bouton `Tester lecture TRAX/LRS` qui exécute uniquement un `GET /statements?limit=1` sans créer de statement.
 - Ajout d'un bouton `Créer un statement test TRAX/LRS` qui envoie un statement xAPI de diagnostic clairement identifiable.
 - Le statement de test contient les extensions `itxeb_diagnostic`, `itxeb_version` et `itxeb_test_type`.
+- Les résultats des tests lecture et écriture TRAX/LRS sont maintenant persistés dans les settings du plugin et réaffichés dans `Diagnostics TRAX / cron`.
 - Passage du plugin principal en version `0.11.0` sur la branche V0.11.
 
 ### Pistes techniques restantes V0.11
 
 - Ajouter un diagnostic plus détaillé du plugin compagnon UIHook.
-- Ajouter une documentation de validation V0.11.
 - Nettoyer les libellés d'administration restants hérités des anciennes versions.
 - Tester sur VM ILIAS 10.5 puis stabiliser la release V0.11.0.
 
