@@ -30,14 +30,16 @@ La V0.11 prépare une version plus robuste pour l'exploitation : installation pl
 - Ajout d'une section `Santé / Diagnostic V0.11` dans l'administration du plugin.
 - Contrôle applicatif de la version plugin, du marqueur `<#1>`, du plugin compagnon UIHook, de l'endpoint TRAX/LRS, du cron, de l'outbox et des tables SQL.
 - Ajout d'un bouton `Tester lecture TRAX/LRS` qui exécute uniquement un `GET /statements?limit=1` sans créer de statement.
+- Ajout d'un bouton `Créer un statement test TRAX/LRS` qui envoie un statement xAPI de diagnostic clairement identifiable.
+- Le statement de test contient les extensions `itxeb_diagnostic`, `itxeb_version` et `itxeb_test_type`.
 - Passage du plugin principal en version `0.11.0` sur la branche V0.11.
 
 ### Pistes techniques restantes V0.11
 
-- Ajouter un test d'écriture xAPI contrôlé, clairement signalé car il crée un statement de test.
 - Ajouter un diagnostic plus détaillé du plugin compagnon UIHook.
 - Ajouter une documentation de validation V0.11.
 - Nettoyer les libellés d'administration restants hérités des anciennes versions.
+- Tester sur VM ILIAS 10.5 puis stabiliser la release V0.11.0.
 
 ## Documentation main — README, docs et roadmap IA
 
