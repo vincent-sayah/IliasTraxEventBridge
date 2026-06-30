@@ -1,14 +1,16 @@
 # Documentation — IliasTraxEventBridge
 
-Ce dossier regroupe toute la documentation de la version stable **V0.10.1** du plugin `IliasTraxEventBridge`.
+Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
-## Version documentée
+## Version stable et branche de travail
 
 | Élément | Valeur |
 |---|---|
 | Version stable | `0.10.1` |
 | Branche stable | `main` |
 | Tag stable | `v0.10.1` |
+| Branche en cours | `v0.11-diagnostic-exploitation` |
+| Objectif V0.11 | Diagnostic, exploitation, rollback et durcissement installation |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Source pédagogique du suivi xAPI | TRAX/LRS |
@@ -22,6 +24,9 @@ Ce dossier regroupe toute la documentation de la version stable **V0.10.1** du p
 | Comprendre ce que fait le plugin | [`FONCTIONNEL.md`](FONCTIONNEL.md) |
 | Comprendre l'architecture technique | [`TECHNIQUE.md`](TECHNIQUE.md) |
 | Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
+| Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
+| Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
+| Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
@@ -29,7 +34,42 @@ Ce dossier regroupe toute la documentation de la version stable **V0.10.1** du p
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
 
-## Documents principaux
+## Documents V0.11
+
+### Cadrage V0.11
+
+[`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) décrit :
+
+- le périmètre de la V0.11 ;
+- les objectifs d'exploitation ;
+- les contrôles attendus ;
+- les critères d'acceptation ;
+- le lien avec la future analyse IA.
+
+### Diagnostic
+
+[`DIAGNOSTIC.md`](DIAGNOSTIC.md) décrit :
+
+- les chemins attendus du plugin principal et du plugin compagnon ;
+- les commandes de contrôle serveur ;
+- les contrôles SQL ;
+- l'analyse de l'outbox ;
+- la vérification du cron ;
+- la vérification TRAX/LRS ;
+- les symptômes fréquents.
+
+### Rollback
+
+[`ROLLBACK.md`](ROLLBACK.md) décrit :
+
+- les sauvegardes avant mise à jour ;
+- le rollback par Git ;
+- le rollback depuis archive `tar.gz` ;
+- le rollback du plugin compagnon ;
+- les précautions SQL ;
+- les contrôles après retour arrière.
+
+## Documents principaux V0.10.1
 
 ### Installation
 
@@ -108,7 +148,7 @@ Elle prévoit notamment un axe futur d'analyse des traces xAPI par IA :
 
 Le cadrage détaillé est dans [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md).
 
-## Décision d'architecture V0.10.1
+## Décision d'architecture V0.10.1 conservée en V0.11
 
 ```text
 Outbox locale = file technique d'envoi
@@ -153,7 +193,7 @@ find . -name "*.php" -print0 | xargs -0 -n1 php -l
 Résultat attendu :
 
 ```text
-$version = '0.10.1';
+$version = '0.10.1' ou version supérieure
 <#1>
 <?php
 aucune erreur PHP
