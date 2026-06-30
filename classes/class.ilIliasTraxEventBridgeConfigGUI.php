@@ -57,8 +57,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
     private function configure(): void
     {
-        $html = $this->styles() . '<div id="itxeb-config-page"><h1>IliasTraxEventBridge — V0.8</h1>'
-            . '<p><strong>V0.8 :</strong> supervision outbox et diagnostic des traces refusées. La V0.8 conserve le filtrage validé en V0.7.1 et ajoute le journal <code>evnt_evhk_itxeb_dlog</code>.</p>'
+        $html = $this->styles() . '<div id="itxeb-config-page"><h1>IliasTraxEventBridge — V0.11 diagnostic exploitation</h1>'
+            . '<p><strong>V0.11 :</strong> durcissement exploitation, diagnostic santé, rollback et contrôles d’installation. La source pédagogique du suivi xAPI reste TRAX/LRS ; l’outbox locale reste une file technique.</p>'
+            . $this->renderHealthCheck()
             . $this->renderState()
             . $this->renderCourseTrackingAccess()
             . $this->renderConfigForm()
@@ -71,6 +72,44 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $this->setContent($html);
     }
 
+    private function renderHealthCheck(): string
+    {
+        $root = dirname(__DIR__);
+        $companion = $this->companionPath($root);
+        $dbupdate = $root . '/sql/dbupdate.php';
+        $script = $root . '/scripts/diagnostic_itxeb.sh';
+        $version = $this->pluginVersion($root . '/plugin.php');
+        $dbupdateFirstLine = $this->firstLine($dbupdate);
+        $endpoint = trim($this->config->getStatementsEndpoint());
+        $outboxFailed = $this->outbox->countByStatus('failed');
+        $retryExhausted = $this->outbox->countRetryExhausted($this->config->getMaxRetry());
+
+        $rows = '';
+        $rows .= $this->healthRow('Version plugin', $version !== '', $version !== '' ? $version : 'version non détectée', $version !== '' ? 'ok' : 'warn');
+        $rows .= $this->healthRow('dbupdate.php', $dbupdateFirstLine === '<#1>', $dbupdateFirstLine === '<#1>' ? 'marqueur <#1> présent' : 'marqueur <#1> absent ou fichier illisible', $dbupdateFirstLine === '<#1>' ? 'ok' : 'error');
+        $rows .= $this->healthRow('Plugin compagnon UIHook', is_dir($companion), is_dir($companion) ? $companion : 'dossier compagnon non trouvé', is_dir($companion) ? 'ok' : 'warn');
+        $rows .= $this->healthRow('Script diagnostic serveur', is_file($script), is_file($script) ? 'scripts/diagnostic_itxeb.sh présent' : 'script absent', is_file($script) ? 'ok' : 'warn');
+        $rows .= $this->healthRow('Endpoint TRAX/LRS', $endpoint !== '', $endpoint !== '' ? $endpoint : 'endpoint non configuré', $endpoint !== '' ? 'ok' : 'warn');
+        $rows .= $this->healthRow('Cron plugin', $this->config->isCronEnabled(), $this->config->isCronEnabled() ? 'activé côté plugin' : 'désactivé côté plugin', $this->config->isCronEnabled() ? 'ok' : 'warn');
+        $rows .= $this->healthRow('Diagnostic refus', !$this->config->isDenyLogEnabled(), $this->config->isDenyLogEnabled() ? 'activé : à réserver à une analyse ciblée' : 'désactivé : état recommandé en exploitation courante', $this->config->isDenyLogEnabled() ? 'warn' : 'ok');
+        $rows .= $this->healthRow('Outbox failed', $outboxFailed === 0, (string)$outboxFailed . ' ligne(s) failed', $outboxFailed === 0 ? 'ok' : 'warn');
+        $rows .= $this->healthRow('Retry épuisé', $retryExhausted === 0, (string)$retryExhausted . ' ligne(s) avec retry épuisé', $retryExhausted === 0 ? 'ok' : 'warn');
+
+        foreach (['evnt_evhk_itxeb_log', 'evnt_evhk_itxeb_out', 'evnt_evhk_itxeb_read', 'evnt_evhk_itxeb_ccfg', 'evnt_evhk_itxeb_rcfg', 'evnt_evhk_itxeb_dlog'] as $table) {
+            $exists = $this->tableExists($table);
+            $rows .= $this->healthRow('Table ' . $table, $exists, $exists ? 'présente' : 'absente ou non vérifiable', $exists ? 'ok' : 'warn');
+        }
+
+        return '<section class="itxeb-section itxeb-health"><h2>Santé / Diagnostic V0.11</h2>'
+            . '<p>Cette section réalise des contrôles non destructifs : elle ne modifie ni la configuration, ni l’outbox, ni les tables SQL.</p>'
+            . '<table class="std itxeb-state-table"><thead><tr><th>Contrôle</th><th>État</th><th>Détail</th></tr></thead><tbody>'
+            . $rows
+            . '</tbody></table>'
+            . '<p><strong>Diagnostic serveur :</strong> pour un contrôle plus complet côté AlmaLinux, lancer <code>bash scripts/diagnostic_itxeb.sh</code> depuis le dossier du plugin.</p>'
+            . '<p><strong>Documentation :</strong> consulter <code>docs/DIAGNOSTIC.md</code> et <code>docs/ROLLBACK.md</code>.</p>'
+            . '</section>';
+    }
+
     private function renderState(): string
     {
         $html = '<section class="itxeb-section"><h2>État</h2><table class="std itxeb-state-table">';
@@ -78,7 +117,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             $html .= '<tr><td>'.$this->esc($k).'</td><td><strong>'.$this->esc($v).'</strong></td></tr>';
         }
         $html .= '<tr><td>Endpoint statements</td><td><code>'.$this->esc($this->config->getStatementsEndpoint()).'</code></td></tr></table>';
-        $html .= '<h3>Diagnostics</h3><table class="std itxeb-state-table">'
+        $html .= '<h3>Diagnostics TRAX / cron</h3><table class="std itxeb-state-table">'
             . $this->diagRow('Dernier test connexion', $this->config->getLastTraxTestAt(), $this->config->getLastTraxTestSuccess(), $this->config->getLastTraxTestHttpStatus(), $this->config->getLastTraxTestMessage())
             . $this->diagRow('Dernier envoi manuel', $this->config->getLastTraxSendAt(), $this->config->getLastTraxSendSuccess(), $this->config->getLastTraxSendHttpStatus(), $this->config->getLastTraxSendMessage())
             . $this->diagRow('Dernier cron', $this->config->getLastCronAt(), $this->config->getLastCronSuccess(), $this->config->getLastCronHttpStatus(), $this->config->getLastCronMessage())
@@ -97,7 +136,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $action = $this->ctrl->getLinkTarget($this, 'configureCourseTracking');
         return '<section class="itxeb-section"><h2>Configuration xAPI par cours</h2>'
-            . '<p><strong>V0.7.1 :</strong> la configuration est disponible depuis <code>Cours &gt; Paramètres &gt; Suivi xAPI</code>. Cette section admin reste disponible pour ouvrir directement un cours par <code>ref_id</code>.</p>'
+            . '<p>En V0.10.1 et V0.11, l’accès fonctionnel attendu est <code>Cours &gt; Suivi xAPI</code>. Cette section admin reste disponible pour ouvrir directement un cours par <code>ref_id</code>.</p>'
             . '<form method="post" action="'.$this->esc($action).'"><table class="std itxeb-form-table"><tbody>'
             . '<tr><td><label for="itxeb_course_ref_id">course_ref_id</label></td><td><input id="itxeb_course_ref_id" name="course_ref_id" type="number" min="1" value="" class="form-control"><div class="small">Exemple : le <code>ref_id</code> visible dans l’URL du cours ILIAS.</div></td></tr>'
             . '</tbody></table><p><button class="btn btn-primary" type="submit">Ouvrir la configuration xAPI du cours</button></p></form></section>';
@@ -179,7 +218,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $rows = $this->denyLog->findRecent(50); $reasonCounts = []; $sourceCounts = []; $eventTypeCounts = [];
         foreach ($this->denyLog->findRecent(200) as $row) { $this->countValue($reasonCounts, (string)($row['reason'] ?? '')); $this->countValue($sourceCounts, (string)($row['source_table'] ?? '')); $this->countValue($eventTypeCounts, (string)($row['event_type'] ?? '')); }
         $statusText = $this->config->isDenyLogEnabled() ? 'activé' : 'désactivé'; $statusClass = $this->config->isDenyLogEnabled() ? 'itxeb-badge-warn' : 'itxeb-badge-muted';
-        $html = '<section class="itxeb-section"><h2>Diagnostic des traces refusées V0.8</h2><p>État actuel : <span class="itxeb-badge '.$statusClass.'">'.$this->esc($statusText).'</span>. À laisser désactivé en exploitation courante.</p>'
+        $html = '<section class="itxeb-section"><h2>Diagnostic des traces refusées</h2><p>État actuel : <span class="itxeb-badge '.$statusClass.'">'.$this->esc($statusText).'</span>. À laisser désactivé en exploitation courante.</p>'
             . '<p><a class="btn btn-default" href="'.$this->esc($this->ctrl->getLinkTarget($this, 'clearDenyLog')).'">Purger le diagnostic des traces refusées</a></p>'
             . '<div class="itxeb-summary"><span><strong>Total refus :</strong> '.$this->esc((string)$this->denyLog->countAll()).'</span></div>'
             . $this->renderCounterBlock('Motifs de refus', $reasonCounts)
@@ -268,6 +307,52 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         return $html . '</tbody></table></div></section>';
     }
 
+    private function healthRow(string $label, bool $ok, string $detail, string $level): string
+    {
+        $class = $level === 'ok' ? 'itxeb-badge-ok' : ($level === 'error' ? 'itxeb-badge-error' : 'itxeb-badge-warn');
+        $text = $level === 'ok' ? 'OK' : ($level === 'error' ? 'ERREUR' : 'ATTENTION');
+        return '<tr><td>'.$this->esc($label).'</td><td><span class="itxeb-badge '.$class.'">'.$text.'</span></td><td>'.$this->esc($detail).'</td></tr>';
+    }
+
+    private function tableExists(string $table): bool
+    {
+        global $DIC, $ilDB;
+        try {
+            $db = null;
+            if (isset($DIC) && method_exists($DIC, 'database')) { $db = $DIC->database(); }
+            elseif (isset($ilDB)) { $db = $ilDB; }
+            if (is_object($db) && method_exists($db, 'tableExists')) { return (bool)$db->tableExists($table); }
+        } catch (Throwable $e) {
+            return false;
+        }
+        return false;
+    }
+
+    private function pluginVersion(string $pluginPhp): string
+    {
+        if (!is_file($pluginPhp)) { return ''; }
+        $content = (string)file_get_contents($pluginPhp);
+        if (preg_match('/\$version\s*=\s*[\'\"]([^\'\"]+)[\'\"]\s*;/', $content, $m)) { return $m[1]; }
+        return '';
+    }
+
+    private function firstLine(string $file): string
+    {
+        if (!is_file($file)) { return ''; }
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        return is_array($lines) && isset($lines[0]) ? trim((string)$lines[0]) : '';
+    }
+
+    private function companionPath(string $pluginRoot): string
+    {
+        $search = '/Services/EventHandling/EventHook/IliasTraxEventBridge';
+        $replace = '/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI';
+        if (substr($pluginRoot, -strlen($search)) === $search) {
+            return substr($pluginRoot, 0, -strlen($search)) . $replace;
+        }
+        return dirname(dirname(dirname($pluginRoot))) . '/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI';
+    }
+
     private function inputRow(string $l, string $n, string $v, string $h): string { return '<tr><td><label for="'.$this->esc($n).'">'.$this->esc($l).'</label></td><td><input id="'.$this->esc($n).'" name="'.$this->esc($n).'" type="text" value="'.$this->esc($v).'" class="form-control"><div class="small">'.$this->esc($h).'</div></td></tr>'; }
     private function passwordRow(string $l, string $n, string $h): string { return '<tr><td><label for="'.$this->esc($n).'">'.$this->esc($l).'</label></td><td><input id="'.$this->esc($n).'" name="'.$this->esc($n).'" type="password" value="" class="form-control"><div class="small">'.$this->esc($h).'</div></td></tr>'; }
     private function checkboxRow(string $l, string $n, bool $c, string $h): string { return '<tr><td><label for="'.$this->esc($n).'">'.$this->esc($l).'</label></td><td><label><input id="'.$this->esc($n).'" name="'.$this->esc($n).'" type="checkbox" value="1"'.($c ? ' checked="checked"' : '').'> activé</label><div class="small">'.$this->esc($h).'</div></td></tr>'; }
@@ -289,7 +374,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . '#itxeb-config-page .itxeb-section{margin-bottom:1.5rem}'
             . '#itxeb-config-page table.std{width:100%;border-collapse:collapse;background:#fff}'
             . '#itxeb-config-page table.std th,#itxeb-config-page table.std td{padding:.55rem .7rem;vertical-align:top;line-height:1.35}'
-            . '#itxeb-config-page .itxeb-state-table,#itxeb-config-page .itxeb-form-table{max-width:980px}'
+            . '#itxeb-config-page .itxeb-state-table,#itxeb-config-page .itxeb-form-table{max-width:1080px}'
             . '#itxeb-config-page .itxeb-summary{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 1rem}'
             . '#itxeb-config-page .itxeb-summary span{background:#f5f5f5;border:1px solid #ddd;padding:.35rem .55rem;border-radius:4px}'
             . '#itxeb-config-page .itxeb-dashboard-block{margin:.8rem 0 1.1rem}'
@@ -298,6 +383,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . '#itxeb-config-page .itxeb-badge-warn{background:#fcf8e3}'
             . '#itxeb-config-page .itxeb-badge-error{background:#f2dede}'
             . '#itxeb-config-page .itxeb-badge-muted{background:#eee}'
+            . '#itxeb-config-page .itxeb-health table td:nth-child(2){width:8rem;text-align:center}'
             . '#itxeb-config-page pre{max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}'
             . '#itxeb-config-page code{white-space:normal;word-break:break-word;overflow-wrap:anywhere}'
             . '</style>';
