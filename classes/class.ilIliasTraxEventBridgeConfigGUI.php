@@ -7,6 +7,7 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeEventDebugRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeDenyLogRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeTraxClient.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeLrsReadClient.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingGUI.php';
 
@@ -32,6 +33,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         switch ($cmd) {
             case 'saveConfig': $this->saveConfig(); break;
             case 'testTraxConnection': $this->testTraxConnection(); break;
+            case 'testLrsRead': $this->testLrsRead(); break;
             case 'sendGenerated': $this->sendGenerated(); break;
             case 'resetFailed': $this->resetFailed(); break;
             case 'configureCourseTracking': $this->handleCourseTracking('show'); break;
@@ -106,6 +108,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . $rows
             . '</tbody></table>'
             . '<p><strong>Diagnostic serveur :</strong> pour un contrôle plus complet côté AlmaLinux, lancer <code>bash scripts/diagnostic_itxeb.sh</code> depuis le dossier du plugin.</p>'
+            . '<p><strong>Tests applicatifs :</strong> utiliser les boutons <code>Tester connexion TRAX</code> et <code>Tester lecture TRAX/LRS</code> dans la section configuration.</p>'
             . '<p><strong>Documentation :</strong> consulter <code>docs/DIAGNOSTIC.md</code> et <code>docs/ROLLBACK.md</code>.</p>'
             . '</section>';
     }
@@ -162,7 +165,9 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= $this->checkboxRow('Activer le diagnostic des traces refusées', 'deny_log_enabled', $this->config->isDenyLogEnabled(), 'À activer uniquement à la demande. Si activé sur une plateforme volumineuse, la table evnt_evhk_itxeb_dlog peut grossir rapidement.');
         foreach ([['Endpoint xAPI TRAX','trax_endpoint',$this->config->getTraxEndpoint(),'Endpoint xAPI racine ou URL complète /statements.'],['Identifiant client TRAX','trax_username',$this->config->getTraxUsername(),'Client xAPI autorisé à écrire.'],['Version xAPI','xapi_version',$this->config->getXapiVersion(),'Recommandé : 1.0.3.'],['Timeout HTTP','http_timeout',(string)$this->config->getHttpTimeout(),'Entre 2 et 120 secondes.'],['Taille batch','batch_size',(string)$this->config->getBatchSize(),'Entre 1 et 100 statements.'],['Max retry','max_retry',(string)$this->config->getMaxRetry(),'Nombre maximum de tentatives par statement.'],['Base URL ILIAS forcée','ilias_base_url',$this->config->getIliasBaseUrl(),'Optionnel. Utilisé pour les IRIs xAPI.']] as $r) { $html .= $this->inputRow($r[0], $r[1], $r[2], $r[3]); }
         $html .= $this->passwordRow('Secret client TRAX', 'trax_password', 'Laisser vide pour conserver le secret.');
-        return $html . '</table><p><button class="btn btn-primary" type="submit">Enregistrer</button></p></form><form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')).'"><p><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p></form></section>';
+        return $html . '</table><p><button class="btn btn-primary" type="submit">Enregistrer</button></p></form>'
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')).'"><p><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p></form>'
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsRead')).'"><p><button class="btn btn-default" type="submit">Tester lecture TRAX/LRS</button> <span class="small">Effectue uniquement un <code>GET /statements?limit=1</code>, sans créer de trace.</span></p></form></section>';
     }
 
     private function renderSendActions(): string
@@ -274,7 +279,26 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $r = (new ilIliasTraxEventBridgeTraxClient($this->config))->testConnection();
         $this->config->setLastTraxTestResult($r->isSuccess(), $r->getHttpStatus(), $r->getShortMessage());
         if ($r->isSuccess()) { $this->success('Connexion TRAX réussie : '.$r->getShortMessage()); }
-        elseif (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) { ilUtil::sendFailure('Connexion TRAX échouée : '.$r->getShortMessage(), true); }
+        else { $this->failure('Connexion TRAX échouée : '.$r->getShortMessage()); }
+        $this->ctrl->redirect($this, 'configure');
+    }
+
+    private function testLrsRead(): void
+    {
+        $r = (new ilIliasTraxEventBridgeLrsReadClient($this->config))->queryStatements(['limit' => 1]);
+        if (!$r->isSuccess()) {
+            $this->failure('Lecture TRAX/LRS échouée : '.$r->getShortMessage());
+            $this->ctrl->redirect($this, 'configure');
+            return;
+        }
+
+        $count = 0;
+        $decoded = json_decode($r->getBody(), true);
+        if (is_array($decoded) && isset($decoded['statements']) && is_array($decoded['statements'])) {
+            $count = count($decoded['statements']);
+        }
+
+        $this->success('Lecture TRAX/LRS réussie : HTTP '.$r->getHttpStatus().' ; '.$count.' statement(s) retourné(s) avec limit=1.');
         $this->ctrl->redirect($this, 'configure');
     }
 
@@ -283,7 +307,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $r = (new ilIliasTraxEventBridgeOutboxSender($this->config, $this->outbox))->sendBatch();
         $this->config->setLastTraxSendResult((bool)$r['success'], (int)$r['http_status'], (string)$r['message']);
         if ($r['success']) { $this->success((string)$r['message']); }
-        elseif (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) { ilUtil::sendFailure((string)$r['message'], true); }
+        else { $this->failure((string)$r['message']); }
         $this->ctrl->redirect($this, 'configure');
     }
 
@@ -362,6 +386,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function postString(string $k): string { return isset($_POST[$k]) && is_scalar($_POST[$k]) ? trim((string)$_POST[$k]) : ''; }
     private function esc(string $v): string { return htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
     private function success(string $m): void { if (class_exists('ilUtil') && method_exists('ilUtil', 'sendSuccess')) { ilUtil::sendSuccess($m, true); } }
+    private function failure(string $m): void { if (class_exists('ilUtil') && method_exists('ilUtil', 'sendFailure')) { ilUtil::sendFailure($m, true); } }
     private function setContent(string $html): void { if (is_object($this->tpl) && method_exists($this->tpl, 'setContent')) { $this->tpl->setContent($html); } }
     private function countValue(array &$counts, string $value): void { $value = trim($value); if ($value === '') { return; } if (!isset($counts[$value])) { $counts[$value] = 0; } $counts[$value]++; }
     private function statementExtensions(string $statementJson): array { $decoded = json_decode($statementJson, true); if (!is_array($decoded)) { return []; } $context = $decoded['context'] ?? []; if (!is_array($context)) { return []; } $extensions = $context['extensions'] ?? []; return is_array($extensions) ? $extensions : []; }
