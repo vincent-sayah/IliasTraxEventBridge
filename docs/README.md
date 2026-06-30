@@ -27,12 +27,13 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
 | Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
 | Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
+| Valider la V0.11 sur VM ILIAS | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
 | Lire la note de release stable | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
-| Voir la checklist de validation | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+| Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
 
 ## Documents V0.11
 
@@ -56,6 +57,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - l'analyse de l'outbox ;
 - la vérification du cron ;
 - la vérification TRAX/LRS ;
+- les tests lecture et écriture TRAX/LRS ;
 - les symptômes fréquents.
 
 ### Rollback
@@ -68,6 +70,19 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - le rollback du plugin compagnon ;
 - les précautions SQL ;
 - les contrôles après retour arrière.
+
+### Validation V0.11
+
+[`VALIDATION_0.11.md`](VALIDATION_0.11.md) décrit :
+
+- les commandes à lancer côté Git Bash ;
+- les commandes à lancer côté VM ILIAS ;
+- le rebuild ILIAS ;
+- les contrôles de la page `Santé / Diagnostic V0.11` ;
+- le test de connexion TRAX ;
+- le test de lecture TRAX/LRS ;
+- le test d'écriture TRAX/LRS ;
+- les critères d'acceptation de la V0.11.
 
 ## Documents principaux V0.10.1
 
@@ -180,7 +195,8 @@ Images disponibles :
 | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) | Note de release corrective stable V0.10.1. |
 | [`RELEASE_TAG_COMMANDS_0.10.1.md`](RELEASE_TAG_COMMANDS_0.10.1.md) | Commandes de tag V0.10.1. |
 | [`STABLE_0.10.1.md`](STABLE_0.10.1.md) | Marqueur documentaire de stabilisation V0.10.1. |
-| [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale de validation. |
+| [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale V0.10.1. |
+| [`VALIDATION_0.11.md`](VALIDATION_0.11.md) | Procédure de validation V0.11. |
 
 ## Commandes de contrôle rapides
 
@@ -190,10 +206,10 @@ head -5 sql/dbupdate.php
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
 ```
 
-Résultat attendu :
+Résultat attendu en V0.11 :
 
 ```text
-$version = '0.10.1' ou version supérieure
+$version = '0.11.0';
 <#1>
 <?php
 aucune erreur PHP
