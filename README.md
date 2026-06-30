@@ -6,10 +6,10 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 
 | Élément | Valeur |
 |---|---|
-| Version stable | `0.10.1` |
+| Version stable | `0.11.0` |
 | Branche stable officielle | `main` |
-| Tag stable | `v0.10.1` |
-| Branche de développement V0.10 | `v0.10-lrs-direct-read` |
+| Tag stable | `v0.11.0` |
+| Branche de développement V0.11 | `v0.11-diagnostic-exploitation` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
@@ -18,9 +18,9 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 | Source pédagogique du suivi xAPI | TRAX/LRS |
 | Rôle de l'outbox locale | File technique d'envoi uniquement |
 
-La V0.10.1 est maintenant promue sur `main`. Pour une installation stable, utiliser `main` ou le tag `v0.10.1`.
+La V0.11.0 est maintenant promue sur `main`. Pour une installation stable, utiliser `main` ou le tag `v0.11.0`.
 
-Correction importante V0.10.1 : le fichier `sql/dbupdate.php` commence par le marqueur ILIAS `<#1>`, ce qui sécurise l'installation depuis une ancienne version ou après désinstallation.
+La V0.11.0 conserve le fonctionnement V0.10.1 et ajoute le durcissement exploitation : diagnostic santé, tests TRAX/LRS, rollback et procédure de validation.
 
 ## Documentation complète
 
@@ -33,14 +33,17 @@ Le dossier `docs/` contient maintenant un index dédié : [`docs/README.md`](doc
 | [`docs/FONCTIONNEL.md`](docs/FONCTIONNEL.md) | Documentation fonctionnelle : objectifs, utilisateurs, parcours cours, vues Tableau de bord / Analyse / Expert / Configuration. |
 | [`docs/TECHNIQUE.md`](docs/TECHNIQUE.md) | Documentation technique : architecture, EventHook, UIHook, outbox, TRAX/LRS, tables SQL, flux de lecture et d'envoi. |
 | [`docs/EXPLOITATION.md`](docs/EXPLOITATION.md) | Exploitation : supervision, cron, tests LRS, requêtes SQL utiles, purge et analyse d'incident. |
+| [`docs/DIAGNOSTIC.md`](docs/DIAGNOSTIC.md) | Diagnostic exploitation V0.11 : santé plugin, tables, outbox, TRAX/LRS et cron. |
+| [`docs/ROLLBACK.md`](docs/ROLLBACK.md) | Procédure de retour arrière. |
+| [`docs/VALIDATION_0.11.md`](docs/VALIDATION_0.11.md) | Procédure complète de validation V0.11. |
 | [`docs/DEVELOPPEUR.md`](docs/DEVELOPPEUR.md) | Documentation développeur : classes principales, conventions, migrations, contrôles avant livraison. |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap à jour : V0.11, V0.12, IA d'analyse des traces, API keys IA, sécurité et gouvernance. |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap à jour : V0.12, V0.13, IA d'analyse des traces, API keys IA, sécurité et gouvernance. |
 | [`docs/IA_ANALYSE_TRACES.md`](docs/IA_ANALYSE_TRACES.md) | Cadrage détaillé de l'analyse des traces xAPI par IA. |
-| [`docs/RELEASE_0.10.1.md`](docs/RELEASE_0.10.1.md) | Note de version stable V0.10.1. |
-| [`docs/V0.10_LRS_DIRECT_READ.md`](docs/V0.10_LRS_DIRECT_READ.md) | Décision d'architecture V0.10 : lecture directe TRAX/LRS. |
+| [`docs/RELEASE_0.11.0.md`](docs/RELEASE_0.11.0.md) | Note de version stable V0.11.0. |
+| [`docs/V0.10_LRS_DIRECT_READ.md`](docs/V0.10_LRS_DIRECT_READ.md) | Décision d'architecture V0.10/V0.11 : lecture directe TRAX/LRS. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
-## Principe d'architecture V0.10.1
+## Principe d'architecture V0.11.0
 
 ```text
 ILIAS 10
@@ -68,6 +71,16 @@ TRAX/LRS      = source officielle du suivi xAPI pédagogique
 ```
 
 L'outbox locale `evnt_evhk_itxeb_out` peut être purgée en exploitation. Elle ne doit donc pas être utilisée comme source fonctionnelle du tableau de bord pédagogique.
+
+## Nouveautés V0.11.0
+
+- Section `Santé / Diagnostic V0.11` dans l'administration du plugin.
+- Script serveur non destructif `scripts/diagnostic_itxeb.sh`.
+- Test de connexion TRAX.
+- Test de lecture TRAX/LRS via `GET /statements?limit=1`, sans création de trace.
+- Test d'écriture TRAX/LRS avec création volontaire d'un statement de diagnostic identifiable.
+- Persistance des résultats lecture/écriture dans `Diagnostics TRAX / cron`.
+- Documentation diagnostic, rollback et validation.
 
 ## Fonctionnalités principales
 
@@ -117,223 +130,3 @@ Tableau de bord | Analyse | Expert | Configuration
 ### Vue Expert du suivi xAPI
 
 ![Écran expert du suivi xAPI](docs/images/suivi_xapi_expert.png)
-
-## Installation rapide depuis main
-
-```bash
-sudo -i
-
-export ILIAS_ROOT="/var/www/ilias"
-export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
-export PLUGIN_NAME="IliasTraxEventBridge"
-
-mkdir -p "$EVENTHOOK_DIR"
-cd "$EVENTHOOK_DIR"
-
-git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
-cd "$PLUGIN_NAME"
-
-grep -n '\$version' plugin.php
-head -5 sql/dbupdate.php
-find . -name "*.php" -print0 | xargs -0 -n1 php -l
-```
-
-Résultat attendu :
-
-```text
-$version = '0.10.1';
-<#1>
-<?php
-aucune erreur de syntaxe PHP
-```
-
-Installer le plugin compagnon UIHook :
-
-```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
-
-Reconstruire ILIAS :
-
-```bash
-cd /var/www/ilias
-sudo -u apache composer du
-sudo -u apache php cli/setup.php build --yes
-systemctl restart httpd
-# si php-fpm est utilisé :
-systemctl restart php-fpm
-```
-
-Puis installer ou mettre à jour les plugins dans ILIAS :
-
-```text
-Administration > Plugins > IliasTraxEventBridge > Installer ou Mettre à jour
-Administration > Plugins > IliasTraxEventBridgeCourseUI > Installer ou Mettre à jour
-```
-
-La procédure complète est disponible dans [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
-
-## Configuration LRS / TRAX
-
-Dans l'administration du plugin principal :
-
-```text
-Administration > Plugins > IliasTraxEventBridge > Configurer
-```
-
-Champs principaux :
-
-| Champ | Description |
-|---|---|
-| Endpoint xAPI TRAX | Endpoint xAPI racine ou URL complète `/statements`. |
-| Identifiant client TRAX | Compte xAPI autorisé à écrire et lire les statements. |
-| Secret client TRAX | Secret du compte xAPI. |
-| Version xAPI | Recommandé : `1.0.3`. |
-| Timeout HTTP | Timeout des appels HTTP vers TRAX/LRS. |
-| Taille batch | Nombre maximum de statements envoyés par batch. |
-| Max retry | Nombre maximum de tentatives par statement. |
-| Base URL ILIAS forcée | Optionnelle, utilisée pour construire les IRIs xAPI. |
-| Activer le cron plugin | Autorise le traitement automatique via le cron ILIAS. |
-| Activer le diagnostic des traces refusées | À activer uniquement pour analyse ciblée. |
-
-Le plugin ajoute automatiquement `/statements` si l'endpoint fourni ne se termine pas déjà par `/statements`.
-
-## Configuration xAPI par cours
-
-Dans un cours ILIAS :
-
-```text
-Cours > Suivi xAPI > Configuration
-```
-
-Procédure :
-
-1. cocher `Activer les traces xAPI pour ce cours` ;
-2. cocher les ressources à tracer ;
-3. enregistrer la configuration xAPI ;
-4. générer de l'activité sur les ressources ;
-5. vérifier les vues `Tableau de bord`, `Analyse` et `Expert`.
-
-Règle métier :
-
-```text
-statement xAPI autorisé = cours activé ET ressource activée
-```
-
-## Cron ILIAS
-
-L'option `Activer le cron plugin` autorise le plugin à travailler lorsque le cron ILIAS s'exécute. Il faut aussi activer le job dans ILIAS :
-
-```text
-Administration > Paramètres système et maintenance > Tâches cron
-```
-
-Job :
-
-```text
-IliasTraxEventBridge — envoi outbox vers TRAX
-```
-
-Identifiant technique :
-
-```text
-itxeb_send_outbox_to_trax
-```
-
-## Tables principales
-
-| Table | Rôle |
-|---|---|
-| `evnt_evhk_itxeb_log` | Journal brut des événements ILIAS reçus. |
-| `evnt_evhk_itxeb_out` | Outbox locale technique des statements xAPI à envoyer. |
-| `evnt_evhk_itxeb_read` | Anti-doublon local pour les consultations `read_event`. |
-| `evnt_evhk_itxeb_ccfg` | Configuration xAPI par cours et préférences dashboard. |
-| `evnt_evhk_itxeb_rcfg` | Configuration xAPI par ressource dans un cours. |
-| `evnt_evhk_itxeb_dlog` | Diagnostic des traces refusées. |
-
-## Objets couverts
-
-| Action ILIAS | Source | `event_type` SQL | Verbe xAPI / famille |
-|---|---|---|---|
-| Démarrage d'un test dans un cours | `Tracking:updateStatus` test | `test_tracking_status` | `attempted` / `test_tracking` |
-| Test réussi dans un cours | `Tracking:updateStatus` test | `test_tracking_status` | `passed` / `test_tracking` |
-| Test échoué dans un cours | `Tracking:updateStatus` test | `test_tracking_status` | `failed` / `test_tracking` |
-| Téléchargement d'un fichier dans un cours | EventHook `sendfile` | `file_downloaded` | `downloaded` / `file_download` |
-| Consultation blog dans un cours | `read_event` | `repository_object_access` | `read` / `repository_blog_access` |
-| Consultation forum dans un cours | `read_event` | `repository_object_access` | `interacted` / `repository_forum_access` |
-| Consultation lien web dans un cours | `read_event` | `repository_object_access` | `visited` / `repository_web_link_access` |
-| Consultation mediacast dans un cours | `read_event` | `repository_object_access` | `viewed` / `repository_media_access` |
-| Consultation wiki dans un cours | `read_event` | `repository_object_access` | `read` / `repository_wiki_access` |
-| Consultation module HTML dans un cours | `read_event` | `repository_object_access` | `read` / `repository_html_module_access` |
-| Consultation module web dans un cours | `read_event` | `repository_object_access` | `read` / `repository_learning_module_access` |
-| Consultation module SCORM dans un cours | `read_event` | `repository_object_access` | `launched` / `repository_scorm_access` |
-
-## Roadmap
-
-La roadmap à jour est disponible ici : [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-Axes principaux envisagés :
-
-- V0.11 : durcissement exploitation, diagnostics et packaging.
-- V0.12 : enrichissement pédagogique des tableaux de bord.
-- V0.13 : analyse IA optionnelle des traces xAPI avec clé API IA configurable.
-- V0.14 : gouvernance, anonymisation avancée et historisation durable.
-
-Le cadrage détaillé de l'analyse IA est disponible ici : [`docs/IA_ANALYSE_TRACES.md`](docs/IA_ANALYSE_TRACES.md).
-
-## Requêtes SQL utiles
-
-Outbox récente :
-
-```sql
-SELECT id, event_log_id, event_type, obj_type, ref_id, obj_id,
-       user_id, status, retry_count, created_at, sent_at, last_error
-FROM evnt_evhk_itxeb_out
-ORDER BY id DESC
-LIMIT 20;
-```
-
-Configuration d'un cours :
-
-```sql
-SELECT *
-FROM evnt_evhk_itxeb_ccfg
-WHERE course_ref_id = 210;
-
-SELECT course_ref_id, ref_id, obj_id, obj_type, enabled, updated_at, updated_by
-FROM evnt_evhk_itxeb_rcfg
-WHERE course_ref_id = 210
-ORDER BY ref_id;
-```
-
-Diagnostic des refus :
-
-```sql
-SELECT id, created_at, reason, event_type, user_id, course_ref_id,
-       ref_id, obj_id, obj_type, source_table, source_id
-FROM evnt_evhk_itxeb_dlog
-ORDER BY id DESC
-LIMIT 30;
-```
-
-## Contrôles de livraison stable
-
-```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-
-grep -n '\$version' plugin.php
-head -5 sql/dbupdate.php
-find . -name "*.php" -print0 | xargs -0 -n1 php -l
-git status
-git log --oneline -10
-```
-
-Résultat attendu :
-
-```text
-$version = '0.10.1';
-sql/dbupdate.php commence par <#1>
-aucune erreur PHP
-working tree clean
-```
