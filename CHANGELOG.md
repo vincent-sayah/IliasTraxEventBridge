@@ -2,6 +2,39 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.11.0 — diagnostic et durcissement exploitation
+
+### Statut
+
+- Branche concernée : `v0.11-diagnostic-exploitation`.
+- Base : `main` / `v0.10.1`.
+- Version cible envisagée : `0.11.0`.
+- Type : durcissement exploitation, diagnostic et rollback.
+- Source fonctionnelle du suivi xAPI : TRAX/LRS.
+- Rôle de l'outbox locale : file technique d'envoi uniquement.
+
+### Objectif
+
+La V0.11 prépare une version plus robuste pour l'exploitation : installation plus contrôlable, diagnostic plus simple, procédures de retour arrière documentées, et préparation d'une future page de santé du plugin.
+
+### Ajouts documentaires
+
+- `docs/V0.11_DIAGNOSTIC_EXPLOITATION.md` : cadrage V0.11.
+- `docs/DIAGNOSTIC.md` : procédure de diagnostic exploitation.
+- `docs/ROLLBACK.md` : procédure de retour arrière.
+- `docs/README.md` mis à jour pour rendre les nouveaux documents visibles.
+
+### Pistes techniques V0.11
+
+- Ajouter `scripts/diagnostic_itxeb.sh`.
+- Ajouter une page ou section `Santé / Diagnostic` dans l'administration du plugin.
+- Vérifier la présence du plugin compagnon UIHook.
+- Vérifier les tables SQL `evnt_evhk_itxeb_*`.
+- Vérifier la configuration TRAX/LRS.
+- Vérifier l'état de l'outbox.
+- Vérifier le cron ILIAS.
+- Préparer les tests de lecture et d'écriture TRAX/LRS.
+
 ## Documentation main — README, docs et roadmap IA
 
 ### Statut
