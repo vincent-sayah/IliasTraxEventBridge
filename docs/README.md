@@ -1,14 +1,16 @@
 # Documentation — IliasTraxEventBridge
 
-Ce dossier regroupe toute la documentation de la version stable **V0.10.1** du plugin `IliasTraxEventBridge`.
+Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
-## Version documentée
+## Version stable et branche de travail
 
 | Élément | Valeur |
 |---|---|
 | Version stable | `0.10.1` |
 | Branche stable | `main` |
 | Tag stable | `v0.10.1` |
+| Branche en cours | `v0.11-diagnostic-exploitation` |
+| Objectif V0.11 | Diagnostic, exploitation, rollback et durcissement installation |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Source pédagogique du suivi xAPI | TRAX/LRS |
@@ -22,14 +24,67 @@ Ce dossier regroupe toute la documentation de la version stable **V0.10.1** du p
 | Comprendre ce que fait le plugin | [`FONCTIONNEL.md`](FONCTIONNEL.md) |
 | Comprendre l'architecture technique | [`TECHNIQUE.md`](TECHNIQUE.md) |
 | Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
+| Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
+| Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
+| Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
+| Valider la V0.11 sur VM ILIAS | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
 | Lire la note de release stable | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
-| Voir la checklist de validation | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+| Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
 
-## Documents principaux
+## Documents V0.11
+
+### Cadrage V0.11
+
+[`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) décrit :
+
+- le périmètre de la V0.11 ;
+- les objectifs d'exploitation ;
+- les contrôles attendus ;
+- les critères d'acceptation ;
+- le lien avec la future analyse IA.
+
+### Diagnostic
+
+[`DIAGNOSTIC.md`](DIAGNOSTIC.md) décrit :
+
+- les chemins attendus du plugin principal et du plugin compagnon ;
+- les commandes de contrôle serveur ;
+- les contrôles SQL ;
+- l'analyse de l'outbox ;
+- la vérification du cron ;
+- la vérification TRAX/LRS ;
+- les tests lecture et écriture TRAX/LRS ;
+- les symptômes fréquents.
+
+### Rollback
+
+[`ROLLBACK.md`](ROLLBACK.md) décrit :
+
+- les sauvegardes avant mise à jour ;
+- le rollback par Git ;
+- le rollback depuis archive `tar.gz` ;
+- le rollback du plugin compagnon ;
+- les précautions SQL ;
+- les contrôles après retour arrière.
+
+### Validation V0.11
+
+[`VALIDATION_0.11.md`](VALIDATION_0.11.md) décrit :
+
+- les commandes à lancer côté Git Bash ;
+- les commandes à lancer côté VM ILIAS ;
+- le rebuild ILIAS ;
+- les contrôles de la page `Santé / Diagnostic V0.11` ;
+- le test de connexion TRAX ;
+- le test de lecture TRAX/LRS ;
+- le test d'écriture TRAX/LRS ;
+- les critères d'acceptation de la V0.11.
+
+## Documents principaux V0.10.1
 
 ### Installation
 
@@ -108,7 +163,7 @@ Elle prévoit notamment un axe futur d'analyse des traces xAPI par IA :
 
 Le cadrage détaillé est dans [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md).
 
-## Décision d'architecture V0.10.1
+## Décision d'architecture V0.10.1 conservée en V0.11
 
 ```text
 Outbox locale = file technique d'envoi
@@ -140,7 +195,8 @@ Images disponibles :
 | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) | Note de release corrective stable V0.10.1. |
 | [`RELEASE_TAG_COMMANDS_0.10.1.md`](RELEASE_TAG_COMMANDS_0.10.1.md) | Commandes de tag V0.10.1. |
 | [`STABLE_0.10.1.md`](STABLE_0.10.1.md) | Marqueur documentaire de stabilisation V0.10.1. |
-| [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale de validation. |
+| [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale V0.10.1. |
+| [`VALIDATION_0.11.md`](VALIDATION_0.11.md) | Procédure de validation V0.11. |
 
 ## Commandes de contrôle rapides
 
@@ -150,10 +206,10 @@ head -5 sql/dbupdate.php
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
 ```
 
-Résultat attendu :
+Résultat attendu en V0.11 :
 
 ```text
-$version = '0.10.1';
+$version = '0.11.0';
 <#1>
 <?php
 aucune erreur PHP

@@ -3,7 +3,7 @@
 /**
  * Configuration wrapper.
  *
- * V0.8 adds deny-log diagnostics that can be enabled on demand.
+ * V0.11 adds persistent diagnostics for TRAX/LRS read and write tests.
  */
 class ilIliasTraxEventBridgeConfig
 {
@@ -118,6 +118,30 @@ class ilIliasTraxEventBridgeConfig
     public function getLastTraxTestSuccess(): string { return $this->yesNo('last_trax_test_success'); }
     public function getLastTraxTestHttpStatus(): string { return $this->get('last_trax_test_http_status', ''); }
     public function getLastTraxTestMessage(): string { return $this->get('last_trax_test_message', ''); }
+
+    public function setLastLrsReadResult(bool $success, int $httpStatus, string $message): void
+    {
+        $this->set('last_lrs_read_at', date('Y-m-d H:i:s'));
+        $this->set('last_lrs_read_success', $success ? '1' : '0');
+        $this->set('last_lrs_read_http_status', (string) $httpStatus);
+        $this->set('last_lrs_read_message', substr($message, 0, 2000));
+    }
+    public function getLastLrsReadAt(): string { return $this->get('last_lrs_read_at', ''); }
+    public function getLastLrsReadSuccess(): string { return $this->yesNo('last_lrs_read_success'); }
+    public function getLastLrsReadHttpStatus(): string { return $this->get('last_lrs_read_http_status', ''); }
+    public function getLastLrsReadMessage(): string { return $this->get('last_lrs_read_message', ''); }
+
+    public function setLastLrsWriteResult(bool $success, int $httpStatus, string $message): void
+    {
+        $this->set('last_lrs_write_at', date('Y-m-d H:i:s'));
+        $this->set('last_lrs_write_success', $success ? '1' : '0');
+        $this->set('last_lrs_write_http_status', (string) $httpStatus);
+        $this->set('last_lrs_write_message', substr($message, 0, 2000));
+    }
+    public function getLastLrsWriteAt(): string { return $this->get('last_lrs_write_at', ''); }
+    public function getLastLrsWriteSuccess(): string { return $this->yesNo('last_lrs_write_success'); }
+    public function getLastLrsWriteHttpStatus(): string { return $this->get('last_lrs_write_http_status', ''); }
+    public function getLastLrsWriteMessage(): string { return $this->get('last_lrs_write_message', ''); }
 
     public function setLastTraxSendResult(bool $success, int $httpStatus, string $message): void
     {
