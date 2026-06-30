@@ -2,14 +2,14 @@
 
 Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
-## Version stable et branche de travail
+## Version stable
 
 | Élément | Valeur |
 |---|---|
-| Version stable | `0.10.1` |
+| Version stable | `0.11.0` |
 | Branche stable | `main` |
-| Tag stable | `v0.10.1` |
-| Branche en cours | `v0.11-diagnostic-exploitation` |
+| Tag stable | `v0.11.0` |
+| Ancienne stable | `v0.10.1` |
 | Objectif V0.11 | Diagnostic, exploitation, rollback et durcissement installation |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
@@ -28,10 +28,10 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
 | Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
 | Valider la V0.11 sur VM ILIAS | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
+| Lire la note de release stable | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
-| Lire la note de release stable | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
 
@@ -84,7 +84,16 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - le test d'écriture TRAX/LRS ;
 - les critères d'acceptation de la V0.11.
 
-## Documents principaux V0.10.1
+### Release V0.11.0
+
+[`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) récapitule :
+
+- la version stable `0.11.0` ;
+- les nouveautés de diagnostic ;
+- les validations attendues ;
+- les points de vigilance.
+
+## Documents principaux
 
 ### Installation
 
@@ -93,7 +102,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - les prérequis ILIAS ;
 - les prérequis TRAX/LRS ;
 - l'installation depuis `main` ;
-- l'installation depuis le tag `v0.10.1` ;
+- l'installation depuis un tag stable ;
 - l'installation du plugin compagnon UIHook ;
 - la reconstruction ILIAS ;
 - les contrôles post-installation ;
@@ -163,7 +172,7 @@ Elle prévoit notamment un axe futur d'analyse des traces xAPI par IA :
 
 Le cadrage détaillé est dans [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md).
 
-## Décision d'architecture V0.10.1 conservée en V0.11
+## Décision d'architecture conservée
 
 ```text
 Outbox locale = file technique d'envoi
@@ -191,12 +200,12 @@ Images disponibles :
 
 | Fichier | Rôle |
 |---|---|
-| [`RELEASE_0.10.0.md`](RELEASE_0.10.0.md) | Note de release initiale V0.10.0. |
+| [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) | Note de release stable V0.11.0. |
+| [`VALIDATION_0.11.md`](VALIDATION_0.11.md) | Procédure de validation V0.11. |
 | [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) | Note de release corrective stable V0.10.1. |
 | [`RELEASE_TAG_COMMANDS_0.10.1.md`](RELEASE_TAG_COMMANDS_0.10.1.md) | Commandes de tag V0.10.1. |
 | [`STABLE_0.10.1.md`](STABLE_0.10.1.md) | Marqueur documentaire de stabilisation V0.10.1. |
 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale V0.10.1. |
-| [`VALIDATION_0.11.md`](VALIDATION_0.11.md) | Procédure de validation V0.11. |
 
 ## Commandes de contrôle rapides
 
@@ -206,7 +215,7 @@ head -5 sql/dbupdate.php
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
 ```
 
-Résultat attendu en V0.11 :
+Résultat attendu en V0.11.0 :
 
 ```text
 $version = '0.11.0';
