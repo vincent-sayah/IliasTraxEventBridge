@@ -8,8 +8,8 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 |---|---|
 | Version stable sur `main` | `0.12.0` |
 | Branche stable officielle | `main` |
-| Dernier tag publié | `v0.11.0` |
-| Tag V0.12 | `v0.12.0` à créer après validation finale de la promotion |
+| Tag stable | `v0.12.0` |
+| Ancien tag stable | `v0.11.0` |
 | Ancienne stable | `0.11.0` |
 | Branche de développement V0.12 | `v0.12-dashboard-pedagogique` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
@@ -20,7 +20,7 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 | Source pédagogique du suivi xAPI | TRAX/LRS |
 | Rôle de l'outbox locale | File technique d'envoi uniquement |
 
-La V0.12.0 est maintenant promue sur `main`. Pour une installation stable courante, utiliser `main`.
+La V0.12.0 est maintenant promue sur `main` et publiée avec le tag stable `v0.12.0`. Pour une installation stable courante, utiliser `main` ou le tag `v0.12.0`.
 
 La V0.12.0 conserve les apports d'exploitation de la V0.11.0 et ajoute un dashboard pédagogique enrichi : synthèse pédagogique, statuts de ressources, analyse améliorée, apprenants en difficulté, export CSV Expert enrichi et ajustements ergonomiques.
 
