@@ -7,10 +7,13 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Élément | Valeur |
 |---|---|
 | Version stable | `0.11.0` |
+| Version en développement | `0.12.0` |
 | Branche stable | `main` |
+| Branche V0.12 | `v0.12-dashboard-pedagogique` |
 | Tag stable | `v0.11.0` |
 | Ancienne stable | `v0.10.1` |
 | Objectif V0.11 | Diagnostic, exploitation, rollback et durcissement installation |
+| Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Source pédagogique du suivi xAPI | TRAX/LRS |
@@ -29,11 +32,37 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
 | Valider la V0.11 sur VM ILIAS | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
 | Lire la note de release stable | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
+| Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
+| Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+
+## Documents V0.12
+
+### Cadrage V0.12
+
+[`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) décrit :
+
+- le périmètre de la V0.12 ;
+- les objectifs pédagogiques ;
+- les indicateurs attendus ;
+- les critères d'acceptation ;
+- les hors périmètre, notamment l'analyse IA.
+
+### Guide d’utilisation V0.12
+
+[`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) décrit :
+
+- le tableau de bord pédagogique ;
+- la synthèse pédagogique ;
+- les statuts `OK`, `À surveiller`, `Critique`, `Désactivée` ;
+- l'onglet Analyse enrichi ;
+- le bloc `Apprenants en difficulté` ;
+- l'export CSV Expert enrichi ;
+- les colonnes pédagogiques ajoutées au CSV.
 
 ## Documents V0.11
 
@@ -158,68 +187,3 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 ## Roadmap et IA
 
 La roadmap est dans [`ROADMAP.md`](ROADMAP.md).
-
-Elle prévoit notamment un axe futur d'analyse des traces xAPI par IA :
-
-- configuration d'une clé API IA dans l'administration du plugin ;
-- choix d'un fournisseur IA ;
-- anonymisation / pseudonymisation avant envoi ;
-- génération de synthèses pédagogiques ;
-- détection de ressources problématiques ;
-- aide à l'identification des apprenants en difficulté ;
-- recommandations d'amélioration de cours ;
-- gouvernance et audit des appels IA.
-
-Le cadrage détaillé est dans [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md).
-
-## Décision d'architecture conservée
-
-```text
-Outbox locale = file technique d'envoi
-TRAX/LRS      = source officielle du suivi xAPI pédagogique
-```
-
-L'outbox locale peut être purgée. Les vues pédagogiques ne doivent donc pas dépendre de cette table locale.
-
-## Images
-
-Les captures d'écran sont stockées dans :
-
-```text
-docs/images/
-```
-
-Images disponibles :
-
-- `suivi_xapi_configuration.png` ;
-- `suivi_xapi_tableau_bord.png` ;
-- `suivi_xapi_analyse.png` ;
-- `suivi_xapi_expert.png`.
-
-## Fichiers de release
-
-| Fichier | Rôle |
-|---|---|
-| [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) | Note de release stable V0.11.0. |
-| [`VALIDATION_0.11.md`](VALIDATION_0.11.md) | Procédure de validation V0.11. |
-| [`RELEASE_0.10.1.md`](RELEASE_0.10.1.md) | Note de release corrective stable V0.10.1. |
-| [`RELEASE_TAG_COMMANDS_0.10.1.md`](RELEASE_TAG_COMMANDS_0.10.1.md) | Commandes de tag V0.10.1. |
-| [`STABLE_0.10.1.md`](STABLE_0.10.1.md) | Marqueur documentaire de stabilisation V0.10.1. |
-| [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) | Checklist finale V0.10.1. |
-
-## Commandes de contrôle rapides
-
-```bash
-grep -n '\$version' plugin.php
-head -5 sql/dbupdate.php
-find . -name "*.php" -print0 | xargs -0 -n1 php -l
-```
-
-Résultat attendu en V0.11.0 :
-
-```text
-$version = '0.11.0';
-<#1>
-<?php
-aucune erreur PHP
-```
