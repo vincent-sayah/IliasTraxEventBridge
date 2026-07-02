@@ -9,9 +9,11 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
 | Tag stable | `v0.12.0` |
+| Version en développement | `0.13.0-dev` |
+| Branche V0.13 | `v0.13-consolidation-ui-companion` |
 | Ancien tag stable | `v0.11.0` |
 | Ancienne stable | `0.11.0` |
-| Ancienne branche de développement V0.12 | `v0.12-dashboard-pedagogique` |
+| Objectif V0.13 | Consolidation du compagnon UI et réduction des patchers |
 | Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
@@ -28,6 +30,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
 | Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
 | Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
+| Cadrer la V0.13 | [`V0.13_CONSOLIDATION_UI_COMPANION.md`](V0.13_CONSOLIDATION_UI_COMPANION.md) |
 | Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
 | Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
 | Valider la V0.12 | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
@@ -38,6 +41,18 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+
+## Documents V0.13
+
+### Consolidation du compagnon UI
+
+[`V0.13_CONSOLIDATION_UI_COMPANION.md`](V0.13_CONSOLIDATION_UI_COMPANION.md) décrit :
+
+- le périmètre de la V0.13 ;
+- la stratégie de consolidation du plugin compagnon ;
+- la réduction attendue des patchers d'installation ;
+- les critères d'acceptation ;
+- les hors périmètre, notamment l'analyse IA et les nouveaux indicateurs.
 
 ## Documents V0.12
 
