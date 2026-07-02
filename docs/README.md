@@ -6,13 +6,12 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
 | Élément | Valeur |
 |---|---|
-| Version stable | `0.11.0` |
-| Version en développement | `0.12.0` |
+| Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
-| Branche V0.12 | `v0.12-dashboard-pedagogique` |
-| Tag stable | `v0.11.0` |
-| Ancienne stable | `v0.10.1` |
-| Objectif V0.11 | Diagnostic, exploitation, rollback et durcissement installation |
+| Dernier tag publié | `v0.11.0` |
+| Tag V0.12 | `v0.12.0` à créer après validation finale de la promotion |
+| Ancienne stable | `0.11.0` |
+| Ancienne branche de développement V0.12 | `v0.12-dashboard-pedagogique` |
 | Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
@@ -29,12 +28,11 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
 | Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
 | Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
-| Cadrer la V0.11 | [`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) |
-| Valider la V0.11 sur VM ILIAS | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
-| Lire la note de release stable | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
 | Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
 | Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
-| Valider la V0.12 avant promotion | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
+| Valider la V0.12 | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
+| Lire la note de release V0.11 historique | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
+| Valider la V0.11 historique | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
@@ -79,9 +77,9 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - la validation de l'export CSV Expert enrichi ;
 - la validation des filtres ;
 - la conservation des diagnostics V0.11 ;
-- les critères d'acceptation finale avant promotion vers `main`.
+- les critères d'acceptation finale.
 
-## Documents V0.11
+## Documents V0.11 historiques
 
 ### Cadrage V0.11
 
@@ -134,7 +132,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
 [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) récapitule :
 
-- la version stable `0.11.0` ;
+- la version stable historique `0.11.0` ;
 - les nouveautés de diagnostic ;
 - les validations attendues ;
 - les points de vigilance.
