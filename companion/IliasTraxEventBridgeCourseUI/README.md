@@ -8,8 +8,8 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 |---|---|
 | Version stable projet sur `main` | `0.12.0` |
 | Branche stable | `main` |
-| Dernier tag publié | `v0.11.0` |
-| Tag V0.12 | `v0.12.0` à créer après validation finale de la promotion |
+| Tag stable | `v0.12.0` |
+| Ancien tag stable | `v0.11.0` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type | UIHook ILIAS |
