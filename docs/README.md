@@ -8,8 +8,8 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 |---|---|
 | Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
-| Dernier tag publié | `v0.11.0` |
-| Tag V0.12 | `v0.12.0` à créer après validation finale de la promotion |
+| Tag stable | `v0.12.0` |
+| Ancien tag stable | `v0.11.0` |
 | Ancienne stable | `0.11.0` |
 | Ancienne branche de développement V0.12 | `v0.12-dashboard-pedagogique` |
 | Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
