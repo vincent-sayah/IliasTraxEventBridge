@@ -30,14 +30,18 @@ Elle doit aider un formateur, un concepteur ou un pilote de cours à comprendre 
 - Création de la branche `v0.12-dashboard-pedagogique` depuis `main`.
 - Passage du plugin principal en version `0.12.0`.
 - Ajout du cadrage `docs/V0.12_DASHBOARD_PEDAGOGIQUE.md`.
+- Ajout de statuts pédagogiques calculés dans la synthèse LRS : `ok`, `watch`, `critical`, `disabled`.
+- Ajout d'une synthèse pédagogique déterministe côté LRS : ressources critiques, ressources à surveiller, ressources activées sans trace.
+- Ajout du patcher `scripts/patch_course_ui_pedagogical_dashboard.php`.
+- Intégration automatique du patcher V0.12 dans `scripts/install_course_ui_companion.sh`.
+- Préparation de l'affichage des statuts pédagogiques dans `Tableau de bord` et `Analyse`.
 
 ### Pistes techniques V0.12
 
-- Inspecter la synthèse LRS existante.
-- Ajouter des indicateurs pédagogiques déterministes.
-- Ajouter des statuts `OK`, `à surveiller`, `critique`.
-- Enrichir le tableau de bord.
-- Enrichir l'onglet Analyse.
+- Tester le patcher compagnon sur VM ILIAS.
+- Vérifier l'affichage `Cours > Suivi xAPI > Analyse`.
+- Ajuster les seuils pédagogiques si nécessaire.
+- Enrichir l'export CSV Expert avec les nouveaux champs pédagogiques.
 - Conserver les diagnostics V0.11.
 
 ## v0.11.0 — diagnostic et durcissement exploitation
