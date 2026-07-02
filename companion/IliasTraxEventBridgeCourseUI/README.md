@@ -6,18 +6,21 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 | Élément | Valeur |
 |---|---|
-| Version stable projet | `0.11.0` |
+| Version stable projet sur `main` | `0.12.0` |
 | Branche stable | `main` |
-| Tag stable | `v0.11.0` |
+| Dernier tag publié | `v0.11.0` |
+| Tag V0.12 | `v0.12.0` à créer après validation finale de la promotion |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type | UIHook ILIAS |
+| Source pédagogique | TRAX/LRS |
+| Rôle de l'outbox locale | File technique d'envoi uniquement |
 
 ## Objectif
 
 Ce plugin compagnon ajoute l'accès au suivi xAPI directement dans l'objet cours ILIAS.
 
-Accès attendu en V0.11.0 :
+Accès attendu en V0.12.0 :
 
 ```text
 Cours > Suivi xAPI
@@ -33,25 +36,35 @@ Le plugin principal `IliasTraxEventBridge` reste responsable de :
 
 - la captation EventHook ;
 - la génération des statements xAPI ;
-- l'outbox locale ;
+- l'outbox locale technique ;
 - le cron ;
 - l'envoi vers TRAX/LRS ;
 - la lecture directe TRAX/LRS ;
 - les tables `evnt_evhk_itxeb_*` ;
 - le filtrage avant outbox ;
 - la configuration globale TRAX/LRS ;
-- la section d'administration `Santé / Diagnostic V0.11`.
+- la section d'administration `Santé / Diagnostic V0.11` conservée ;
+- le calcul des indicateurs pédagogiques V0.12 à partir de TRAX/LRS.
 
 Le plugin compagnon est responsable de l'intégration UI dans le cours et de l'affichage des vues de suivi.
 
-## Rôle des vues
+## Rôle des vues V0.12
 
 | Vue | Rôle |
 |---|---|
-| Tableau de bord | Synthèse pédagogique alimentée par TRAX/LRS. |
-| Analyse | Analyse des ressources, verbes retournés par TRAX, ressources retournées par TRAX. |
-| Expert | Statements TRAX détaillés et export CSV. |
-| Configuration | Activation cours / ressources, préférences dashboard, diagnostic LRS, supervision outbox. |
+| Tableau de bord | Synthèse pédagogique alimentée par TRAX/LRS, compteurs OK / À surveiller / Critique / Sans trace, activité, top ressources et export PDF. |
+| Analyse | Analyse des ressources avec statut pédagogique, raison, taux d'échec, score moyen, ressources sans trace et apprenants en difficulté anonymisés. |
+| Expert | Statements TRAX détaillés et export CSV enrichi avec les colonnes pédagogiques V0.12. |
+| Configuration | Activation cours / ressources, préférences dashboard, diagnostic LRS, supervision technique outbox. |
+
+## Points ergonomiques V0.12
+
+- Bouton `Export PDF` placé dans l'en-tête du tableau de bord.
+- Blocs et tableaux mieux encadrés.
+- Titres de blocs renforcés.
+- `À surveiller` colorisé en orange.
+- `Critique` colorisé en rouge.
+- Colonne `Raison` de l'onglet Analyse rendue plus lisible.
 
 ## Packaging
 
@@ -84,30 +97,16 @@ Le script d'installation matérialise les templates `.php.tpl` en vrais fichiers
 Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
 
 ```bash
-sudo -i
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 
+git fetch origin
+git checkout main
+git pull origin main
+
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
-
-cd /var/www/ilias
-sudo -u apache composer du
-sudo -u apache php cli/setup.php build --yes
-systemctl restart httpd
-systemctl restart php-fpm
 ```
 
-Variables optionnelles :
-
-```bash
-ILIAS_ROOT=/var/www/ilias
-HTTPD_USER=apache
-```
-
-Exemple avec variables explicites :
-
-```bash
-ILIAS_ROOT=/var/www/ilias HTTPD_USER=apache bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
+Ensuite reconstruire ILIAS et redémarrer les services selon la procédure habituelle de l'environnement.
 
 ## Chemin d'installation cible
 
@@ -121,4 +120,12 @@ Le plugin principal reste ici :
 
 ```text
 /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+```
+
+## Validation V0.12
+
+La validation détaillée est décrite dans :
+
+```text
+docs/VALIDATION_0.12.md
 ```
