@@ -34,6 +34,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Lire la note de release stable | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
 | Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
 | Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
+| Valider la V0.12 avant promotion | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
 | Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
 | Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
@@ -63,6 +64,22 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 - le bloc `Apprenants en difficulté` ;
 - l'export CSV Expert enrichi ;
 - les colonnes pédagogiques ajoutées au CSV.
+
+### Validation V0.12
+
+[`VALIDATION_0.12.md`](VALIDATION_0.12.md) décrit :
+
+- la mise à jour du plugin sur VM ILIAS ;
+- l'installation complète du compagnon UI ;
+- les contrôles fichiers installés ;
+- le rebuild ILIAS ;
+- la validation du tableau de bord ;
+- la validation de l'analyse ;
+- la validation de l'export PDF ;
+- la validation de l'export CSV Expert enrichi ;
+- la validation des filtres ;
+- la conservation des diagnostics V0.11 ;
+- les critères d'acceptation finale avant promotion vers `main`.
 
 ## Documents V0.11
 
