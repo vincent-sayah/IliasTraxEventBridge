@@ -62,6 +62,16 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 'tests_passed' => 0,
                 'tests_failed' => 0,
             ],
+            'pedagogy' => [
+                'ok_count' => 0,
+                'watch_count' => 0,
+                'critical_count' => 0,
+                'disabled_count' => 0,
+                'resources_without_trace' => 0,
+                'high_failure_resources' => 0,
+                'low_score_resources' => 0,
+                'synthesis_lines' => [],
+            ],
             'by_day' => [],
             'by_verb' => [],
             'by_status' => [],
@@ -90,6 +100,11 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 'test_attempts' => 0,
                 'test_passed' => 0,
                 'test_failed' => 0,
+                'failure_rate' => null,
+                'score_status' => 'none',
+                'pedagogical_status' => !empty($resource['enabled']) ? 'watch' : 'disabled',
+                'pedagogical_label' => !empty($resource['enabled']) ? 'À surveiller' : 'Désactivée',
+                'pedagogical_reason' => !empty($resource['enabled']) ? 'Ressource activée sans trace TRAX.' : 'Ressource désactivée dans le suivi xAPI.',
                 'signal' => !empty($resource['enabled']) ? 'activée sans trace' : 'désactivée',
             ];
         }
@@ -236,6 +251,11 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 'test_attempts' => 0,
                 'test_passed' => 0,
                 'test_failed' => 0,
+                'failure_rate' => null,
+                'score_status' => 'none',
+                'pedagogical_status' => 'ok',
+                'pedagogical_label' => 'OK',
+                'pedagogical_reason' => 'Ressource utilisée.',
                 'signal' => 'utilisée',
                 'enabled' => true,
                 'resource_family' => '',
@@ -300,22 +320,36 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         uasort($summary['by_verb'], static function (array $a, array $b): int {
             return (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0);
         });
+
+        $pedagogy = [
+            'ok_count' => 0,
+            'watch_count' => 0,
+            'critical_count' => 0,
+            'disabled_count' => 0,
+            'resources_without_trace' => 0,
+            'high_failure_resources' => 0,
+            'low_score_resources' => 0,
+            'synthesis_lines' => [],
+        ];
+
         foreach ($summary['by_resource'] as &$resource) {
             $resource['learners_count'] = count((array) ($resource['learners'] ?? []));
             $scores = (array) ($resource['scores'] ?? []);
             $resource['avg_score_raw'] = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : null;
-            $traces = (int) ($resource['traces'] ?? 0);
-            if ($traces > 0) {
-                $resource['signal'] = 'utilisée';
-            } elseif (!empty($resource['enabled'])) {
-                $resource['signal'] = 'aucune trace TRAX';
-            } else {
-                $resource['signal'] = 'désactivée';
-            }
+            $this->decorateResourceWithPedagogicalStatus($resource, $pedagogy);
             unset($resource['learners'], $resource['scores']);
         }
         unset($resource);
+
+        $summary['pedagogy'] = $this->finalizePedagogy($pedagogy, $summary);
+
         uasort($summary['by_resource'], static function (array $a, array $b): int {
+            $rank = ['critical' => 4, 'watch' => 3, 'ok' => 2, 'disabled' => 1];
+            $rankA = $rank[(string) ($a['pedagogical_status'] ?? '')] ?? 0;
+            $rankB = $rank[(string) ($b['pedagogical_status'] ?? '')] ?? 0;
+            if ($rankA !== $rankB) {
+                return $rankB <=> $rankA;
+            }
             return (int) ($b['traces'] ?? 0) <=> (int) ($a['traces'] ?? 0);
         });
         usort($summary['expert_rows'], static function (array $a, array $b): int {
@@ -334,6 +368,131 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $summary['summary']['avg_score_raw'] = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : null;
         unset($summary['learners'], $summary['scores']);
         return $summary;
+    }
+
+    /** @param array<string,mixed> $resource @param array<string,mixed> $pedagogy */
+    private function decorateResourceWithPedagogicalStatus(array &$resource, array &$pedagogy): void
+    {
+        $enabled = !empty($resource['enabled']);
+        $traces = (int) ($resource['traces'] ?? 0);
+        $passed = (int) ($resource['test_passed'] ?? 0);
+        $failed = (int) ($resource['test_failed'] ?? 0);
+        $attempts = (int) ($resource['test_attempts'] ?? 0);
+        $avgScore = $resource['avg_score_raw'];
+        $evaluatedAttempts = $passed + $failed;
+        $failureRate = $evaluatedAttempts > 0 ? round(($failed / $evaluatedAttempts) * 100, 1) : null;
+
+        $resource['failure_rate'] = $failureRate;
+        $resource['score_status'] = 'none';
+
+        if (!$enabled) {
+            $resource['signal'] = 'désactivée';
+            $resource['pedagogical_status'] = 'disabled';
+            $resource['pedagogical_label'] = 'Désactivée';
+            $resource['pedagogical_reason'] = 'Ressource désactivée dans le suivi xAPI.';
+            $pedagogy['disabled_count']++;
+            return;
+        }
+
+        if ($traces <= 0) {
+            $resource['signal'] = 'aucune trace TRAX';
+            $resource['pedagogical_status'] = 'watch';
+            $resource['pedagogical_label'] = 'À surveiller';
+            $resource['pedagogical_reason'] = 'Ressource activée mais aucune trace TRAX n’a été trouvée sur la période.';
+            $pedagogy['watch_count']++;
+            $pedagogy['resources_without_trace']++;
+            return;
+        }
+
+        $status = 'ok';
+        $label = 'OK';
+        $reason = 'Ressource utilisée sur la période.';
+
+        if ($failureRate !== null) {
+            if ($failed >= 2 && $failureRate >= 50.0) {
+                $status = 'critical';
+                $label = 'Critique';
+                $reason = 'Taux d’échec élevé sur cette ressource.';
+                $pedagogy['high_failure_resources']++;
+            } elseif ($failed >= 1 && $failureRate >= 30.0) {
+                $status = 'watch';
+                $label = 'À surveiller';
+                $reason = 'Des échecs sont observés sur cette ressource.';
+                $pedagogy['high_failure_resources']++;
+            }
+        }
+
+        if (is_numeric($avgScore)) {
+            if ((float) $avgScore < 50.0) {
+                $resource['score_status'] = 'low';
+                $pedagogy['low_score_resources']++;
+                if ($status !== 'critical') {
+                    $status = 'critical';
+                    $label = 'Critique';
+                    $reason = 'Score moyen faible sur cette ressource.';
+                }
+            } elseif ((float) $avgScore < 70.0) {
+                $resource['score_status'] = 'medium';
+                if ($status === 'ok') {
+                    $status = 'watch';
+                    $label = 'À surveiller';
+                    $reason = 'Score moyen à surveiller sur cette ressource.';
+                }
+            } else {
+                $resource['score_status'] = 'good';
+            }
+        }
+
+        $resource['signal'] = $status === 'ok' ? 'utilisée' : ($status === 'critical' ? 'critique' : 'à surveiller');
+        $resource['pedagogical_status'] = $status;
+        $resource['pedagogical_label'] = $label;
+        $resource['pedagogical_reason'] = $reason;
+        $resource['test_attempts'] = max($attempts, $evaluatedAttempts);
+
+        if ($status === 'critical') {
+            $pedagogy['critical_count']++;
+        } elseif ($status === 'watch') {
+            $pedagogy['watch_count']++;
+        } else {
+            $pedagogy['ok_count']++;
+        }
+    }
+
+    /** @param array<string,mixed> $pedagogy @param array<string,mixed> $summary @return array<string,mixed> */
+    private function finalizePedagogy(array $pedagogy, array $summary): array
+    {
+        $lines = [];
+        $activeLearners = count((array) ($summary['learners'] ?? []));
+        $totalStatements = (int) ($summary['returned'] ?? 0);
+
+        if ($totalStatements <= 0) {
+            $lines[] = 'Aucune trace TRAX/LRS trouvée sur la période.';
+        } else {
+            $lines[] = $totalStatements . ' trace(s) TRAX/LRS analysée(s) sur la période.';
+        }
+
+        if ($activeLearners > 0) {
+            $lines[] = $activeLearners . ' apprenant(s) actif(s) détecté(s).';
+        }
+
+        if ((int) $pedagogy['resources_without_trace'] > 0) {
+            $lines[] = $pedagogy['resources_without_trace'] . ' ressource(s) activée(s) ne présentent aucune trace TRAX sur la période.';
+        }
+
+        if ((int) $pedagogy['critical_count'] > 0) {
+            $lines[] = $pedagogy['critical_count'] . ' ressource(s) sont en statut critique.';
+        }
+
+        if ((int) $pedagogy['watch_count'] > 0) {
+            $lines[] = $pedagogy['watch_count'] . ' ressource(s) sont à surveiller.';
+        }
+
+        if ((int) $pedagogy['critical_count'] === 0 && (int) $pedagogy['watch_count'] === 0 && $totalStatements > 0) {
+            $lines[] = 'Aucun signal pédagogique défavorable détecté sur la période.';
+        }
+
+        $pedagogy['synthesis_lines'] = $lines;
+        return $pedagogy;
     }
 
     private function courseActivityId(int $courseRefId, int $courseObjId): string
