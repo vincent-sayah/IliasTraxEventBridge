@@ -23,11 +23,34 @@ $s = one($s,
     'dashboard synthesis insertion'
 );
 
-$s = one($s,
-    " . \$this->metricCard('Activées sans trace', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Envoyées TRAX', (string) (\$summary['sent'] ?? 0), 'status sent')",
-    " . \$this->metricCard('Critiques', (string) (\$dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')\n            . \$this->metricCard('À surveiller', (string) (\$dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')\n            . \$this->metricCard('Activées sans trace', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Envoyées TRAX', (string) (\$summary['sent'] ?? 0), 'status sent')",
-    'dashboard KPI insertion'
-);
+$kpiInserted = false;
+$patterns = [
+    [
+        " . \$this->metricCard('Activées sans trace', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Envoyées TRAX', (string) (\$summary['sent'] ?? 0), 'status sent')",
+        " . \$this->metricCard('Critiques', (string) (\$dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')\n            . \$this->metricCard('À surveiller', (string) (\$dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')\n            . \$this->metricCard('Activées sans trace', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Envoyées TRAX', (string) (\$summary['sent'] ?? 0), 'status sent')",
+    ],
+    [
+        " . \$this->metricCard('Sans statement TRAX', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Pages lues', (string) (\$dashboard['pages'] ?? 0), 'pagination')",
+        " . \$this->metricCard('Critiques', (string) (\$dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')\n            . \$this->metricCard('À surveiller', (string) (\$dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')\n            . \$this->metricCard('Sans statement TRAX', (string) \$this->countEnabledWithoutTraceResources(\$dashboard), 'À surveiller')\n            . \$this->metricCard('Pages lues', (string) (\$dashboard['pages'] ?? 0), 'pagination')",
+    ],
+    [
+        " . \$this->metricCard('Score moyen', \$summary['avg_score_raw'] === null ? '-' : (string) \$summary['avg_score_raw'] . ' %', 'Tests')",
+        " . \$this->metricCard('Critiques', (string) (\$dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')\n            . \$this->metricCard('À surveiller', (string) (\$dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')\n            . \$this->metricCard('Score moyen', \$summary['avg_score_raw'] === null ? '-' : (string) \$summary['avg_score_raw'] . ' %', 'Tests')",
+    ],
+];
+foreach ($patterns as $pair) {
+    $count = 0;
+    $candidate = str_replace($pair[0], $pair[1], $s, $count);
+    if ($count === 1) {
+        $s = $candidate;
+        $kpiInserted = true;
+        break;
+    }
+}
+if (!$kpiInserted) {
+    fwrite(STDERR, "Patch failed for dashboard KPI insertion: no compatible marker found.\n");
+    exit(1);
+}
 
 $start = strpos($s, "    /** @param array<string,mixed> \$course */\n    private function renderAnalysis(array \$course): string");
 $end = strpos($s, "    /** @param array<string,mixed> \$course */\n    private function renderExpert(array \$course): string", $start);
