@@ -34,14 +34,17 @@ Elle doit aider un formateur, un concepteur ou un pilote de cours à comprendre 
 - Ajout d'une synthèse pédagogique déterministe côté LRS : ressources critiques, ressources à surveiller, ressources activées sans trace.
 - Ajout du patcher `scripts/patch_course_ui_pedagogical_dashboard.php`.
 - Intégration automatique du patcher V0.12 dans `scripts/install_course_ui_companion.sh`.
-- Préparation de l'affichage des statuts pédagogiques dans `Tableau de bord` et `Analyse`.
+- Affichage des statuts pédagogiques dans `Tableau de bord` et `Analyse`.
+- Restauration du bloc anonymisé `Apprenants en difficulté` après application du rendu V0.12.
+- Ajout du patcher `scripts/patch_course_ui_expert_csv_pedagogy.php`.
+- Enrichissement de l'export CSV Expert avec les colonnes pédagogiques : statut, libellé, raison, taux d'échec, score moyen ressource, nombre de traces, apprenants distincts, indicateurs critique / à surveiller.
 
 ### Pistes techniques V0.12
 
-- Tester le patcher compagnon sur VM ILIAS.
-- Vérifier l'affichage `Cours > Suivi xAPI > Analyse`.
+- Tester l'export CSV Expert enrichi sur VM ILIAS.
+- Vérifier l'ouverture du CSV dans LibreOffice / Excel.
 - Ajuster les seuils pédagogiques si nécessaire.
-- Enrichir l'export CSV Expert avec les nouveaux champs pédagogiques.
+- Mettre à jour la documentation utilisateur V0.12.
 - Conserver les diagnostics V0.11.
 
 ## v0.11.0 — diagnostic et durcissement exploitation
