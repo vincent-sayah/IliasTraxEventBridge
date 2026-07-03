@@ -6,20 +6,6 @@ HTTPD_USER="${HTTPD_USER:-apache}"
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$PLUGIN_ROOT/companion/IliasTraxEventBridgeCourseUI"
 TARGET_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
-CLEAN_NAV_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_clean_navigation.php"
-TYPE_FILTER_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_type_filter.php"
-SUCCESS_RATE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_success_rates.php"
-FAILURE_SIGNAL_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_failure_signals.php"
-STRUGGLING_LEARNERS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_struggling_learners.php"
-LRS_DIRECT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_direct_summary.php"
-LRS_PRIMARY_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_primary_views.php"
-OUTBOX_TECH_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_outbox_technical_config.php"
-LRS_DIAG_CONFIG_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_diagnostics_config.php"
-LRS_ANALYSIS_DETAILS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_lrs_analysis_details.php"
-PEDAGOGICAL_DASHBOARD_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pedagogical_dashboard.php"
-PDF_EXPORT_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_export.php"
-PDF_WKHTMLTOPDF_PATHS_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_wkhtmltopdf_paths.php"
-PDF_ROUTE_PATCHER="$PLUGIN_ROOT/scripts/patch_course_ui_pdf_route.php"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Source companion directory not found: $SOURCE_DIR" >&2
@@ -34,6 +20,7 @@ fi
 echo "Installing IliasTraxEventBridgeCourseUI companion"
 echo "Source: $SOURCE_DIR"
 echo "Target: $TARGET_DIR"
+echo "Mode  : V0.12.1 consolidated templates"
 
 rm -rf "$TARGET_DIR"
 mkdir -p "$TARGET_DIR/classes"
@@ -50,90 +37,6 @@ while IFS= read -r -d '' template; do
   mkdir -p "$TARGET_DIR/$(dirname "$target_rel")"
   cp "$template" "$TARGET_DIR/$target_rel"
 done < <(find "$SOURCE_DIR/classes" -type f -name '*.php.tpl' -print0)
-
-if [[ -f "$CLEAN_NAV_PATCHER" ]]; then
-  php "$CLEAN_NAV_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Clean navigation patcher not found, skipping: $CLEAN_NAV_PATCHER"
-fi
-
-if [[ -f "$TYPE_FILTER_PATCHER" ]]; then
-  php "$TYPE_FILTER_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Type filter patcher not found, skipping: $TYPE_FILTER_PATCHER"
-fi
-
-if [[ -f "$SUCCESS_RATE_PATCHER" ]]; then
-  php "$SUCCESS_RATE_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Success rate patcher not found, skipping: $SUCCESS_RATE_PATCHER"
-fi
-
-if [[ -f "$FAILURE_SIGNAL_PATCHER" ]]; then
-  php "$FAILURE_SIGNAL_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Failure signal patcher not found, skipping: $FAILURE_SIGNAL_PATCHER"
-fi
-
-if [[ -f "$STRUGGLING_LEARNERS_PATCHER" ]]; then
-  php "$STRUGGLING_LEARNERS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Struggling learners patcher not found, skipping: $STRUGGLING_LEARNERS_PATCHER"
-fi
-
-if [[ -f "$LRS_DIRECT_PATCHER" ]]; then
-  php "$LRS_DIRECT_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "LRS direct patcher not found, skipping: $LRS_DIRECT_PATCHER"
-fi
-
-if [[ -f "$LRS_PRIMARY_PATCHER" ]]; then
-  php "$LRS_PRIMARY_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "LRS primary views patcher not found, skipping: $LRS_PRIMARY_PATCHER"
-fi
-
-if [[ -f "$OUTBOX_TECH_PATCHER" ]]; then
-  php "$OUTBOX_TECH_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Outbox technical config patcher not found, skipping: $OUTBOX_TECH_PATCHER"
-fi
-
-if [[ -f "$LRS_DIAG_CONFIG_PATCHER" ]]; then
-  php "$LRS_DIAG_CONFIG_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "LRS diagnostics config patcher not found, skipping: $LRS_DIAG_CONFIG_PATCHER"
-fi
-
-if [[ -f "$LRS_ANALYSIS_DETAILS_PATCHER" ]]; then
-  php "$LRS_ANALYSIS_DETAILS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "LRS analysis details patcher not found, skipping: $LRS_ANALYSIS_DETAILS_PATCHER"
-fi
-
-if [[ -f "$PEDAGOGICAL_DASHBOARD_PATCHER" ]]; then
-  php "$PEDAGOGICAL_DASHBOARD_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "Pedagogical dashboard patcher not found, skipping: $PEDAGOGICAL_DASHBOARD_PATCHER"
-fi
-
-if [[ -f "$PDF_EXPORT_PATCHER" ]]; then
-  php "$PDF_EXPORT_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "PDF export patcher not found, skipping: $PDF_EXPORT_PATCHER"
-fi
-
-if [[ -f "$PDF_WKHTMLTOPDF_PATHS_PATCHER" ]]; then
-  php "$PDF_WKHTMLTOPDF_PATHS_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-else
-  echo "PDF wkhtmltopdf paths patcher not found, skipping: $PDF_WKHTMLTOPDF_PATHS_PATCHER"
-fi
-
-if [[ -f "$PDF_ROUTE_PATCHER" ]]; then
-  php "$PDF_ROUTE_PATCHER" "$TARGET_DIR/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php"
-else
-  echo "PDF route patcher not found, skipping: $PDF_ROUTE_PATCHER"
-fi
 
 find "$TARGET_DIR" -type d -exec chmod 755 {} \;
 find "$TARGET_DIR" -type f -exec chmod 644 {} \;

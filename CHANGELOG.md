@@ -2,6 +2,48 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.12.1 — consolidation technique du compagnon UI
+
+### Statut
+
+- Branche concernée : `v0.12.1-consolidation-ui-companion`.
+- Base : `main` / `v0.12.0`.
+- Version plugin : `0.12.1`.
+- Type : maintenance technique, consolidation et non-régression.
+- Source fonctionnelle du suivi xAPI : TRAX/LRS.
+- Rôle de l'outbox locale : file technique d'envoi uniquement.
+
+### Objectif
+
+La V0.12.1 consolide les apports stabilisés de la V0.12.0 directement dans les templates du compagnon `IliasTraxEventBridgeCourseUI`.
+
+Cette version ne modifie pas le comportement fonctionnel. Elle simplifie l'installation et la maintenance en supprimant la dépendance aux patchers successifs de l'écran cours.
+
+La V0.13 reste réservée à l'analyse IA optionnelle des traces xAPI.
+
+### Ajouts réalisés
+
+- Création de la branche `v0.12.1-consolidation-ui-companion` depuis l'état de consolidation déjà validé.
+- Passage du plugin principal en version `0.12.1`.
+- Consolidation du template `class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`.
+- Consolidation de la route PDF `exportCourseDashboardPdf` dans le template UIHookGUI.
+- Simplification de `scripts/install_course_ui_companion.sh`.
+- Simplification du wrapper `scripts/install_course_ui_companion_with_standalone_fix.sh`.
+- Ajout de `docs/V0.12.1_CONSOLIDATION_UI_COMPANION.md`.
+- Ajout de `docs/VALIDATION_0.12.1.md`.
+- Ajout du script `scripts/audit_course_ui_companion_v0121.sh`.
+
+### Validation
+
+- Installation du compagnon : OK.
+- Audit technique : OK.
+- Tableau de bord : OK.
+- Analyse : OK.
+- Expert / CSV : OK.
+- Configuration : OK.
+- Export PDF : OK.
+- Logs : pas de nouvelle erreur bloquante observée.
+
 ## v0.12.0 — enrichissement pédagogique du tableau de bord
 
 ### Statut

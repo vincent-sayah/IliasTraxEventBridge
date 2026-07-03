@@ -510,6 +510,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             'showCourseAnalysis',
             'showCourseExpert',
             'exportCourseExpertCsv',
+            'exportCourseDashboardPdf',
             'saveCourseTracking',
             'saveDashboardPreferences',
             'enableAllCourseTracking',
