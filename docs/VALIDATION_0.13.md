@@ -112,6 +112,8 @@ Dans un cours ILIAS de test, ouvrir l'onglet `Suivi xAPI`.
 - les couleurs orange et rouge restent visibles ;
 - le bouton ou lien d'export PDF est présent.
 
+Résultat V0.13 : OK.
+
 ### Analyse
 
 À vérifier :
@@ -123,6 +125,8 @@ Dans un cours ILIAS de test, ouvrir l'onglet `Suivi xAPI`.
 - la colonne `Raison` est lisible ;
 - les compteurs traces, apprenants, score moyen, tests et taux d'échec sont présents ;
 - le bloc `Apprenants en difficulté` est présent lorsque des données de test le justifient.
+
+Résultat V0.13 : OK.
 
 ### Expert
 
@@ -141,6 +145,8 @@ Dans un cours ILIAS de test, ouvrir l'onglet `Suivi xAPI`.
   - `resource_is_critical` ;
   - `resource_is_watch`.
 
+Résultat V0.13 : OK.
+
 ### Configuration
 
 À vérifier :
@@ -152,6 +158,8 @@ Dans un cours ILIAS de test, ouvrir l'onglet `Suivi xAPI`.
 - la lecture directe TRAX/LRS reste visible ;
 - les diagnostics V0.11 restent accessibles.
 
+Résultat V0.13 : OK.
+
 ### Export PDF
 
 À vérifier :
@@ -160,6 +168,8 @@ Dans un cours ILIAS de test, ouvrir l'onglet `Suivi xAPI`.
 - la route `exportCourseDashboardPdf` est reconnue sans patcher post-installation ;
 - aucune erreur PHP n'apparaît dans les logs ILIAS ;
 - le fichier PDF généré contient le tableau de bord attendu.
+
+Résultat V0.13 : OK.
 
 ## Validation logs
 
@@ -175,6 +185,8 @@ Résultat attendu :
 - pas d'exception liée au compagnon UI ;
 - pas d'erreur liée à `exportCourseDashboardPdf` ;
 - pas d'erreur liée aux classes du compagnon.
+
+Résultat V0.13 : OK. Les erreurs visibles dans les extraits de validation étaient antérieures aux tests V0.13 et ne correspondent pas à une régression de cette version.
 
 ## Nettoyage local
 
@@ -210,11 +222,13 @@ La V0.13 peut être finalisée si :
 - le comportement fonctionnel est équivalent à la V0.12 ;
 - le flux d'installation ne dépend plus des patchers historiques.
 
+Résultat : tous les critères sont validés.
+
 ## Décision
 
 ```text
-Statut : à valider
-Date   : à compléter
-Validé par : à compléter
-Remarques : à compléter
+Statut : validé
+Date   : 2026-07-03
+Validé par : Vincent Sayah
+Remarques : validation fonctionnelle V0.13 OK. Installation depuis templates consolidés, audit OK, vues Tableau de bord / Analyse / Expert / Configuration OK, exports CSV et PDF OK, pas de nouvelle erreur bloquante observée dans les logs.
 ```
