@@ -8,7 +8,7 @@ Toutes les évolutions notables du plugin sont listées ici.
 
 - Branche concernée : `v0.12.1-consolidation-ui-companion`.
 - Base : `main` / `v0.12.0`.
-- Version plugin en validation : `0.12.1-dev`.
+- Version plugin : `0.12.1`.
 - Type : maintenance technique, consolidation et non-régression.
 - Source fonctionnelle du suivi xAPI : TRAX/LRS.
 - Rôle de l'outbox locale : file technique d'envoi uniquement.
@@ -24,7 +24,7 @@ La V0.13 reste réservée à l'analyse IA optionnelle des traces xAPI.
 ### Ajouts réalisés
 
 - Création de la branche `v0.12.1-consolidation-ui-companion` depuis l'état de consolidation déjà validé.
-- Passage du plugin principal en version `0.12.1-dev`.
+- Passage du plugin principal en version `0.12.1`.
 - Consolidation du template `class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`.
 - Consolidation de la route PDF `exportCourseDashboardPdf` dans le template UIHookGUI.
 - Simplification de `scripts/install_course_ui_companion.sh`.
