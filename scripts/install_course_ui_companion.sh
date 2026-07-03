@@ -20,7 +20,7 @@ fi
 echo "Installing IliasTraxEventBridgeCourseUI companion"
 echo "Source: $SOURCE_DIR"
 echo "Target: $TARGET_DIR"
-echo "Mode  : V0.13 consolidated templates"
+echo "Mode  : V0.12.1 consolidated templates"
 
 rm -rf "$TARGET_DIR"
 mkdir -p "$TARGET_DIR/classes"
