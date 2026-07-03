@@ -9,11 +9,12 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
 | Tag stable | `v0.12.0` |
-| Version en développement | `0.13.0-dev` |
-| Branche V0.13 | `v0.13-consolidation-ui-companion` |
+| Version de maintenance en développement | `0.12.1-dev` |
+| Branche V0.12.1 | `v0.12.1-consolidation-ui-companion` |
+| Prochaine fonctionnalité roadmap | `V0.13` — analyse IA optionnelle des traces xAPI |
 | Ancien tag stable | `v0.11.0` |
 | Ancienne stable | `0.11.0` |
-| Objectif V0.13 | Consolidation du compagnon UI et réduction des patchers |
+| Objectif V0.12.1 | Consolidation du compagnon UI V0.12 et réduction des patchers |
 | Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
@@ -30,7 +31,8 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
 | Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
 | Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
-| Cadrer la V0.13 | [`V0.13_CONSOLIDATION_UI_COMPANION.md`](V0.13_CONSOLIDATION_UI_COMPANION.md) |
+| Cadrer la V0.12.1 | [`V0.12.1_CONSOLIDATION_UI_COMPANION.md`](V0.12.1_CONSOLIDATION_UI_COMPANION.md) |
+| Valider la V0.12.1 | [`VALIDATION_0.12.1.md`](VALIDATION_0.12.1.md) |
 | Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
 | Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
 | Valider la V0.12 | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
@@ -42,17 +44,27 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
 
-## Documents V0.13
+## Documents V0.12.1
 
 ### Consolidation du compagnon UI
 
-[`V0.13_CONSOLIDATION_UI_COMPANION.md`](V0.13_CONSOLIDATION_UI_COMPANION.md) décrit :
+[`V0.12.1_CONSOLIDATION_UI_COMPANION.md`](V0.12.1_CONSOLIDATION_UI_COMPANION.md) décrit :
 
-- le périmètre de la V0.13 ;
+- le périmètre de la V0.12.1 ;
 - la stratégie de consolidation du plugin compagnon ;
-- la réduction attendue des patchers d'installation ;
+- l'intégration de la route PDF dans le template UIHookGUI ;
+- la réduction des patchers d'installation ;
 - les critères d'acceptation ;
-- les hors périmètre, notamment l'analyse IA et les nouveaux indicateurs.
+- le hors périmètre V0.13, notamment l'analyse IA.
+
+[`VALIDATION_0.12.1.md`](VALIDATION_0.12.1.md) décrit :
+
+- la préparation de la VM ;
+- l'installation depuis les templates consolidés ;
+- l'audit technique ;
+- la validation des vues Tableau de bord, Analyse, Expert et Configuration ;
+- la validation des exports CSV et PDF ;
+- la décision de validation.
 
 ## Documents V0.12
 
@@ -216,4 +228,4 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
 ## Roadmap et IA
 
-La roadmap est dans [`ROADMAP.md`](ROADMAP.md).
+La roadmap est dans [`ROADMAP.md`](ROADMAP.md). Elle conserve la V0.13 pour l'analyse IA optionnelle des traces xAPI.
