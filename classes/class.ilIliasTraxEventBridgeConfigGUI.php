@@ -127,6 +127,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             . $this->diagRow('Dernier test connexion', $this->config->getLastTraxTestAt(), $this->config->getLastTraxTestSuccess(), $this->config->getLastTraxTestHttpStatus(), $this->config->getLastTraxTestMessage())
             . $this->diagRow('Dernier test lecture TRAX/LRS', $this->config->getLastLrsReadAt(), $this->config->getLastLrsReadSuccess(), $this->config->getLastLrsReadHttpStatus(), $this->config->getLastLrsReadMessage())
             . $this->diagRow('Dernier test écriture TRAX/LRS', $this->config->getLastLrsWriteAt(), $this->config->getLastLrsWriteSuccess(), $this->config->getLastLrsWriteHttpStatus(), $this->config->getLastLrsWriteMessage())
+            . $this->diagRow('Dernier test IA', $this->config->getLastAiTestAt(), $this->config->getLastAiTestSuccess(), $this->config->getLastAiTestHttpStatus(), $this->config->getLastAiTestMessage())
             . $this->diagRow('Dernier envoi manuel', $this->config->getLastTraxSendAt(), $this->config->getLastTraxSendSuccess(), $this->config->getLastTraxSendHttpStatus(), $this->config->getLastTraxSendMessage())
             . $this->diagRow('Dernier cron', $this->config->getLastCronAt(), $this->config->getLastCronSuccess(), $this->config->getLastCronHttpStatus(), $this->config->getLastCronMessage())
             . '</table><p><a class="btn btn-default" href="'.$this->esc($this->ctrl->getLinkTarget($this, 'clearLog')).'">Vider le journal debug</a> '
@@ -291,11 +292,14 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function testAiConfiguration(): void
     {
         $r = (new ilIliasTraxEventBridgeAiClient($this->config))->testConnection();
+        $message = $r->getShortMessage();
+
+        $this->config->setLastAiTestResult($r->isSuccess(), $r->getHttpStatus(), $message);
 
         if ($r->isSuccess()) {
-            $this->success('Test IA réussi : '.$r->getShortMessage().'. Aucun statement xAPI réel n’a été envoyé à l’IA.');
+            $this->success('Test IA réussi : '.$message.'. Aucun statement xAPI réel n’a été envoyé à l’IA.');
         } else {
-            $this->failure('Test IA échoué : '.$r->getShortMessage());
+            $this->failure('Test IA échoué : '.$message);
         }
 
         $this->ctrl->redirect($this, 'configure');

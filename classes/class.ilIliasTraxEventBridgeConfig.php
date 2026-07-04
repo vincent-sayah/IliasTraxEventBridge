@@ -107,6 +107,17 @@ class ilIliasTraxEventBridgeConfig
         return rtrim($endpoint, '/') . '/statements';
     }
 
+    public function setLastAiTestResult(bool $success, int $httpStatus, string $message): void
+    {
+        $this->set('last_ai_test_at', date('Y-m-d H:i:s'));
+        $this->set('last_ai_test_success', $success ? '1' : '0');
+        $this->set('last_ai_test_http_status', (string) $httpStatus);
+        $this->set('last_ai_test_message', substr($message, 0, 2000));
+    }
+    public function getLastAiTestAt(): string { return $this->get('last_ai_test_at', ''); }
+    public function getLastAiTestSuccess(): string { return $this->yesNo('last_ai_test_success'); }
+    public function getLastAiTestHttpStatus(): string { return $this->get('last_ai_test_http_status', ''); }
+    public function getLastAiTestMessage(): string { return $this->get('last_ai_test_message', ''); }
     public function setLastTraxTestResult(bool $success, int $httpStatus, string $message): void
     {
         $this->set('last_trax_test_at', date('Y-m-d H:i:s'));
