@@ -3,7 +3,9 @@
 /**
  * Configuration wrapper.
  *
- * V0.11 adds persistent diagnostics for TRAX/LRS read and write tests.
+ * V0.13 stores optional AI settings in the ILIAS plugin configuration.
+ * The AI API key may be stored in ILIAS settings or provided by the server
+ * environment variable ITXEB_AI_API_KEY as a fallback.
  */
 class ilIliasTraxEventBridgeConfig
 {
@@ -118,6 +120,7 @@ class ilIliasTraxEventBridgeConfig
     public function getLastAiTestSuccess(): string { return $this->yesNo('last_ai_test_success'); }
     public function getLastAiTestHttpStatus(): string { return $this->get('last_ai_test_http_status', ''); }
     public function getLastAiTestMessage(): string { return $this->get('last_ai_test_message', ''); }
+
     public function setLastTraxTestResult(bool $success, int $httpStatus, string $message): void
     {
         $this->set('last_trax_test_at', date('Y-m-d H:i:s'));
@@ -210,24 +213,35 @@ class ilIliasTraxEventBridgeConfig
     public function isAiLogEnabled(): bool { return $this->getBool('ai_log_enabled', false); }
     public function setAiLogEnabled(bool $enabled): void { $this->setBool('ai_log_enabled', $enabled); }
 
-    public function getAiApiKey(): string
+    public function getStoredAiApiKey(): string { return trim($this->get('ai_api_key', '')); }
+    public function setStoredAiApiKey(string $apiKey): void { $this->set('ai_api_key', trim($apiKey)); }
+    public function clearStoredAiApiKey(): void { $this->set('ai_api_key', ''); }
+
+    public function getServerAiApiKey(): string
     {
         $value = getenv('ITXEB_AI_API_KEY');
         if (is_string($value) && trim($value) !== '') { return trim($value); }
-        if (isset($_ENV['ITXEB_AI_API_KEY']) && is_scalar($_ENV['ITXEB_AI_API_KEY']) && trim((string)$_ENV['ITXEB_AI_API_KEY']) !== '') { return trim((string)$_ENV['ITXEB_AI_API_KEY']); }
-        if (isset($_SERVER['ITXEB_AI_API_KEY']) && is_scalar($_SERVER['ITXEB_AI_API_KEY']) && trim((string)$_SERVER['ITXEB_AI_API_KEY']) !== '') { return trim((string)$_SERVER['ITXEB_AI_API_KEY']); }
+        if (isset($_ENV['ITXEB_AI_API_KEY']) && is_scalar($_ENV['ITXEB_AI_API_KEY']) && trim((string) $_ENV['ITXEB_AI_API_KEY']) !== '') { return trim((string) $_ENV['ITXEB_AI_API_KEY']); }
+        if (isset($_SERVER['ITXEB_AI_API_KEY']) && is_scalar($_SERVER['ITXEB_AI_API_KEY']) && trim((string) $_SERVER['ITXEB_AI_API_KEY']) !== '') { return trim((string) $_SERVER['ITXEB_AI_API_KEY']); }
         return '';
     }
 
-    public function hasAiApiKey(): bool
+    public function getAiApiKey(): string
     {
-        return $this->getAiApiKey() !== '';
+        $stored = $this->getStoredAiApiKey();
+        if ($stored !== '') { return $stored; }
+        return $this->getServerAiApiKey();
     }
+
+    public function hasAiApiKey(): bool { return $this->getAiApiKey() !== ''; }
 
     public function getAiApiKeyStatus(): string
     {
-        return $this->hasAiApiKey() ? 'presente cote serveur' : 'absente cote serveur';
+        if ($this->getStoredAiApiKey() !== '') { return 'présente dans la configuration du plugin'; }
+        if ($this->getServerAiApiKey() !== '') { return 'présente côté serveur'; }
+        return 'absente';
     }
+
     private function yesNo(string $key): string
     {
         $value = $this->get($key, '');
