@@ -35,6 +35,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
             case 'testTraxConnection': $this->testTraxConnection(); break;
             case 'testLrsRead': $this->testLrsRead(); break;
             case 'testLrsWrite': $this->testLrsWrite(); break;
+            case 'testAiConfiguration': $this->testAiConfiguration(); break;
             case 'sendGenerated': $this->sendGenerated(); break;
             case 'resetFailed': $this->resetFailed(); break;
             case 'configureCourseTracking': $this->handleCourseTracking('show'); break;
@@ -117,7 +118,7 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     private function renderState(): string
     {
         $html = '<section class="itxeb-section"><h2>État</h2><table class="std itxeb-state-table">';
-        foreach (['Plugin actif'=>$this->config->isEnabled()?'oui':'non','Mode debug'=>$this->config->isDebugEnabled()?'oui':'non','Génération xAPI locale'=>$this->config->isLocalXapiGenerationEnabled()?'oui':'non','Cron plugin'=>$this->config->isCronEnabled()?'activé':'désactivé','Diagnostic traces refusées'=>$this->config->isDenyLogEnabled()?'activé':'désactivé'] as $k=>$v) {
+        foreach (['Plugin actif'=>$this->config->isEnabled()?'oui':'non','Mode debug'=>$this->config->isDebugEnabled()?'oui':'non','Génération xAPI locale'=>$this->config->isLocalXapiGenerationEnabled()?'oui':'non','Cron plugin'=>$this->config->isCronEnabled()?'activé':'désactivé','Diagnostic traces refusées'=>$this->config->isDenyLogEnabled()?'activé':'désactivé','Analyse IA'=>$this->config->isAiEnabled()?'activée':'désactivée','Clé API IA'=>$this->config->getAiApiKeyStatus()] as $k=>$v) {
             $html .= '<tr><td>'.$this->esc($k).'</td><td><strong>'.$this->esc($v).'</strong></td></tr>';
         }
         $html .= '<tr><td>Endpoint statements</td><td><code>'.$this->esc($this->config->getStatementsEndpoint()).'</code></td></tr></table>';
@@ -168,10 +169,16 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
         $html .= $this->checkboxRow('Activer le diagnostic des traces refusées', 'deny_log_enabled', $this->config->isDenyLogEnabled(), 'À activer uniquement à la demande. Si activé sur une plateforme volumineuse, la table evnt_evhk_itxeb_dlog peut grossir rapidement.');
         foreach ([['Endpoint xAPI TRAX','trax_endpoint',$this->config->getTraxEndpoint(),'Endpoint xAPI racine ou URL complète /statements.'],['Identifiant client TRAX','trax_username',$this->config->getTraxUsername(),'Client xAPI autorisé à écrire.'],['Version xAPI','xapi_version',$this->config->getXapiVersion(),'Recommandé : 1.0.3.'],['Timeout HTTP','http_timeout',(string)$this->config->getHttpTimeout(),'Entre 2 et 120 secondes.'],['Taille batch','batch_size',(string)$this->config->getBatchSize(),'Entre 1 et 100 statements.'],['Max retry','max_retry',(string)$this->config->getMaxRetry(),'Nombre maximum de tentatives par statement.'],['Base URL ILIAS forcée','ilias_base_url',$this->config->getIliasBaseUrl(),'Optionnel. Utilisé pour les IRIs xAPI.']] as $r) { $html .= $this->inputRow($r[0], $r[1], $r[2], $r[3]); }
         $html .= $this->passwordRow('Secret client TRAX', 'trax_password', 'Laisser vide pour conserver le secret.');
+        $html .= '<tr><th colspan="2"><h3>Configuration IA V0.13</h3><p>Analyse optionnelle, désactivée par défaut. La clé API n’est pas stockée dans Git ni affichée en clair : elle doit être fournie côté serveur via <code>ITXEB_AI_API_KEY</code>.</p></th></tr>';
+        $html .= $this->checkboxRow('Activer l’analyse IA', 'ai_enabled', $this->config->isAiEnabled(), 'Active les fonctions IA. Désactivé par défaut.');
+        foreach ([['Fournisseur IA','ai_provider',$this->config->getAiProvider(),'Exemple : vibe, mistral, passerelle interne.'],['URL API IA','ai_api_url',$this->config->getAiApiUrl(),'Endpoint HTTP du fournisseur IA ou de la passerelle interne.'],['Modèle IA','ai_model',$this->config->getAiModel(),'Nom du modèle utilisé par le fournisseur.'],['Timeout IA','ai_timeout',(string)$this->config->getAiTimeout(),'Entre 2 et 120 secondes.'],['Mode anonymisation','ai_anonymization_mode',$this->config->getAiAnonymizationMode(),'Valeurs autorisées : strict, pseudonymized, none. Recommandé : strict.'],['Limite de traces IA','ai_trace_limit',(string)$this->config->getAiTraceLimit(),'Nombre maximum d’éléments agrégés envoyés à l’IA, entre 1 et 1000.']] as $r) { $html .= $this->inputRow($r[0], $r[1], $r[2], $r[3]); }
+        $html .= $this->checkboxRow('Journaliser les appels IA', 'ai_log_enabled', $this->config->isAiLogEnabled(), 'Journal technique uniquement, sans prompt sensible ni clé API.');
+        $html .= '<tr><td>Clé API IA</td><td><strong>'.$this->esc($this->config->getAiApiKeyStatus()).'</strong><div class="small">La valeur réelle de la clé n’est jamais affichée. Variable attendue : <code>ITXEB_AI_API_KEY</code>.</div></td></tr>';
         return $html . '</table><p><button class="btn btn-primary" type="submit">Enregistrer</button></p></form>'
             . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testTraxConnection')).'"><p><button class="btn btn-default" type="submit">Tester connexion TRAX</button></p></form>'
             . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsRead')).'"><p><button class="btn btn-default" type="submit">Tester lecture TRAX/LRS</button> <span class="small">Effectue uniquement un <code>GET /statements?limit=1</code>, sans créer de trace.</span></p></form>'
-            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsWrite')).'"><p><button class="btn btn-warning" type="submit">Créer un statement test TRAX/LRS</button> <span class="small"><strong>Attention :</strong> crée volontairement un statement xAPI de diagnostic dans TRAX/LRS.</span></p></form></section>';
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testLrsWrite')).'"><p><button class="btn btn-warning" type="submit">Créer un statement test TRAX/LRS</button> <span class="small"><strong>Attention :</strong> crée volontairement un statement xAPI de diagnostic dans TRAX/LRS.</span></p></form>'
+            . '<form method="post" action="'.$this->esc($this->ctrl->getLinkTarget($this, 'testAiConfiguration')).'"><p><button class="btn btn-default" type="submit">Tester configuration IA</button> <span class="small">Contrôle la configuration locale sans envoyer de traces xAPI à l’IA.</span></p></form></section>';
     }
 
     private function renderSendActions(): string
@@ -272,12 +279,43 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
     {
         $this->config->setCronEnabled($this->postString('cron_enabled') === '1');
         $this->config->setDenyLogEnabled($this->postString('deny_log_enabled') === '1');
-        foreach (['TraxEndpoint'=>'trax_endpoint','TraxUsername'=>'trax_username','XapiVersion'=>'xapi_version','IliasBaseUrl'=>'ilias_base_url'] as $m=>$k) { $this->config->{'set'.$m}($this->postString($k)); }
-        $this->config->setHttpTimeout((int)$this->postString('http_timeout')); $this->config->setBatchSize((int)$this->postString('batch_size')); $this->config->setMaxRetry((int)$this->postString('max_retry'));
+        $this->config->setAiEnabled($this->postString('ai_enabled') === '1');
+        $this->config->setAiLogEnabled($this->postString('ai_log_enabled') === '1');
+        foreach (['TraxEndpoint'=>'trax_endpoint','TraxUsername'=>'trax_username','XapiVersion'=>'xapi_version','IliasBaseUrl'=>'ilias_base_url','AiProvider'=>'ai_provider','AiApiUrl'=>'ai_api_url','AiModel'=>'ai_model','AiAnonymizationMode'=>'ai_anonymization_mode'] as $m=>$k) { $this->config->{'set'.$m}($this->postString($k)); }
+        $this->config->setHttpTimeout((int)$this->postString('http_timeout')); $this->config->setBatchSize((int)$this->postString('batch_size')); $this->config->setMaxRetry((int)$this->postString('max_retry')); $this->config->setAiTimeout((int)$this->postString('ai_timeout')); $this->config->setAiTraceLimit((int)$this->postString('ai_trace_limit'));
         if ($this->postString('trax_password') !== '') { $this->config->setTraxPassword($this->postString('trax_password')); }
         $this->success('Configuration enregistrée.'); $this->ctrl->redirect($this, 'configure');
     }
 
+    private function testAiConfiguration(): void
+    {
+        if (!$this->config->isAiEnabled()) {
+            $this->failure('Analyse IA désactivée : aucun appel IA ne sera effectué.');
+            $this->ctrl->redirect($this, 'configure');
+            return;
+        }
+
+        if (!$this->config->hasAiApiKey()) {
+            $this->failure('Configuration IA incomplète : variable serveur ITXEB_AI_API_KEY absente.');
+            $this->ctrl->redirect($this, 'configure');
+            return;
+        }
+
+        if ($this->config->getAiApiUrl() === '') {
+            $this->failure('Configuration IA incomplète : URL API IA absente.');
+            $this->ctrl->redirect($this, 'configure');
+            return;
+        }
+
+        if ($this->config->getAiModel() === '') {
+            $this->failure('Configuration IA incomplète : modèle IA absent.');
+            $this->ctrl->redirect($this, 'configure');
+            return;
+        }
+
+        $this->success('Configuration IA cohérente : clé serveur présente, URL API et modèle configurés. Aucun appel IA réel n’a été effectué.');
+        $this->ctrl->redirect($this, 'configure');
+    }
     private function testTraxConnection(): void
     {
         $r = (new ilIliasTraxEventBridgeTraxClient($this->config))->testConnection();

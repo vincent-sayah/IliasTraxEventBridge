@@ -167,6 +167,56 @@ class ilIliasTraxEventBridgeConfig
     public function getLastCronHttpStatus(): string { return $this->get('last_cron_http_status', ''); }
     public function getLastCronMessage(): string { return $this->get('last_cron_message', ''); }
 
+    public function isAiEnabled(): bool { return $this->getBool('ai_enabled', false); }
+    public function setAiEnabled(bool $enabled): void { $this->setBool('ai_enabled', $enabled); }
+
+    public function getAiProvider(): string { return trim($this->get('ai_provider', 'vibe')); }
+    public function setAiProvider(string $provider): void { $this->set('ai_provider', trim($provider) !== '' ? trim($provider) : 'vibe'); }
+
+    public function getAiApiUrl(): string { return rtrim(trim($this->get('ai_api_url', '')), '/'); }
+    public function setAiApiUrl(string $url): void { $this->set('ai_api_url', rtrim(trim($url), '/')); }
+
+    public function getAiModel(): string { return trim($this->get('ai_model', '')); }
+    public function setAiModel(string $model): void { $this->set('ai_model', trim($model)); }
+
+    public function getAiTimeout(): int { return max(2, min(120, (int) $this->get('ai_timeout', '20'))); }
+    public function setAiTimeout(int $timeout): void { $this->set('ai_timeout', (string) max(2, min(120, $timeout))); }
+
+    public function getAiAnonymizationMode(): string
+    {
+        $mode = strtolower(trim($this->get('ai_anonymization_mode', 'strict')));
+        return in_array($mode, ['strict', 'pseudonymized', 'none'], true) ? $mode : 'strict';
+    }
+    public function setAiAnonymizationMode(string $mode): void
+    {
+        $mode = strtolower(trim($mode));
+        $this->set('ai_anonymization_mode', in_array($mode, ['strict', 'pseudonymized', 'none'], true) ? $mode : 'strict');
+    }
+
+    public function getAiTraceLimit(): int { return max(1, min(1000, (int) $this->get('ai_trace_limit', '200'))); }
+    public function setAiTraceLimit(int $limit): void { $this->set('ai_trace_limit', (string) max(1, min(1000, $limit))); }
+
+    public function isAiLogEnabled(): bool { return $this->getBool('ai_log_enabled', false); }
+    public function setAiLogEnabled(bool $enabled): void { $this->setBool('ai_log_enabled', $enabled); }
+
+    public function getAiApiKey(): string
+    {
+        $value = getenv('ITXEB_AI_API_KEY');
+        if (is_string($value) && trim($value) !== '') { return trim($value); }
+        if (isset($_ENV['ITXEB_AI_API_KEY']) && is_scalar($_ENV['ITXEB_AI_API_KEY']) && trim((string)$_ENV['ITXEB_AI_API_KEY']) !== '') { return trim((string)$_ENV['ITXEB_AI_API_KEY']); }
+        if (isset($_SERVER['ITXEB_AI_API_KEY']) && is_scalar($_SERVER['ITXEB_AI_API_KEY']) && trim((string)$_SERVER['ITXEB_AI_API_KEY']) !== '') { return trim((string)$_SERVER['ITXEB_AI_API_KEY']); }
+        return '';
+    }
+
+    public function hasAiApiKey(): bool
+    {
+        return $this->getAiApiKey() !== '';
+    }
+
+    public function getAiApiKeyStatus(): string
+    {
+        return $this->hasAiApiKey() ? 'presente cote serveur' : 'absente cote serveur';
+    }
     private function yesNo(string $key): string
     {
         $value = $this->get($key, '');
