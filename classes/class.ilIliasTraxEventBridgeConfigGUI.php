@@ -8,6 +8,7 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeDenyLogRepository.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeTraxClient.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeLrsReadClient.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeAiClient.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeOutboxSender.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseTrackingGUI.php';
 
@@ -289,31 +290,14 @@ class ilIliasTraxEventBridgeConfigGUI extends ilPluginConfigGUI
 
     private function testAiConfiguration(): void
     {
-        if (!$this->config->isAiEnabled()) {
-            $this->failure('Analyse IA désactivée : aucun appel IA ne sera effectué.');
-            $this->ctrl->redirect($this, 'configure');
-            return;
+        $r = (new ilIliasTraxEventBridgeAiClient($this->config))->testConnection();
+
+        if ($r->isSuccess()) {
+            $this->success('Test IA réussi : '.$r->getShortMessage().'. Aucun statement xAPI réel n’a été envoyé à l’IA.');
+        } else {
+            $this->failure('Test IA échoué : '.$r->getShortMessage());
         }
 
-        if (!$this->config->hasAiApiKey()) {
-            $this->failure('Configuration IA incomplète : variable serveur ITXEB_AI_API_KEY absente.');
-            $this->ctrl->redirect($this, 'configure');
-            return;
-        }
-
-        if ($this->config->getAiApiUrl() === '') {
-            $this->failure('Configuration IA incomplète : URL API IA absente.');
-            $this->ctrl->redirect($this, 'configure');
-            return;
-        }
-
-        if ($this->config->getAiModel() === '') {
-            $this->failure('Configuration IA incomplète : modèle IA absent.');
-            $this->ctrl->redirect($this, 'configure');
-            return;
-        }
-
-        $this->success('Configuration IA cohérente : clé serveur présente, URL API et modèle configurés. Aucun appel IA réel n’a été effectué.');
         $this->ctrl->redirect($this, 'configure');
     }
     private function testTraxConnection(): void
