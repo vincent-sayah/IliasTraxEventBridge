@@ -19,6 +19,8 @@ Version : 0.13.0-dev
 db0e00e Persist V0.13 AI test diagnostics
 7621781 Allow storing AI API key in plugin configuration
 cb8dfed Add AI API key field to plugin configuration
+b02bdb5 Add reusable AI chat completion client
+fd4840b Add anonymized course AI analyzer service
 ```
 
 ## Points validés
@@ -31,6 +33,8 @@ cb8dfed Add AI API key field to plugin configuration
 - Le test IA affiche un diagnostic persistant dans la page de configuration.
 - Aucun statement xAPI réel n’est envoyé pendant le test de connexion IA.
 - Le test de connexion IA Mistral/Vibe est validé : HTTP 200 OK.
+- Le client IA dispose maintenant d’une méthode réutilisable d’appel chat completion.
+- Le service d’analyse IA de cours prépare un payload agrégé et anonymisé.
 
 ## Validation observée
 
@@ -43,7 +47,7 @@ Message : HTTP 200 OK
 
 ## Prochaine étape
 
-- Ajouter l’analyse pédagogique IA depuis l’écran Suivi xAPI d’un cours.
-- Construire un prompt à partir des données agrégées, sans identité nominative.
+- Brancher le service d’analyse IA dans l’écran Suivi xAPI d’un cours.
+- Ajouter le bouton Générer une analyse IA du cours dans l’onglet Analyse.
 - Afficher une synthèse pédagogique dans l’onglet Analyse.
 - Journaliser uniquement les métadonnées techniques, sans clé API et sans prompt sensible.
