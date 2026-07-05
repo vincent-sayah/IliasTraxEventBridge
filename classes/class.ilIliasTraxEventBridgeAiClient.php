@@ -4,10 +4,10 @@ require_once __DIR__ . '/class.ilIliasTraxEventBridgeConfig.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeHttpResult.php';
 
 /**
- * Client HTTP minimal pour le test de connexion IA V0.13.
+ * Client HTTP IA V0.13.
  *
- * Ce client ne lit la clé que depuis la configuration serveur ITXEB_AI_API_KEY.
- * Il n'envoie pas de traces xAPI réelles pendant le test de connexion.
+ * Utilise la clé configurée dans le plugin ou, en secours, la variable serveur
+ * ITXEB_AI_API_KEY. Les appels de test n'envoient aucune trace xAPI réelle.
  */
 class ilIliasTraxEventBridgeAiClient
 {
@@ -21,12 +21,51 @@ class ilIliasTraxEventBridgeAiClient
 
     public function testConnection(): ilIliasTraxEventBridgeHttpResult
     {
+        return $this->sendChatMessages([
+            [
+                'role' => 'system',
+                'content' => 'Tu es un service de test technique. Réponds très brièvement.'
+            ],
+            [
+                'role' => 'user',
+                'content' => 'Réponds uniquement par OK_V013_AI_TEST.'
+            ]
+        ], 32);
+    }
+
+    /**
+     * @param array<int,array<string,string>> $messages
+     */
+    public function sendChatMessages(array $messages, int $maxTokens = 900): ilIliasTraxEventBridgeHttpResult
+    {
+        $validation = $this->validateConfiguration();
+        if ($validation !== null) {
+            return $validation;
+        }
+
+        $payload = [
+            'model' => $this->config->getAiModel(),
+            'messages' => $messages,
+            'temperature' => 0.2,
+            'max_tokens' => max(32, min(3000, $maxTokens))
+        ];
+
+        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($encoded)) {
+            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Impossible d’encoder le payload IA.');
+        }
+
+        return $this->request('POST', $this->config->getAiApiUrl(), $encoded);
+    }
+
+    private function validateConfiguration(): ?ilIliasTraxEventBridgeHttpResult
+    {
         if (!$this->config->isAiEnabled()) {
             return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Analyse IA désactivée.');
         }
 
         if (!$this->config->hasAiApiKey()) {
-            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Variable serveur ITXEB_AI_API_KEY absente.');
+            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Clé API IA absente.');
         }
 
         if ($this->config->getAiApiUrl() === '') {
@@ -37,28 +76,7 @@ class ilIliasTraxEventBridgeAiClient
             return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Modèle IA absent.');
         }
 
-        $payload = [
-            'model' => $this->config->getAiModel(),
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => 'Tu es un service de test technique. Réponds très brièvement.'
-                ],
-                [
-                    'role' => 'user',
-                    'content' => 'Réponds uniquement par OK_V013_AI_TEST.'
-                ]
-            ],
-            'temperature' => 0,
-            'max_tokens' => 32
-        ];
-
-        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        if (!is_string($encoded)) {
-            return new ilIliasTraxEventBridgeHttpResult(false, 0, '', 'Impossible d’encoder le payload IA.');
-        }
-
-        return $this->request('POST', $this->config->getAiApiUrl(), $encoded);
+        return null;
     }
 
     private function request(string $method, string $url, string $payload): ilIliasTraxEventBridgeHttpResult
