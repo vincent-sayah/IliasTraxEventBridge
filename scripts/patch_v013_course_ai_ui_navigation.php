@@ -30,30 +30,51 @@ function itxeb_nav_patch_file(string $file): bool
 
     $original = $content;
 
-    $pattern = '~\$action\s*=\s*\$this->currentUrlWith\(\[\s*\'itxeb_cui_cmd\'\s*=>\s*\'generateCourseAiAnalysis\',\s*\'itxeb_course_ref_id\'\s*=>\s*\(string\)\s*\$courseRefId,\s*\'itxeb_period_days\'\s*=>\s*\(string\)\s*\$this->getPeriodDays\(\),\s*\'itxeb_filter_ref_id\'\s*=>\s*\(string\)\s*\$this->getSelectedResourceRefId\(\),\s*\'itxeb_filter_obj_type\'\s*=>\s*\$this->getSelectedObjectType\(\),\s*\]\);~s';
-    $replacement = '$action = $this->currentRequestUri();';
-    $content = preg_replace($pattern, $replacement, $content, 1, $count);
-    if ($content === null) {
-        itxeb_nav_fail("erreur regex dans {$file}");
+    $oldAction = <<<'PHP'
+        $action = $this->currentUrlWith([
+            'itxeb_cui_cmd' => 'generateCourseAiAnalysis',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+            'itxeb_period_days' => (string) $this->getPeriodDays(),
+            'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
+            'itxeb_filter_obj_type' => $this->getSelectedObjectType(),
+        ]);
+PHP;
+
+    $newAction = <<<'PHP'
+        $action = $this->currentRequestUri();
+PHP;
+
+    if (strpos($content, $oldAction) !== false) {
+        $content = str_replace($oldAction, $newAction, $content);
+    } elseif (strpos($content, '$action = $this->currentRequestUri();') === false && strpos($content, 'generateCourseAiAnalysis') !== false) {
+        $pattern = '~\$action\s*=\s*\$this->currentUrlWith\(\[.*?generateCourseAiAnalysis.*?\]\);~s';
+        $content = preg_replace($pattern, '$action = $this->currentRequestUri();', $content, 1, $count);
+        if ($content === null) {
+            itxeb_nav_fail("erreur regex dans {$file}");
+        }
+        if ((int) $count === 0) {
+            itxeb_nav_fail("bloc action Analyse IA introuvable dans {$file}");
+        }
     }
 
-    if ($count === 0 && strpos($content, '$action = $this->currentRequestUri();') === false && strpos($content, 'generateCourseAiAnalysis') !== false) {
-        itxeb_nav_fail("bloc action Analyse IA introuvable dans {$file}");
-    }
+    $oldHidden = <<<'PHP'
+            . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
+            . '<p><button class="btn btn-primary" type="submit">Générer une analyse IA du cours</button></p>'
+PHP;
 
-    $needle = ". '<input type=\"hidden\" name=\"itxeb_course_ref_id\" value=\"' . $this->esc((string) $courseRefId) . '\">'\n"
-        . "            . '<p><button class=\"btn btn-primary\" type=\"submit\">Générer une analyse IA du cours</button></p>'";
-    $insert = ". '<input type=\"hidden\" name=\"itxeb_course_ref_id\" value=\"' . $this->esc((string) $courseRefId) . '\">'\n"
-        . "            . '<input type=\"hidden\" name=\"itxeb_period_days\" value=\"' . $this->esc((string) $this->getPeriodDays()) . '\">'\n"
-        . "            . '<input type=\"hidden\" name=\"itxeb_filter_ref_id\" value=\"' . $this->esc((string) $this->getSelectedResourceRefId()) . '\">'\n"
-        . "            . '<input type=\"hidden\" name=\"itxeb_filter_obj_type\" value=\"' . $this->esc($this->getSelectedObjectType()) . '\">'\n"
-        . "            . '<p><button class=\"btn btn-primary\" type=\"submit\">Générer une analyse IA du cours</button></p>'";
+    $newHidden = <<<'PHP'
+            . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
+            . '<input type="hidden" name="itxeb_period_days" value="' . $this->esc((string) $this->getPeriodDays()) . '">'
+            . '<input type="hidden" name="itxeb_filter_ref_id" value="' . $this->esc((string) $this->getSelectedResourceRefId()) . '">'
+            . '<input type="hidden" name="itxeb_filter_obj_type" value="' . $this->esc($this->getSelectedObjectType()) . '">'
+            . '<p><button class="btn btn-primary" type="submit">Générer une analyse IA du cours</button></p>'
+PHP;
 
-    if (strpos($content, 'name="itxeb_period_days" value="') === false) {
-        if (strpos($content, $needle) === false) {
+    if (strpos($content, 'name="itxeb_period_days" value="') === false && strpos($content, 'Générer une analyse IA du cours') !== false) {
+        if (strpos($content, $oldHidden) === false) {
             itxeb_nav_fail("point insertion champs cachés Analyse IA introuvable dans {$file}");
         }
-        $content = str_replace($needle, $insert, $content);
+        $content = str_replace($oldHidden, $newHidden, $content);
     }
 
     if ($content === $original) {
