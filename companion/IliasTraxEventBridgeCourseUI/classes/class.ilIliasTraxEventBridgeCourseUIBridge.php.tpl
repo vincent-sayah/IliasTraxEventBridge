@@ -98,21 +98,40 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return '';
         }
 
-        $script = isset($_SERVER['SCRIPT_NAME']) && is_scalar($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : '';
+        $script = $this->buildIliasPhpEntrypoint();
         if ($script === '') {
             return '';
         }
 
-        // Clean fallback route. Do not set cmd=show: on ILIAS 10 this can call
-        // ilObjCourseGUI::showObject(), which does not exist on some versions.
         $params = [
-            'baseClass' => 'ilrepositorygui',
+            'baseClass' => 'ilRepositoryGUI',
             'ref_id' => (string) $courseRefId,
             'itxeb_cui_cmd' => 'showCourseDashboard',
             'itxeb_course_ref_id' => (string) $courseRefId,
         ];
 
         return $script . '?' . http_build_query($params, '', '&');
+    }
+
+    private function buildIliasPhpEntrypoint(): string
+    {
+        foreach (['SCRIPT_NAME', 'PHP_SELF'] as $key) {
+            $value = isset($_SERVER[$key]) && is_scalar($_SERVER[$key]) ? (string) $_SERVER[$key] : '';
+            if ($value === '') {
+                continue;
+            }
+            $path = (string) (parse_url($value, PHP_URL_PATH) ?: $value);
+            $dir = rtrim(str_replace('\\', '/', dirname($path)), '/');
+            if (basename($path) === 'ilias.php') {
+                return $path;
+            }
+            if ($dir === '' || $dir === '.') {
+                return '/ilias.php';
+            }
+            return $dir . '/ilias.php';
+        }
+
+        return '/ilias.php';
     }
 
     public function isCourseRefId(int $refId): bool

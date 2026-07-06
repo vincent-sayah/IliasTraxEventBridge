@@ -32,8 +32,14 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
         $courseObjId = (int) ($course['course_obj_id'] ?? 0);
         $days = max(1, min(365, $days));
+        $periodStartTs = time() - ($days * 86400);
+        // TRAX/LRS peut retourner une page vide sur une fenêtre courte alors que
+        // les mêmes statements existent dans une fenêtre plus large. Pour éviter
+        // des KPIs à 0 incohérents, on interroge plus large pour 7/30 jours puis
+        // on post-filtre chaque statement sur la vraie période demandée.
+        $queryDays = $days <= 30 ? min(365, max($days * 2, 14)) : $days;
         $activity = $this->courseActivityId($courseRefId, $courseObjId);
-        $since = gmdate('Y-m-d\TH:i:s\Z', time() - ($days * 86400));
+        $since = gmdate('Y-m-d\TH:i:s\Z', time() - ($queryDays * 86400));
         $allowedResources = $this->allowedResources($course);
 
         $summary = [
@@ -41,7 +47,10 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'http_status' => 0,
             'error' => '',
             'activity_id' => $activity,
-            'since' => $since,
+            'since' => gmdate('Y-m-d\TH:i:s\Z', $periodStartTs),
+            'query_since' => $since,
+            'period_days' => $days,
+            'period_start_ts' => $periodStartTs,
             'returned' => 0,
             'more' => '',
             'pages' => 0,
@@ -209,6 +218,9 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             if (!is_array($statement)) {
                 continue;
             }
+            if (!$this->isStatementInRequestedPeriod($summary, $statement)) {
+                continue;
+            }
             $resource = $this->resourceInfo($statement);
             $refId = (int) ($resource['ref_id'] ?? 0);
             if (count($allowedResources) > 0 && $refId > 0 && !isset($allowedResources[$refId])) {
@@ -218,6 +230,23 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         }
     }
 
+    /** @param array<string,mixed> $summary @param array<string,mixed> $statement */
+    private function isStatementInRequestedPeriod(array $summary, array $statement): bool
+    {
+        $start = (int) ($summary['period_start_ts'] ?? 0);
+        if ($start <= 0) {
+            return true;
+        }
+        $timestamp = (string) ($statement['timestamp'] ?? ($statement['stored'] ?? ''));
+        if ($timestamp === '') {
+            return true;
+        }
+        $ts = strtotime($timestamp);
+        if ($ts === false) {
+            return true;
+        }
+        return $ts >= $start;
+    }
     /** @param array<string,mixed> $summary */
     private function addStatement(array &$summary, array $statement, array $resource): void
     {

@@ -16,6 +16,14 @@ class ilIliasTraxEventBridgeCourseUIScreen
     private $lrsSummary;
     private string $message = '';
     private string $messageType = 'info';
+    private bool $renderInnerTabs = true;
+
+    public function setRenderInnerTabs(bool $renderInnerTabs): void
+    {
+        $this->renderInnerTabs = $renderInnerTabs;
+    }
+    /** @var array<string,mixed>|null */
+    private $aiAnalysisResult = null;
 
     public function __construct(ilIliasTraxEventBridgeCourseUIBridge $bridge)
     {
@@ -35,6 +43,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
             if (class_exists('ilIliasTraxEventBridgeLrsCourseSummary')) {
                 $this->lrsSummary = new ilIliasTraxEventBridgeLrsCourseSummary();
             }
+            $aiAnalyzerPath = $this->bridge->getMainPluginPath() . '/classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php';
+            if (is_file($aiAnalyzerPath)) { require_once $aiAnalyzerPath; }
         }
     }
 
@@ -76,6 +86,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
 
         $course = $this->resolver->resolveCourse($courseRefId);
+        if ($cmd === 'generateCourseAiAnalysis') {
+            $this->runCourseAiAnalysis($course);
+            $cmd = 'showCourseAnalysis';
+        }
         if ($cmd === 'exportCourseDashboardPdf') {
             $this->sendDashboardPdf($course);
         }
@@ -84,7 +98,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
 
         $html = $this->renderMessage()
-            . $this->renderInnerTabs($courseRefId, $cmd)
+            . ($this->renderInnerTabs ? $this->renderInnerTabs($courseRefId, $cmd) : '')
             . $this->renderView($course, $cmd);
 
         return $this->renderShell($html, $courseRefId, (string) ($course['course_title'] ?? ''), $cmd);
@@ -388,7 +402,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section"><h2>Analyse des ressources</h2><p>Ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderPedagogicalSynthesis($dashboard);
+        $html = '<section class="itxeb-cui-section"><h2>Analyse des ressources</h2><p>Ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderPedagogicalSynthesis($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -408,6 +422,74 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 . '<td>' . $this->esc((string) ($stats['last_at'] ?? '')) . '</td><td>' . $this->esc($score) . '</td><td>' . $this->esc($testText) . '</td><td>' . $this->esc($failureRate) . '</td></tr>';
         }
         return $html . '</tbody></table></div>' . $this->renderStrugglingLearners($dashboard) . '</section>';
+    }
+    /** @param array<string,mixed> $course */
+    private function runCourseAiAnalysis(array $course): void
+    {
+        if (!class_exists('ilIliasTraxEventBridgeCourseAiAnalyzer')) {
+            $this->aiAnalysisResult = [
+                'success' => false,
+                'http_status' => 0,
+                'message' => 'Service analyse IA indisponible.',
+                'analysis' => '',
+                'payload_summary' => '',
+            ];
+            $this->message = 'Analyse IA impossible : service indisponible.';
+            $this->messageType = 'error';
+            return;
+        }
+
+        $dashboard = $this->loadDashboard($course);
+        $this->aiAnalysisResult = (new ilIliasTraxEventBridgeCourseAiAnalyzer())->analyze($course, $dashboard);
+        if (!empty($this->aiAnalysisResult['success'])) {
+            $this->message = 'Analyse IA générée.';
+            $this->messageType = 'success';
+        } else {
+            $this->message = 'Analyse IA échouée : ' . (string) ($this->aiAnalysisResult['message'] ?? 'erreur inconnue');
+            $this->messageType = 'error';
+        }
+    }
+
+    /** @param array<string,mixed> $course */
+    private function renderAiAnalysisAction(array $course): string
+    {
+        $courseRefId = (int) ($course['course_ref_id'] ?? 0);
+        $url = $this->currentUrlWith([
+            'itxeb_cui_cmd' => 'generateCourseAiAnalysis',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+            'itxeb_period_days' => (string) $this->getPeriodDays(),
+            'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
+            'itxeb_filter_obj_type' => $this->getSelectedObjectType(),
+        ]);
+
+        return '<section class="itxeb-cui-section itxeb-ai-analysis-action"><h3>Analyse IA du cours</h3>'
+            . '<p>Génère une synthèse pédagogique à partir des données xAPI agrégées de la période sélectionnée. En anonymisation stricte, aucun nom, courriel ou identité nominative apprenant n’est envoyé.</p>'
+            . '<p><a class="btn btn-primary" href="' . $this->esc($url) . '">Générer une analyse IA du cours</a></p>'
+            . '</section>';
+    }
+
+    private function renderAiAnalysisResult(): string
+    {
+        if ($this->aiAnalysisResult === null) {
+            return '';
+        }
+
+        $success = !empty($this->aiAnalysisResult['success']);
+        $http = (string) ($this->aiAnalysisResult['http_status'] ?? '0');
+        $message = (string) ($this->aiAnalysisResult['message'] ?? '');
+        $payloadSummary = (string) ($this->aiAnalysisResult['payload_summary'] ?? '');
+        $analysis = trim((string) ($this->aiAnalysisResult['analysis'] ?? ''));
+        $class = $success ? 'itxeb-cui-alert itxeb-cui-success' : 'itxeb-cui-alert itxeb-cui-error';
+
+        $html = '<section class="itxeb-cui-section itxeb-ai-analysis-result"><h3>Résultat analyse IA</h3>'
+            . '<div class="' . $class . '"><strong>HTTP ' . $this->esc($http) . '</strong> — ' . $this->esc($message) . '</div>';
+        if ($payloadSummary !== '') {
+            $html .= '<p><small>' . $this->esc($payloadSummary) . '</small></p>';
+        }
+        if ($analysis !== '') {
+            $html .= '<pre>' . $this->esc($analysis) . '</pre>';
+        }
+        return $html . '</section>';
     }
     /** @param array<string,mixed> $course */
     /** @param array<string,mixed> $dashboard */

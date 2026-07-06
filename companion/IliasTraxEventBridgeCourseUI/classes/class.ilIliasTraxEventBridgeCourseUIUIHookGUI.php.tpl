@@ -2,9 +2,10 @@
 
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIBridge.php';
 require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIScreen.php';
+require_once __DIR__ . '/class.ilIliasTraxEventBridgeCourseUIRouterGUI.php';
 
 /**
- * UIHook GUI for exposing course-level xAPI configuration and feedback.
+ * UIHook léger : point d'entrée Suivi xAPI dans l'onglet Contenu du cours.
  */
 class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
@@ -24,43 +25,51 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
      */
     public function getHTML($a_comp, $a_part, $a_par = []): array
     {
-        if ($a_part !== 'template_show' || !isset($a_par['html']) || !is_string($a_par['html'])) {
+        if (!isset($a_par['html']) || !is_string($a_par['html'])) {
             return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
         }
 
+        $html = $a_par['html'];
+        if (strpos($html, 'il_center_col') === false || strpos($html, 'mainspacekeeper') === false) {
+            return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
+        }
+
+        // Ne jamais réintercepter la page routée ilUIPluginRouterGUI :
+        // sinon le HTML du screen est réinséré comme texte échappé.
+        if ($this->isRoutedPluginRequest()) {
+            return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
+        }
+
+        $context = $this->getCurrentCourseContext();
+        $courseRefId = (int) ($context['course_ref_id'] ?? 0);
+        if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage'])) {
+            return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
+        }
+
+        // Fallback technique : si la page est appelée avec itxeb_cui_cmd, on
+        // remplace le contenu central. Le chemin principal reste la page routée
+        // ilUIPluginRouterGUI avec vrais onglets ILIAS.
         if ($this->isCourseUiCommandRequest()) {
             $screen = new ilIliasTraxEventBridgeCourseUIScreen($this->bridge);
-            $html = $this->replaceCenterColumnContent($a_par['html'], $screen->handle());
-            $html = $this->removeNativeCourseChrome($html);
-            $html = $this->injectCourseMainTabIntoHtml($html);
-            $html = $this->activateInjectedMainTab($html);
-            return [
-                'mode' => ilUIHookPluginGUI::REPLACE,
-                'html' => $html,
-            ];
+            $newHtml = $this->replaceCenterColumnContent($html, $screen->handle());
+            return ['mode' => ilUIHookPluginGUI::REPLACE, 'html' => $newHtml];
         }
 
-        if ($this->isReadyForCourseContext()) {
-            return [
-                'mode' => ilUIHookPluginGUI::REPLACE,
-                'html' => $this->injectCourseMainTabIntoHtml($a_par['html']),
-            ];
+        // Important : ne pas afficher l'encart sur Info/Membres/Paramètres.
+        if (!$this->isCourseContentRequest()) {
+            return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
         }
 
-        return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
+        $url = $this->buildRouterUrl($courseRefId, 'showDashboard');
+        $newHtml = $this->injectCourseEntryButton($html, $url);
+        return $newHtml !== $html
+            ? ['mode' => ilUIHookPluginGUI::REPLACE, 'html' => $newHtml]
+            : ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
     }
 
-    /**
-     * Top-level tab injection is handled through getHTML(), because it is more
-     * stable across ILIAS 10 screens than trying to hook different tab objects.
-     *
-     * @param string $a_comp
-     * @param string $a_part
-     * @param array<string,mixed> $a_par
-     */
+    /** @param string $a_comp @param string $a_part @param array<string,mixed> $a_par */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
-        // Intentionally empty: do not add Suivi xAPI as a Parameters subtab.
     }
 
     /** @return array<string,mixed> */
@@ -69,480 +78,191 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         return $this->bridge->getCourseContext();
     }
 
-    public function isReadyForCourseContext(): bool
+    private function isRoutedPluginRequest(): bool
     {
-        $context = $this->getCurrentCourseContext();
+        $query = [];
+        $uri = isset($_SERVER['REQUEST_URI']) && is_scalar($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        $parts = parse_url($uri);
+        if (is_array($parts) && isset($parts['query']) && is_string($parts['query'])) {
+            parse_str($parts['query'], $query);
+        } elseif (!empty($_GET)) {
+            $query = $_GET;
+        }
 
-        return (int) ($context['course_ref_id'] ?? 0) > 0
-            && (bool) ($context['main_plugin_available'] ?? false)
-            && (bool) ($context['course_tracking_classes_available'] ?? false)
-            && (bool) ($context['can_manage'] ?? false)
-            && (string) ($context['configuration_url'] ?? '') !== '';
+        $baseClass = strtolower((string) ($query['baseClass'] ?? $query['baseclass'] ?? ''));
+        $cmdClass = strtolower((string) ($query['cmdClass'] ?? $query['cmdclass'] ?? ''));
+
+        return $baseClass === 'iluipluginroutergui'
+            || $cmdClass === strtolower(ilIliasTraxEventBridgeCourseUIRouterGUI::class);
     }
-
-    public function getContextualConfigurationUrl(): string
+    private function isCourseUiCommandRequest(): bool
     {
-        $context = $this->getCurrentCourseContext();
-        return (string) ($context['configuration_url'] ?? '');
-    }
-
-    private function injectCourseMainTabIntoHtml(string $html): string
-    {
-        if ($html === '' || strpos($html, 'itxeb_course_xapi_main_tab') !== false) {
-            return $html;
-        }
-
-        $baseHref = $this->findMainTabHref($html, ['Contenu', 'Content', 'Inhalt'])
-            ?: $this->findMainTabHref($html, ['Membres', 'Members', 'Participants'])
-            ?: $this->findMainTabHref($html, ['Paramètres', 'Settings', 'Réglages'])
-            ?: $this->getContextualConfigurationUrl();
-        $url = $this->esc($this->buildXapiUrlFromHref($baseHref));
-        if ($url === '') {
-            return $html;
-        }
-
-        $active = $this->isCourseUiCommandRequest();
-        $li = $this->mainTabLi($url, $active);
-        $anchor = $this->mainTabAnchor($url, $active);
-
-        // Preferred position: immediately after the main course tab "Membres".
-        foreach ([
-            '/(<li[^>]*>\s*<a[^>]*>\s*Membres\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Members\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Participants\s*<\/a>\s*<\/li>)/iu',
-        ] as $pattern) {
-            $newHtml = preg_replace($pattern, '$1' . $li, $html, 1, $count);
-            if (is_string($newHtml) && $count > 0) {
-                return $newHtml;
-            }
-        }
-
-        // Fallback: place it just before Parameters/Settings if Members was not found.
-        foreach ([
-            '/(<li[^>]*>\s*<a[^>]*>\s*Paramètres\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Settings\s*<\/a>\s*<\/li>)/iu',
-            '/(<li[^>]*>\s*<a[^>]*>\s*Réglages\s*<\/a>\s*<\/li>)/iu',
-        ] as $pattern) {
-            $newHtml = preg_replace($pattern, $li . '$1', $html, 1, $count);
-            if (is_string($newHtml) && $count > 0) {
-                return $newHtml;
-            }
-        }
-
-        // Last fallback for variants without <li>: add the link after a Members anchor.
-        foreach ([
-            '/(<a[^>]*>\s*Membres\s*<\/a>)/iu',
-            '/(<a[^>]*>\s*Members\s*<\/a>)/iu',
-            '/(<a[^>]*>\s*Participants\s*<\/a>)/iu',
-        ] as $pattern) {
-            $newHtml = preg_replace($pattern, '$1 ' . $anchor, $html, 1, $count);
-            if (is_string($newHtml) && $count > 0) {
-                return $newHtml;
-            }
-        }
-
-        // Last resort: visible link before the central form/content.
-        $fallback = '<div class="ilStartupSection" style="margin:8px 0 12px 0;">' . $anchor . '</div>';
-        $newHtml = preg_replace('/(<form\b)/i', $fallback . '$1', $html, 1, $count);
-        return is_string($newHtml) && $count > 0 ? $newHtml : $html . $fallback;
-    }
-
-    private function activateInjectedMainTab(string $html): string
-    {
-        if ($html === '' || strpos($html, 'tab_itxeb_course_xapi_main') === false || !class_exists('DOMDocument')) {
-            return $html;
-        }
-
-        $internalErrors = libxml_use_internal_errors(true);
-        $dom = new DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-        if (!$loaded) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-
-        $tab = $dom->getElementById('tab_itxeb_course_xapi_main');
-        if (!$tab instanceof DOMElement) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-
-        $parent = $tab->parentNode;
-        if ($parent instanceof DOMNode) {
-            foreach ($parent->childNodes as $sibling) {
-                if (!$sibling instanceof DOMElement) {
-                    continue;
-                }
-                if ($sibling->isSameNode($tab)) {
-                    continue;
-                }
-                $this->removeClass($sibling, 'active');
-                foreach ($sibling->getElementsByTagName('a') as $a) {
-                    if ($a instanceof DOMElement) {
-                        $this->removeClass($a, 'active');
-                        if ($a->hasAttribute('aria-selected')) {
-                            $a->setAttribute('aria-selected', 'false');
-                        }
-                    }
-                }
-            }
-        }
-
-        $this->addClass($tab, 'active');
-        foreach ($tab->getElementsByTagName('a') as $a) {
-            if ($a instanceof DOMElement) {
-                $this->addClass($a, 'active');
-                if ($a->hasAttribute('aria-selected')) {
-                    $a->setAttribute('aria-selected', 'true');
-                }
-            }
-        }
-
-        $html = $dom->saveHTML();
-        $html = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $html) ?? $html;
-        libxml_clear_errors();
-        libxml_use_internal_errors($internalErrors);
-        return $html;
-    }
-
-    private function removeNativeCourseChrome(string $html): string
-    {
-        if ($html === '' || !class_exists('DOMDocument')) {
-            return $html;
-        }
-
-        $internalErrors = libxml_use_internal_errors(true);
-        $dom = new DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-        if (!$loaded) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-
-        $xpath = new DOMXPath($dom);
-
-        foreach ([
-            '//*[@id="ilSubTabs" or @id="il_sub_tabs" or @id="ilToolbar" or @id="il_toolbar"]',
-            '//*[contains(concat(" ", normalize-space(@class), " "), " ilSubTabs ")]',
-            '//*[contains(concat(" ", normalize-space(@class), " "), " il_SubTabs ")]',
-            '//*[contains(concat(" ", normalize-space(@class), " "), " ilTabsContentSub ")]',
-            '//*[contains(concat(" ", normalize-space(@class), " "), " ilToolbar ")]',
-            '//*[contains(concat(" ", normalize-space(@class), " "), " ilToolbarContainer ")]',
-        ] as $query) {
-            $nodes = $xpath->query($query);
-            if ($nodes === false) {
-                continue;
-            }
-            $this->removeNodeList($nodes);
-        }
-
-        foreach ([
-            'Editer Participants',
-            'Éditer Participants',
-            'Répartition par groupes',
-            'Galerie des Membres du Cours',
-            'Voir',
-            'Gérer',
-            'Ajouter un nouvel objet',
-            'Editer la page',
-            'Éditer la page',
-            'Vue des membres',
-            'Rechercher utilisateurs',
-            'Feuille de Présence',
-            'Envoyer un message aux membres',
-        ] as $label) {
-            $this->removeNativeBlockContainingLabel($xpath, $label);
-        }
-
-        $html = $dom->saveHTML();
-        $html = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $html) ?? $html;
-        libxml_clear_errors();
-        libxml_use_internal_errors($internalErrors);
-        return $html;
-    }
-
-    private function removeNodeList(DOMNodeList $nodes): void
-    {
-        $toRemove = [];
-        foreach ($nodes as $node) {
-            if ($node instanceof DOMElement && !$this->containsItxebNode($node)) {
-                $toRemove[] = $node;
-            }
-        }
-        foreach ($toRemove as $node) {
-            if ($node->parentNode instanceof DOMNode) {
-                $node->parentNode->removeChild($node);
-            }
-        }
-    }
-
-    private function removeNativeBlockContainingLabel(DOMXPath $xpath, string $label): void
-    {
-        $query = '//*[self::a or self::button or self::span or self::label][contains(normalize-space(.), ' . $this->xpathLiteral($label) . ')]';
-        $nodes = $xpath->query($query);
-        if ($nodes === false) {
-            return;
-        }
-
-        $toRemove = [];
-        foreach ($nodes as $node) {
-            if (!$node instanceof DOMElement || $this->containsItxebNode($node)) {
-                continue;
-            }
-            $target = $this->findRemovableNativeAncestor($node);
-            if ($target instanceof DOMElement && !$this->containsItxebNode($target)) {
-                $toRemove[] = $target;
-            }
-        }
-
-        foreach ($toRemove as $node) {
-            if ($node->parentNode instanceof DOMNode) {
-                $node->parentNode->removeChild($node);
-            }
-        }
-    }
-
-    private function findRemovableNativeAncestor(DOMElement $node): DOMElement
-    {
-        $current = $node;
-        for ($i = 0; $i < 5; $i++) {
-            $parent = $current->parentNode;
-            if (!$parent instanceof DOMElement) {
-                break;
-            }
-            $tag = strtolower($parent->tagName);
-            if (in_array($tag, ['nav', 'ul', 'form', 'section'], true)) {
-                return $parent;
-            }
-            if ($tag === 'div') {
-                $class = ' ' . $parent->getAttribute('class') . ' ';
-                if (stripos($class, ' ilToolbar ') !== false || stripos($class, ' ilSubTabs ') !== false || stripos($class, ' il_SubTabs ') !== false) {
-                    return $parent;
-                }
-                $current = $parent;
-                continue;
-            }
-            if ($tag === 'body' || $tag === 'html') {
-                break;
-            }
-            $current = $parent;
-        }
-        return $node;
-    }
-
-    private function containsItxebNode(DOMElement $node): bool
-    {
-        if (strpos((string) $node->getAttribute('id'), 'itxeb') !== false || strpos((string) $node->getAttribute('class'), 'itxeb') !== false) {
-            return true;
-        }
-        foreach ($node->getElementsByTagName('*') as $child) {
-            if ($child instanceof DOMElement && (strpos((string) $child->getAttribute('id'), 'itxeb') !== false || strpos((string) $child->getAttribute('class'), 'itxeb') !== false)) {
+        foreach ([$_GET, $_POST] as $source) {
+            if (isset($source['itxeb_cui_cmd']) && is_scalar($source['itxeb_cui_cmd']) && (string) $source['itxeb_cui_cmd'] !== '') {
                 return true;
             }
         }
         return false;
     }
 
-    private function addClass(DOMElement $element, string $class): void
+    private function isCourseContentRequest(): bool
     {
-        $classes = preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [];
-        if (!in_array($class, $classes, true)) {
-            $classes[] = $class;
-        }
-        $element->setAttribute('class', trim(implode(' ', array_filter($classes))));
-    }
-
-    private function removeClass(DOMElement $element, string $class): void
-    {
-        $classes = preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [];
-        $classes = array_values(array_filter($classes, static function (string $value) use ($class): bool {
-            return $value !== '' && $value !== $class;
-        }));
-        if (count($classes) > 0) {
-            $element->setAttribute('class', implode(' ', $classes));
-        } else {
-            $element->removeAttribute('class');
-        }
-    }
-
-    private function xpathLiteral(string $value): string
-    {
-        if (strpos($value, "'") === false) {
-            return "'" . $value . "'";
-        }
-        if (strpos($value, '"') === false) {
-            return '"' . $value . '"';
-        }
-        $parts = explode("'", $value);
-        return "concat('" . implode("', \"'\", '", $parts) . "')";
-    }
-
-    /** @param array<int,string> $labels */
-    private function findMainTabHref(string $html, array $labels): string
-    {
-        foreach ($labels as $label) {
-            $pattern = '/<a[^>]+href=("|\')([^"\']+)\1[^>]*>\s*' . preg_quote($label, '/') . '\s*<\/a>/iu';
-            if (preg_match($pattern, $html, $matches)) {
-                return html_entity_decode((string) $matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            }
-        }
-        return '';
-    }
-
-    private function buildXapiUrlFromHref(string $href): string
-    {
-        if ($href === '') {
-            return '';
-        }
-
-        $parts = parse_url($href);
-        $path = (string) ($parts['path'] ?? $this->currentScriptName());
-        if ($path === '') {
-            $path = $this->currentScriptName();
-        }
+        $uri = isset($_SERVER['REQUEST_URI']) && is_scalar($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
         $query = [];
-        if (isset($parts['query']) && is_string($parts['query']) && $parts['query'] !== '') {
+        $parts = parse_url($uri);
+        if (is_array($parts) && isset($parts['query']) && is_string($parts['query'])) {
             parse_str($parts['query'], $query);
-        }
-        if (!is_array($query)) {
-            $query = [];
-        }
-
-        $courseRefId = (int) ($query['ref_id'] ?? 0);
-        if ($courseRefId <= 0) {
-            $context = $this->getCurrentCourseContext();
-            $courseRefId = (int) ($context['course_ref_id'] ?? 0);
-        }
-        if ($courseRefId > 0) {
-            $query['ref_id'] = (string) $courseRefId;
-            $query['itxeb_course_ref_id'] = (string) $courseRefId;
+        } elseif (!empty($_GET)) {
+            $query = $_GET;
         }
 
-        // Avoid invalid commands such as ilObjCourseGUI::showObject(). Keep the
-        // valid ILIAS routing parameters already present in the selected tab URL.
-        unset($query['cmd']);
-        $query['itxeb_cui_cmd'] = 'showCourseDashboard';
+        $baseClass = strtolower((string) ($query['baseClass'] ?? $query['baseclass'] ?? ''));
+        $cmdClass = strtolower((string) ($query['cmdClass'] ?? $query['cmdclass'] ?? ''));
+        $cmd = strtolower((string) ($query['cmd'] ?? ''));
 
-        $rebuilt = $path . '?' . http_build_query($query, '', '&');
-        if (isset($parts['fragment']) && is_string($parts['fragment']) && $parts['fragment'] !== '') {
-            $rebuilt .= '#' . $parts['fragment'];
+        if ($baseClass !== '' && $baseClass !== 'ilrepositorygui') {
+            return false;
         }
-        return $rebuilt;
+        if ($cmdClass !== '' && $cmdClass !== 'ilobjcoursegui') {
+            return false;
+        }
+        if ($cmd !== '' && !in_array($cmd, ['show', 'view', 'render'], true)) {
+            return false;
+        }
+
+        return isset($query['ref_id']) && (int) $query['ref_id'] > 0;
     }
 
-    private function currentScriptName(): string
+    private function buildRouterUrl(int $courseRefId, string $cmd): string
     {
-        return isset($_SERVER['SCRIPT_NAME']) && is_scalar($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : 'ilias.php';
+        try {
+            if (isset($GLOBALS['DIC']) && is_object($GLOBALS['DIC']) && method_exists($GLOBALS['DIC'], 'ctrl')) {
+                $ctrl = $GLOBALS['DIC']->ctrl();
+                $ctrl->setParameterByClass(ilIliasTraxEventBridgeCourseUIRouterGUI::class, 'itxeb_course_ref_id', (string) $courseRefId);
+                $url = (string) $ctrl->getLinkTargetByClass([
+                    ilUIPluginRouterGUI::class,
+                    ilIliasTraxEventBridgeCourseUIRouterGUI::class,
+                ], $cmd);
+                $ctrl->setParameterByClass(ilIliasTraxEventBridgeCourseUIRouterGUI::class, 'itxeb_course_ref_id', '');
+
+                // Une URL ilCtrl correcte contient cmdNode. Si cmdNode est absent,
+                // la structure de contrôle n'a pas encore été reconstruite.
+                if ($url !== '' && strpos($url, 'cmdNode=') !== false) {
+                    return $url;
+                }
+            }
+        } catch (Throwable $ignored) {
+        }
+
+        return $this->buildCourseFallbackUrl($courseRefId);
     }
 
-    private function mainTabLi(string $url, bool $active): string
+    private function buildCourseFallbackUrl(int $courseRefId): string
     {
-        $liClass = $active ? ' class="active"' : '';
-        return '<li id="tab_itxeb_course_xapi_main"' . $liClass . '>' . $this->mainTabAnchor($url, $active) . '</li>';
+        $script = isset($_SERVER['SCRIPT_NAME']) && is_scalar($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : '/ilias.php';
+        if ($script === '') {
+            $script = '/ilias.php';
+        }
+        return $script . '?' . http_build_query([
+            'baseClass' => 'ilrepositorygui',
+            'cmdClass' => 'ilobjcoursegui',
+            'ref_id' => (string) $courseRefId,
+            'itxeb_cui_cmd' => 'showCourseDashboard',
+            'itxeb_course_ref_id' => (string) $courseRefId,
+        ], '', '&');
     }
 
-    private function mainTabAnchor(string $url, bool $active): string
+    private function injectCourseEntryButton(string $html, string $url): string
     {
-        $aClass = $active ? ' class="active"' : '';
-        return '<a id="itxeb_course_xapi_main_tab"' . $aClass . ' href="' . $url . '">Suivi xAPI</a>';
-    }
+        if (strpos($html, 'id="itxeb_course_xapi_entry"') !== false || strpos($html, "id='itxeb_course_xapi_entry'") !== false) {
+            return $html;
+        }
 
-    private function replaceCenterColumnContent(string $pageHtml, string $contentHtml): string
-    {
-        if ($pageHtml === '' || !class_exists('DOMDocument')) {
-            return $pageHtml;
+        $entryHtml = '<div id="itxeb_course_xapi_entry" class="ilInfoScreenSec itxeb-course-xapi-entry" style="margin:0 0 15px 0;padding:12px;border:1px solid #d0d0d0;background:#f8f8f8;">'
+            . '<h3>Suivi xAPI</h3>'
+            . '<p>Consulter le tableau de bord, l’analyse pédagogique et la vue expert xAPI de ce cours.</p>'
+            . '<a class="btn btn-default" href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">Ouvrir le suivi xAPI</a>'
+            . '</div>';
+
+        if (!class_exists('DOMDocument')) {
+            $newHtml = preg_replace('/(<[^>]+id=("|\')il_center_col\2[^>]*>)/isu', '$1' . $entryHtml, $html, 1, $count);
+            return is_string($newHtml) && $count > 0 ? $newHtml : $html;
         }
 
         $internalErrors = libxml_use_internal_errors(true);
         $dom = new DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $pageHtml);
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         if (!$loaded) {
             libxml_clear_errors();
             libxml_use_internal_errors($internalErrors);
-            return $pageHtml;
+            return $html;
         }
 
-        $xpath = new DOMXPath($dom);
-        $centerColumn = $xpath->query('//*[@id="il_center_col"]')->item(0);
-        if (!$centerColumn instanceof DOMElement) {
+        $center = $dom->getElementById('il_center_col');
+        if (!$center instanceof DOMElement) {
             libxml_clear_errors();
             libxml_use_internal_errors($internalErrors);
-            return $pageHtml;
+            return $html;
         }
 
-        while ($centerColumn->firstChild !== null) {
-            $centerColumn->removeChild($centerColumn->firstChild);
+        $fragment = $dom->createDocumentFragment();
+        if (@$fragment->appendXML($entryHtml) === false) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $html;
+        }
+        if ($center->firstChild instanceof DOMNode) {
+            $center->insertBefore($fragment, $center->firstChild);
+        } else {
+            $center->appendChild($fragment);
         }
 
-        $fragmentDocument = new DOMDocument('1.0', 'UTF-8');
-        $fragmentLoaded = $fragmentDocument->loadHTML('<?xml encoding="utf-8" ?><div id="itxeb_cui_wrapper">' . $contentHtml . '</div>');
-        if ($fragmentLoaded) {
-            $wrapper = $fragmentDocument->getElementById('itxeb_cui_wrapper');
-            if ($wrapper instanceof DOMElement) {
-                while ($wrapper->firstChild !== null) {
-                    $centerColumn->appendChild($dom->importNode($wrapper->firstChild, true));
-                    $wrapper->removeChild($wrapper->firstChild);
-                }
-            }
-        }
-
-        $html = $dom->saveHTML();
-        $html = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $html) ?? $pageHtml;
+        $result = $dom->saveHTML();
+        $result = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $result) ?? (string) $result;
         libxml_clear_errors();
         libxml_use_internal_errors($internalErrors);
-
-        return $html;
+        return $result;
     }
 
-    private function isCourseUiCommandRequest(): bool
+    private function replaceCenterColumnContent(string $html, string $content): string
     {
-        $cmd = $this->requestValue($_POST, 'itxeb_cui_cmd');
-        if ($cmd === '') {
-            $cmd = $this->requestValue($_GET, 'itxeb_cui_cmd');
+        if ($html === '' || !class_exists('DOMDocument')) {
+            return $content;
         }
 
-        return in_array($cmd, [
-            'showCourseTracking',
-            'showCourseDashboard',
-            'showCourseAnalysis',
-            'showCourseExpert',
-            'exportCourseExpertCsv',
-            'exportCourseDashboardPdf',
-            'saveCourseTracking',
-            'saveDashboardPreferences',
-            'enableAllCourseTracking',
-            'disableAllCourseTracking',
-            'resetCourseTracking',
-        ], true) || $this->requestValue($_POST, 'itxeb_dashboard_save') === '1';
-    }
-
-    private function requestValue($source, string $key): string
-    {
-        try {
-            if (is_array($source)) {
-                return isset($source[$key]) && is_scalar($source[$key]) ? (string) $source[$key] : '';
-            }
-            if ($source instanceof ArrayAccess) {
-                return isset($source[$key]) && is_scalar($source[$key]) ? (string) $source[$key] : '';
-            }
-            if (is_object($source) && method_exists($source, 'offsetExists') && method_exists($source, 'offsetGet')) {
-                if (!$source->offsetExists($key)) {
-                    return '';
-                }
-                $value = $source->offsetGet($key);
-                return is_scalar($value) ? (string) $value : '';
-            }
-        } catch (Throwable $ignored) {
-            return '';
+        $internalErrors = libxml_use_internal_errors(true);
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        if (!$loaded) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $content;
         }
-        return '';
-    }
 
-    private function esc(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $center = $dom->getElementById('il_center_col');
+        if (!$center instanceof DOMElement) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+            return $content;
+        }
+
+        while ($center->firstChild instanceof DOMNode) {
+            $center->removeChild($center->firstChild);
+        }
+
+        $fragment = $dom->createDocumentFragment();
+        if (@$fragment->appendXML('<div>' . $content . '</div>') !== false) {
+            while ($fragment->firstChild instanceof DOMNode) {
+                $center->appendChild($fragment->firstChild);
+            }
+        } else {
+            $center->appendChild($dom->createTextNode($content));
+        }
+
+        $result = $dom->saveHTML();
+        $result = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $result) ?? (string) $result;
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+        return $result;
     }
 }
