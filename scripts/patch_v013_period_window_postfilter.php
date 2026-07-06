@@ -7,6 +7,10 @@
  * LRS pour les périodes courtes, puis on filtre en PHP sur la vraie période
  * demandée. Cela rend tous les blocs cohérents : synthèse, activité, actions,
  * top ressources, analyse, expert, PDF et comparaison.
+ *
+ * Script idempotent : s'il détecte que le correctif est déjà présent, il sort
+ * proprement avec un message OK au lieu de considérer les blocs initiaux comme
+ * introuvables.
  */
 
 function fail_period_patch(string $message): void
@@ -21,6 +25,14 @@ function write_period_patch(string $path, string $content): void
         fail_period_patch("écriture impossible: {$path}");
     }
     echo "WRITE: {$path}\n";
+}
+
+function already_period_patched(string $content): bool
+{
+    return strpos($content, '$periodStartTs = time() - ($days * 86400);') !== false
+        && strpos($content, '$queryDays = $days <= 30 ? min(365, max($days * 2, 14)) : $days;') !== false
+        && strpos($content, "'period_start_ts' => $" . "periodStartTs") !== false
+        && strpos($content, 'private function isStatementInRequestedPeriod') !== false;
 }
 
 $root = getcwd();
@@ -38,6 +50,15 @@ if (!is_string($c)) {
     fail_period_patch("lecture impossible: {$file}");
 }
 $original = $c;
+
+if (already_period_patched($c)) {
+    echo "OK: correctif périodes courtes déjà présent.\n";
+    passthru('php -l ' . escapeshellarg($file), $code);
+    if ($code !== 0) {
+        fail_period_patch("syntaxe PHP invalide: {$file}");
+    }
+    exit(0);
+}
 
 $old = <<<'PHP'
         $days = max(1, min(365, $days));
@@ -58,7 +79,7 @@ $new = <<<'PHP'
         $allowedResources = $this->allowedResources($course);
 PHP;
 if (strpos($c, $old) === false) {
-    fail_period_patch('bloc days/since introuvable');
+    fail_period_patch('bloc days/since introuvable et correctif non détecté');
 }
 $c = str_replace($old, $new, $c);
 
@@ -74,7 +95,7 @@ $new = <<<'PHP'
             'returned' => 0,
 PHP;
 if (strpos($c, $old) === false) {
-    fail_period_patch('bloc summary since introuvable');
+    fail_period_patch('bloc summary since introuvable et correctif non détecté');
 }
 $c = str_replace($old, $new, $c);
 
@@ -90,7 +111,7 @@ $new = <<<'PHP'
             $refId = (int) ($resource['ref_id'] ?? 0);
 PHP;
 if (strpos($c, $old) === false) {
-    fail_period_patch('point insertion filtre période introuvable');
+    fail_period_patch('point insertion filtre période introuvable et correctif non détecté');
 }
 $c = str_replace($old, $new, $c);
 
