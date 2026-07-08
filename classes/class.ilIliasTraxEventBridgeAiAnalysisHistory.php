@@ -94,6 +94,26 @@ class ilIliasTraxEventBridgeAiAnalysisHistory
         return $records;
     }
 
+    public function archive(int $courseRefId, string $id): bool
+    {
+        if ($courseRefId <= 0 || !preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $id)) {
+            return false;
+        }
+        $file = $this->recordFile($courseRefId, $id);
+        if (!is_file($file)) {
+            return false;
+        }
+        $archiveDir = dirname($this->dir) . '/ai_analysis_history_deleted';
+        if (!is_dir($archiveDir)) {
+            @mkdir($archiveDir, 0750, true);
+        }
+        if (!is_dir($archiveDir)) {
+            return false;
+        }
+        @chmod($archiveDir, 0750);
+        $target = $archiveDir . '/' . basename($file) . '.archived-' . gmdate('YmdHis');
+        return @rename($file, $target);
+    }
     private function ensureDir(): void
     {
         if (!is_dir($this->dir)) {
