@@ -14,6 +14,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
     private $analytics;
     /** @var ilIliasTraxEventBridgeLrsCourseSummary|null */
     private $lrsSummary;
+    /** @var ilIliasTraxEventBridgeAiAnalysisHistory|null */
+    private $aiHistory;
     private string $message = '';
     private string $messageType = 'info';
     private bool $renderInnerTabs = true;
@@ -45,6 +47,11 @@ class ilIliasTraxEventBridgeCourseUIScreen
             }
             $aiAnalyzerPath = $this->bridge->getMainPluginPath() . '/classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php';
             if (is_file($aiAnalyzerPath)) { require_once $aiAnalyzerPath; }
+            $aiHistoryPath = $this->bridge->getMainPluginPath() . '/classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php';
+            if (is_file($aiHistoryPath)) { require_once $aiHistoryPath; }
+            if (class_exists('ilIliasTraxEventBridgeAiAnalysisHistory')) {
+                $this->aiHistory = new ilIliasTraxEventBridgeAiAnalysisHistory($this->bridge->getMainPluginPath());
+            }
         }
     }
 
@@ -402,7 +409,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section"><h2>Analyse des ressources</h2><p>Ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderPedagogicalSynthesis($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><p>Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderAiHistoryPanel($course) . $this->renderPedagogicalSynthesis($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -442,7 +449,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $dashboard = $this->loadDashboard($course);
         $this->aiAnalysisResult = (new ilIliasTraxEventBridgeCourseAiAnalyzer())->analyze($course, $dashboard);
         if (!empty($this->aiAnalysisResult['success'])) {
-            $this->message = 'Analyse IA générée.';
+            $this->saveAiAnalysisHistory($course, $this->aiAnalysisResult);
+            $this->message = 'Analyse IA générée et historisée.';
             $this->messageType = 'success';
         } else {
             $this->message = 'Analyse IA échouée : ' . (string) ($this->aiAnalysisResult['message'] ?? 'erreur inconnue');
@@ -462,9 +470,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
             'itxeb_filter_obj_type' => $this->getSelectedObjectType(),
         ]);
 
-        return '<section class="itxeb-cui-section itxeb-ai-analysis-action"><h3>Analyse IA du cours</h3>'
+        return '<section class="itxeb-cui-section itxeb-ai-analysis-action itxeb-trainer-card"><h3>Analyse IA du cours</h3>'
             . '<p>Génère une synthèse pédagogique à partir des données xAPI agrégées de la période sélectionnée. En anonymisation stricte, aucun nom, courriel ou identité nominative apprenant n’est envoyé.</p>'
-            . '<p><a class="btn btn-primary" href="' . $this->esc($url) . '">Générer une analyse IA du cours</a></p>'
+            . '<p><a class="btn btn-primary" href="' . $this->esc($url) . '">Générer une nouvelle analyse IA</a></p>'
+            . '<p><small>La dernière analyse réussie est historisée localement et reprise dans l’export PDF.</small></p>'
             . '</section>';
     }
 
@@ -487,10 +496,139 @@ class ilIliasTraxEventBridgeCourseUIScreen
             $html .= '<p><small>' . $this->esc($payloadSummary) . '</small></p>';
         }
         if ($analysis !== '') {
-            $html .= '<pre>' . $this->esc($analysis) . '</pre>';
+            $html .= $this->renderAiMarkdown($analysis);
         }
         return $html . '</section>';
     }
+    /** @param array<string,mixed> $dashboard */
+    private function renderTrainerActionSummary(array $dashboard): string
+    {
+        $summary = is_array($dashboard['summary'] ?? null) ? $dashboard['summary'] : [];
+        $pedagogy = is_array($dashboard['pedagogy'] ?? null) ? $dashboard['pedagogy'] : [];
+        $critical = (int) ($pedagogy['critical_count'] ?? 0);
+        $watch = (int) ($pedagogy['watch_count'] ?? 0);
+        $withoutTrace = (int) ($pedagogy['resources_without_trace'] ?? 0);
+        $failed = (int) ($summary['tests_failed'] ?? 0);
+        $passed = (int) ($summary['tests_passed'] ?? 0);
+        $priority = $critical > 0 ? 'Priorité haute : traiter les ressources critiques.' : ($watch > 0 || $withoutTrace > 0 ? 'Priorité moyenne : vérifier les ressources à surveiller.' : 'Situation stable sur les données disponibles.');
+        return '<div class="itxeb-trainer-summary">'
+            . $this->metricCard('Priorité formateur', $critical > 0 ? 'Haute' : (($watch + $withoutTrace) > 0 ? 'Moyenne' : 'Normale'), $priority)
+            . $this->metricCard('Ressources critiques', (string) $critical, 'À reprendre en premier')
+            . $this->metricCard('À surveiller', (string) $watch, 'Signaux faibles')
+            . $this->metricCard('Tests', (string) $passed . ' / ' . (string) $failed, 'Réussis / échoués')
+            . '</div>';
+    }
+
+    /** @param array<string,mixed> $course @param array<string,mixed> $result */
+    private function saveAiAnalysisHistory(array $course, array $result): void
+    {
+        if (!$this->aiHistory) {
+            return;
+        }
+        try {
+            $this->aiHistory->save($course, $this->getPeriodDays(), $result, $this->getCurrentUserId());
+        } catch (Throwable $e) {
+            error_log('[IliasTraxEventBridge] Historisation IA impossible: ' . $e->getMessage());
+        }
+    }
+
+    /** @param array<string,mixed> $course */
+    private function renderAiHistoryPanel(array $course): string
+    {
+        if (!$this->aiHistory) {
+            return '';
+        }
+        $records = $this->aiHistory->list((int) ($course['course_ref_id'] ?? 0), 5);
+        if (count($records) === 0) {
+            return '<section class="itxeb-cui-section itxeb-ai-history"><h3>Historique des analyses IA</h3><p><em>Aucune analyse IA historisée pour ce cours.</em></p></section>';
+        }
+        $html = '<section class="itxeb-cui-section itxeb-ai-history"><h3>Historique des analyses IA</h3><p>Dernières analyses générées pour ce cours.</p><div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr><th>Date UTC</th><th>Période</th><th>Statut</th><th>Résumé payload</th></tr></thead><tbody>';
+        foreach ($records as $record) {
+            $html .= '<tr><td>' . $this->esc((string) ($record['created_at_utc'] ?? '')) . '</td>'
+                . '<td>' . $this->esc((string) ($record['period_days'] ?? '')) . ' jour(s)</td>'
+                . '<td>' . (!empty($record['success']) ? 'OK' : 'Erreur') . '</td>'
+                . '<td><small>' . $this->esc((string) ($record['payload_summary'] ?? '')) . '</small></td></tr>';
+        }
+        return $html . '</tbody></table></div></section>';
+    }
+
+    private function renderAiMarkdown(string $markdown): string
+    {
+        $lines = preg_split('/\R/', trim($markdown));
+        if (!is_array($lines)) {
+            return '<div class="itxeb-ai-markdown"><p>' . $this->esc($markdown) . '</p></div>';
+        }
+        $html = '<div class="itxeb-ai-markdown">';
+        $inList = false;
+        $inTable = false;
+        foreach ($lines as $line) {
+            $trim = trim((string) $line);
+            if ($trim === '' || $trim === '---') {
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                if ($inTable) { $html .= '</tbody></table></div>'; $inTable = false; }
+                continue;
+            }
+            if (preg_match('/^##\s*(.+)$/u', $trim, $m) === 1) {
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                if ($inTable) { $html .= '</tbody></table></div>'; $inTable = false; }
+                $html .= '<h4>' . $this->renderInlineMarkdown((string) $m[1]) . '</h4>';
+                continue;
+            }
+            if (preg_match('/^###\s*(.+)$/u', $trim, $m) === 1) {
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                if ($inTable) { $html .= '</tbody></table></div>'; $inTable = false; }
+                $html .= '<h5>' . $this->renderInlineMarkdown((string) $m[1]) . '</h5>';
+                continue;
+            }
+            if (strpos($trim, '|') === 0 && substr($trim, -1) === '|') {
+                if (preg_match('/^\|\s*-+/', $trim) === 1) { continue; }
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                if (!$inTable) { $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table itxeb-ai-table"><tbody>'; $inTable = true; }
+                $html .= '<tr>';
+                foreach (array_map('trim', explode('|', trim($trim, '|'))) as $cell) {
+                    $html .= '<td>' . $this->renderInlineMarkdown($cell) . '</td>';
+                }
+                $html .= '</tr>';
+                continue;
+            }
+            if (preg_match('/^-\s+(.+)$/u', $trim, $m) === 1) {
+                if ($inTable) { $html .= '</tbody></table></div>'; $inTable = false; }
+                if (!$inList) { $html .= '<ul>'; $inList = true; }
+                $html .= '<li>' . $this->renderInlineMarkdown((string) $m[1]) . '</li>';
+                continue;
+            }
+            if ($inList) { $html .= '</ul>'; $inList = false; }
+            if ($inTable) { $html .= '</tbody></table></div>'; $inTable = false; }
+            $html .= '<p>' . $this->renderInlineMarkdown($trim) . '</p>';
+        }
+        if ($inList) { $html .= '</ul>'; }
+        if ($inTable) { $html .= '</tbody></table></div>'; }
+        return $html . '</div>';
+    }
+
+    private function renderInlineMarkdown(string $text): string
+    {
+        $escaped = $this->esc($text);
+        return preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $escaped) ?: $escaped;
+    }
+
+    /** @param array<string,mixed> $course */
+    private function pdfAiAnalysisSection(array $course): string
+    {
+        if (!$this->aiHistory) {
+            return '';
+        }
+        $record = $this->aiHistory->latest((int) ($course['course_ref_id'] ?? 0), $this->getPeriodDays());
+        if ($record === []) {
+            $record = $this->aiHistory->latest((int) ($course['course_ref_id'] ?? 0), 0);
+        }
+        $analysis = trim((string) ($record['analysis'] ?? ''));
+        if ($analysis === '') {
+            return '<h2>Analyse IA</h2><p><em>Aucune analyse IA historisée à inclure dans le PDF.</em></p>';
+        }
+        return '<h2>Analyse IA historisée</h2><p class="small">Générée le ' . $this->esc((string) ($record['created_at_utc'] ?? '')) . ' — ' . $this->esc((string) ($record['payload_summary'] ?? '')) . '</p>' . $this->renderAiMarkdown($analysis);
+    }
+
     /** @param array<string,mixed> $course */
     /** @param array<string,mixed> $dashboard */
     private function renderStrugglingLearners(array $dashboard): string
@@ -736,7 +874,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $typeFilter = $this->getSelectedObjectType() !== '' ? $this->getSelectedObjectType() : 'tous';
         $html = '<html><head><meta charset="utf-8"><style>'
             . 'body{font-family:DejaVu Sans,Arial,sans-serif;font-size:11px;color:#222}h1{font-size:20px;margin:0 0 6px}h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #999;padding-bottom:3px}table{width:100%;border-collapse:collapse;margin:6px 0 12px}th,td{border:1px solid #bbb;padding:4px 5px;vertical-align:top}th{background:#eee}.small{font-size:9px;color:#555}.kpi td{width:25%}'
-            . '#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}</style></head><body>';
+            . '#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}.itxeb-trainer-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}.itxeb-trainer-card{border-left:4px solid #337ab7}.itxeb-ai-markdown{border:1px solid #c8d6e5;background:#fff;padding:14px;border-radius:6px;line-height:1.55}.itxeb-ai-markdown h4{font-size:18px;margin:16px 0 8px;border-bottom:1px solid #d9e2ec;padding-bottom:4px}.itxeb-ai-markdown h5{font-size:15px;margin:12px 0 6px}.itxeb-ai-markdown ul{margin:6px 0 12px 22px}.itxeb-ai-markdown li{margin:4px 0}.itxeb-ai-table td:first-child{font-weight:700}.itxeb-ai-history table small{line-height:1.35}</style></head><body>';
         $html .= '<h1>Rapport Suivi xAPI — ' . $this->esc($title) . '</h1>';
         $html .= '<p class="small">Source fonctionnelle : TRAX/LRS direct. Généré le ' . $this->esc(gmdate('Y-m-d H:i:s') . ' UTC') . '.</p>';
         $html .= '<h2>Contexte</h2><table><tbody>'
@@ -763,6 +901,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
         $html .= $this->pdfSimpleCountTable('Actions xAPI', array_slice($verbItems, 0, 12, true));
         $html .= $this->pdfResourcesTable($dashboard);
+        $html .= $this->pdfAiAnalysisSection($course);
         return $html . '</body></html>';
     }
 
@@ -1482,6 +1621,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function styles(): string
     {
-        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:1px solid #ddd;background:#fff;margin:.7rem 0 1rem;padding:.75rem;border-radius:4px}#itxeb-course-ui-screen .itxeb-pedagogy-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:.5rem 0}#itxeb-course-ui-screen .itxeb-pedagogy-lines{margin:.6rem 0 0 1.2rem}#itxeb-course-ui-screen .itxeb-pedagogy-badge{display:inline-block;padding:.25rem .45rem;border-radius:3px;font-weight:700;white-space:nowrap}#itxeb-course-ui-screen .itxeb-pedagogy-ok{background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-pedagogy-watch{background:#fcf8e3;color:#8a6d3b}#itxeb-course-ui-screen .itxeb-pedagogy-critical{background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-muted{background:#eee;color:#555}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}#itxeb-course-ui-screen .itxeb-filter-help{color:#666;margin-left:.35rem}#itxeb-course-ui-screen .itxeb-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.4rem;margin:.7rem 0}#itxeb-course-ui-screen .itxeb-widget-choice{display:block;border:1px solid #ddd;background:#fff;border-radius:4px;padding:.45rem .55rem}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-signal-warning{border-color:#f0ad4e;background:#fcf8e3;color:#8a6d3b;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal-danger{border-color:#d9534f;background:#f2dede;color:#a94442;font-weight:bold}#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}</style>';
+        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:1px solid #ddd;background:#fff;margin:.7rem 0 1rem;padding:.75rem;border-radius:4px}#itxeb-course-ui-screen .itxeb-pedagogy-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:.5rem 0}#itxeb-course-ui-screen .itxeb-pedagogy-lines{margin:.6rem 0 0 1.2rem}#itxeb-course-ui-screen .itxeb-pedagogy-badge{display:inline-block;padding:.25rem .45rem;border-radius:3px;font-weight:700;white-space:nowrap}#itxeb-course-ui-screen .itxeb-pedagogy-ok{background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-pedagogy-watch{background:#fcf8e3;color:#8a6d3b}#itxeb-course-ui-screen .itxeb-pedagogy-critical{background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-muted{background:#eee;color:#555}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}#itxeb-course-ui-screen .itxeb-filter-help{color:#666;margin-left:.35rem}#itxeb-course-ui-screen .itxeb-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.4rem;margin:.7rem 0}#itxeb-course-ui-screen .itxeb-widget-choice{display:block;border:1px solid #ddd;background:#fff;border-radius:4px;padding:.45rem .55rem}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-signal-warning{border-color:#f0ad4e;background:#fcf8e3;color:#8a6d3b;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal-danger{border-color:#d9534f;background:#f2dede;color:#a94442;font-weight:bold}#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}.itxeb-trainer-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}.itxeb-trainer-card{border-left:4px solid #337ab7}.itxeb-ai-markdown{border:1px solid #c8d6e5;background:#fff;padding:14px;border-radius:6px;line-height:1.55}.itxeb-ai-markdown h4{font-size:18px;margin:16px 0 8px;border-bottom:1px solid #d9e2ec;padding-bottom:4px}.itxeb-ai-markdown h5{font-size:15px;margin:12px 0 6px}.itxeb-ai-markdown ul{margin:6px 0 12px 22px}.itxeb-ai-markdown li{margin:4px 0}.itxeb-ai-table td:first-child{font-weight:700}.itxeb-ai-history table small{line-height:1.35}</style>';
     }
 }
