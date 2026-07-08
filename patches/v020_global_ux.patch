@@ -1,56 +1,42 @@
 diff --git a/plugin.php b/plugin.php
 --- a/plugin.php
 +++ b/plugin.php
-@@ -1,7 +1,7 @@
+@@ -1,8 +1,8 @@
  <?php
+ 
  $id = 'itxeb';
 -$version = '0.19.1-dev';
 +$version = '0.20.0-dev';
- $ilias_min_version = '10.0';
- $ilias_max_version = '10.999';
- $responsible = 'Vincent Sayah';
+ $ilias_min_version = '10.0.0';
+ $ilias_max_version = '10.999.999';
+ $responsible = 'TRAX / ILIAS integration';
+ $responsible_mail = 'noreply@localhost';
 diff --git a/companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl b/companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 --- a/companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 +++ b/companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-@@ -1,7 +1,7 @@
+@@ -1,8 +1,8 @@
  <?php
+ 
  $id = 'itxebcui';
 -$version = '0.7.1';
 +$version = '0.8.0';
- $ilias_min_version = '10.0';
- $ilias_max_version = '10.999';
- $responsible = 'Vincent Sayah';
+ $ilias_min_version = '10.0.0';
+ $ilias_max_version = '10.999.999';
+ $responsible = 'TRAX / ILIAS integration';
+ $responsible_mail = 'noreply@localhost';
 diff --git a/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl b/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 --- a/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 +++ b/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
-@@ -414,11 +414,34 @@
-     private function pedagogicalBadgeClass(string $status): string
-     {
-         return $status === 'critical' ? 'itxeb-pedagogy-critical' : ($status === 'watch' ? 'itxeb-pedagogy-watch' : ($status === 'ok' ? 'itxeb-pedagogy-ok' : 'itxeb-pedagogy-muted'));
-     }
-+
-+    private function renderUxGuide(string $view): string
-+    {
-+        $cards = [
-+            ['1', 'Choisir la période', 'Filtrer sur 7, 30, 90 ou 365 jours.'],
-+            ['2', 'Lire les signaux', 'Commencer par les ressources critiques puis celles à surveiller.'],
-+            ['3', 'Comparer l’historique IA', 'Cocher deux analyses puis lancer la comparaison.'],
-+        ];
-+        $html = '<div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><div style="font-weight:700;margin-bottom:8px">Mode d’emploi rapide</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">';
-+        foreach ($cards as $card) {
-+            $html .= '<div style="background:#fff;border:1px solid #d9e2ec;border-radius:5px;padding:10px"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#337ab7;color:#fff;font-weight:700;margin-right:7px">' . $this->esc((string) $card[0]) . '</span><strong>' . $this->esc((string) $card[1]) . '</strong><p style="margin:5px 0 0;color:#555">' . $this->esc((string) $card[2]) . '</p></div>';
-+        }
-+        return $html . '</div></div>';
-+    }
-+
-     /** @param array<string,mixed> $course */
-     private function renderAnalysis(array $course): string
+@@ -436,7 +436,7 @@
      {
          $dashboard = $this->loadDashboard($course);
          $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
 -        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><p>Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderAiHistoryPanel($course) . $this->renderPedagogicalSynthesis($dashboard);
-+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2>' . $this->renderUxGuide('analysis') . '<p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderAiHistoryPanel($course) . $this->renderPedagogicalSynthesis($dashboard);
-@@ -700,8 +723,8 @@
++        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Cocher deux analyses IA historisées pour les comparer.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderAiHistoryPanel($course) . $this->renderPedagogicalSynthesis($dashboard);
+         if (count($resources) === 0) {
+             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
+         }
+@@ -697,7 +697,7 @@
              . '<input type="hidden" name="itxeb_period_days" value="' . $this->esc((string) $this->getPeriodDays()) . '">'
              . '<input type="hidden" name="itxeb_filter_ref_id" value="' . $this->esc((string) $this->getSelectedResourceRefId()) . '">'
              . '<input type="hidden" name="itxeb_filter_obj_type" value="' . $this->esc($this->getSelectedObjectType()) . '">'
