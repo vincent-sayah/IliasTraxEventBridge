@@ -2,6 +2,74 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.16 — consolidation post V0.15.2
+
+### Statut
+
+- Branche concernée : `v0.13-ai-xapi-analysis`.
+- Base : `0.15.2-dev` validée.
+- Type : consolidation documentaire et nettoyage technique.
+- Source fonctionnelle du suivi xAPI : TRAX/LRS.
+- Rôle de l'outbox locale : file technique d'envoi uniquement.
+
+### Objectif
+
+La V0.16 consolide l'état validé de la V0.15.2 afin de repartir sur une base propre pour les évolutions suivantes.
+
+### Changements réalisés
+
+- Suppression du script temporaire `scripts/patch_v0151_ai_screen_markdown_history_pdf.php`.
+- Suppression du script temporaire `scripts/patch_v0152_ai_screen_template_and_live.php`.
+- Ajout de la note de release `docs/RELEASE_0.15.2.md`.
+- Mise à jour du `README.md` pour rendre visibles les fonctionnalités IA validées.
+- Mise à jour du présent `CHANGELOG.md`.
+
+### Suite préparée
+
+- Consultation détaillée d'une analyse IA historisée.
+- Suppression contrôlée d'une analyse IA historisée.
+- Comparaison de deux analyses IA.
+- Documentation plus explicite du déploiement du plugin companion UI.
+
+## v0.15.2-dev — analyse IA formateur validée
+
+### Statut
+
+- Branche concernée : `v0.13-ai-xapi-analysis`.
+- Version plugin principal : `0.15.2-dev`.
+- Version companion UI : `0.4.2`.
+- Type : évolution fonctionnelle IA et consolidation d'écran cours.
+- Source fonctionnelle du suivi xAPI : TRAX/LRS.
+- Rôle de l'outbox locale : file technique d'envoi uniquement.
+
+### Objectif
+
+La V0.15.2 rend l'analyse IA exploitable directement par le formateur dans l'onglet `Analyse` du suivi xAPI cours.
+
+Elle transforme le retour IA brut en page lisible, conserve un historique local des analyses et enrichit l'export PDF avec la dernière analyse IA historisée.
+
+### Ajouts réalisés
+
+- Ajout de `classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php`.
+- Ajout du stockage runtime local `var/ai_analysis_history`.
+- Ajout de `/var/` dans `.gitignore`.
+- Mise à jour de l'écran `Analyse` en page `Analyse formateur`.
+- Ajout du rendu Markdown/HTML de la réponse IA.
+- Ajout du bloc `Historique des analyses IA`.
+- Sauvegarde automatique des analyses IA réussies.
+- Intégration de la dernière analyse IA historisée dans l'export PDF.
+- Passage du plugin principal en `0.15.2-dev`.
+- Passage du companion UI en `0.4.2`.
+
+### Validation
+
+- Analyse IA formatée : OK.
+- Historique IA visible : OK.
+- Fichiers JSON d'historique générés : OK.
+- Export PDF avec analyse IA historisée : OK.
+- PHP lint sur les fichiers principaux : OK.
+- Plugin principal, poste Windows et serveur ILIAS réalignés sur GitHub : OK.
+
 ## v0.12.1 — consolidation technique du compagnon UI
 
 ### Statut
@@ -110,7 +178,6 @@ La V0.11 prépare une version plus robuste pour l'exploitation : installation pl
 - `docs/DIAGNOSTIC.md` : procédure de diagnostic exploitation.
 - `docs/ROLLBACK.md` : procédure de retour arrière.
 - `docs/VALIDATION_0.11.md` : procédure complète de validation sur VM ILIAS.
-- `docs/README.md` mis à jour pour rendre les nouveaux documents visibles.
 
 ### Ajouts techniques réalisés
 
@@ -120,7 +187,7 @@ La V0.11 prépare une version plus robuste pour l'exploitation : installation pl
 - Ajout d'un bouton `Tester lecture TRAX/LRS` qui exécute uniquement un `GET /statements?limit=1` sans créer de statement.
 - Ajout d'un bouton `Créer un statement test TRAX/LRS` qui envoie un statement xAPI de diagnostic clairement identifiable.
 - Le statement de test contient les extensions `itxeb_diagnostic`, `itxeb_version` et `itxeb_test_type`.
-- Les résultats des tests lecture et écriture TRAX/LRS sont maintenant persistés dans les settings du plugin et réaffichés dans `Diagnostics TRAX / cron`.
+- Les résultats des tests lecture et écriture TRAX/LRS sont persistés dans les settings du plugin et réaffichés dans `Diagnostics TRAX / cron`.
 - Passage du plugin principal en version `0.11.0` sur la branche V0.11.
 
 ### Pistes techniques restantes V0.11
