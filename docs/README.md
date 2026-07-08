@@ -2,20 +2,18 @@
 
 Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
-## Version stable
+## Version stable et développement
 
 | Élément | Valeur |
 |---|---|
 | Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
 | Tag stable | `v0.12.0` |
-| Version de maintenance en développement | `0.12.1-dev` |
-| Branche V0.12.1 | `v0.12.1-consolidation-ui-companion` |
-| Prochaine fonctionnalité roadmap | `V0.13` — analyse IA optionnelle des traces xAPI |
+| Version de développement validée | `0.15.2-dev` |
+| Branche IA | `v0.13-ai-xapi-analysis` |
+| Consolidation en cours | `V0.16` |
 | Ancien tag stable | `v0.11.0` |
 | Ancienne stable | `0.11.0` |
-| Objectif V0.12.1 | Consolidation du compagnon UI V0.12 et réduction des patchers |
-| Objectif V0.12 | Dashboard pédagogique, analyse enrichie et export CSV pédagogique |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Source pédagogique du suivi xAPI | TRAX/LRS |
@@ -25,6 +23,7 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
 | Besoin | Document à lire |
 |---|---|
+| Lire la note de release IA validée | [`RELEASE_0.15.2.md`](RELEASE_0.15.2.md) |
 | Installer le plugin sur ILIAS | [`INSTALLATION.md`](INSTALLATION.md) |
 | Comprendre ce que fait le plugin | [`FONCTIONNEL.md`](FONCTIONNEL.md) |
 | Comprendre l'architecture technique | [`TECHNIQUE.md`](TECHNIQUE.md) |
@@ -43,6 +42,28 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 | Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
 | Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
 | Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+
+## Documents V0.15.2 / V0.16
+
+### Release V0.15.2-dev
+
+[`RELEASE_0.15.2.md`](RELEASE_0.15.2.md) récapitule la version IA validée :
+
+- analyse IA formateur ;
+- rendu Markdown/HTML ;
+- historisation locale des analyses IA ;
+- export PDF enrichi avec la dernière analyse historisée ;
+- séparation code / runtime avec `var/ai_analysis_history` ignoré par Git ;
+- validations serveur et points d'attention sur le plugin companion live.
+
+### Consolidation V0.16
+
+La V0.16 consolide l'état V0.15.2 :
+
+- suppression des scripts temporaires de patch V0.15.1 et V0.15.2 ;
+- mise à jour du `README.md` racine ;
+- mise à jour du `CHANGELOG.md` ;
+- mise à jour du présent index documentaire.
 
 ## Documents V0.12.1
 
@@ -216,16 +237,4 @@ Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
 
 ### Développeur
 
-[`DEVELOPPEUR.md`](DEVELOPPEUR.md) décrit :
-
-- la structure du dépôt ;
-- la gestion des versions ;
-- les règles de migration SQL ILIAS ;
-- les conventions de développement ;
-- l'ajout de nouveaux événements ;
-- l'ajout de nouveaux indicateurs ;
-- les contrôles avant commit et release.
-
-## Roadmap et IA
-
-La roadmap est dans [`ROADMAP.md`](ROADMAP.md). Elle conserve la V0.13 pour l'analyse IA optionnelle des traces xAPI.
+[`DEVELOPPEUR.md`](DEVELOPPEUR.md) décrit les classes principales, les conventions de développement, les migrations et les contrôles avant livraison.
