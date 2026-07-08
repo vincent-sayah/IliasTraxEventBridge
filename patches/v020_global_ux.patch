@@ -36,7 +36,7 @@ diff --git a/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEve
          if (count($resources) === 0) {
              return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
          }
-@@ -697,7 +697,7 @@
+@@ -697,6 +697,6 @@
              . '<input type="hidden" name="itxeb_period_days" value="' . $this->esc((string) $this->getPeriodDays()) . '">'
              . '<input type="hidden" name="itxeb_filter_ref_id" value="' . $this->esc((string) $this->getSelectedResourceRefId()) . '">'
              . '<input type="hidden" name="itxeb_filter_obj_type" value="' . $this->esc($this->getSelectedObjectType()) . '">'
