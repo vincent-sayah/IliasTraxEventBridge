@@ -2,16 +2,17 @@
 
 Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS en statements xAPI, de les envoyer vers un LRS xAPI comme TRAX 3, puis d'afficher un suivi xAPI de cours alimenté directement par TRAX/LRS.
 
-## Version stable officielle
+## État des versions
 
 | Élément | Valeur |
 |---|---|
 | Version stable sur `main` | `0.12.0` |
 | Branche stable officielle | `main` |
 | Tag stable | `v0.12.0` |
-| Ancien tag stable | `v0.11.0` |
-| Ancienne stable | `0.11.0` |
-| Branche de développement V0.12 | `v0.12-dashboard-pedagogique` |
+| Version de développement validée | `0.15.2-dev` |
+| Branche de développement IA | `v0.13-ai-xapi-analysis` |
+| État V0.15.2 | validée fonctionnellement |
+| Consolidation en cours | `V0.16` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
@@ -20,9 +21,9 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 | Source pédagogique du suivi xAPI | TRAX/LRS |
 | Rôle de l'outbox locale | File technique d'envoi uniquement |
 
-La V0.12.0 est maintenant promue sur `main` et publiée avec le tag stable `v0.12.0`. Pour une installation stable courante, utiliser `main` ou le tag `v0.12.0`.
+Pour une installation stable courante, utiliser `main` ou le tag `v0.12.0`.
 
-La V0.12.0 conserve les apports d'exploitation de la V0.11.0 et ajoute un dashboard pédagogique enrichi : synthèse pédagogique, statuts de ressources, analyse améliorée, apprenants en difficulté, export CSV Expert enrichi et ajustements ergonomiques.
+La branche `v0.13-ai-xapi-analysis` porte les évolutions IA validées en environnement de test : analyse IA formateur, rendu Markdown/HTML, historisation locale des analyses et export PDF enrichi.
 
 ## Documentation complète
 
@@ -31,6 +32,7 @@ Le dossier `docs/` contient un index dédié : [`docs/README.md`](docs/README.md
 | Document | Rôle |
 |---|---|
 | [`docs/README.md`](docs/README.md) | Index général de toute la documentation. |
+| [`docs/RELEASE_0.15.2.md`](docs/RELEASE_0.15.2.md) | Note de release de la V0.15.2-dev validée : analyse IA, historique, PDF enrichi. |
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation complète, mise à jour, reconstruction ILIAS, plugin compagnon, contrôles et dépannage. |
 | [`docs/FONCTIONNEL.md`](docs/FONCTIONNEL.md) | Documentation fonctionnelle : objectifs, utilisateurs, parcours cours, vues Tableau de bord / Analyse / Expert / Configuration. |
 | [`docs/TECHNIQUE.md`](docs/TECHNIQUE.md) | Documentation technique : architecture, EventHook, UIHook, outbox, TRAX/LRS, tables SQL, flux de lecture et d'envoi. |
@@ -42,13 +44,13 @@ Le dossier `docs/` contient un index dédié : [`docs/README.md`](docs/README.md
 | [`docs/V0.12_GUIDE_UTILISATION.md`](docs/V0.12_GUIDE_UTILISATION.md) | Guide utilisateur du dashboard pédagogique V0.12. |
 | [`docs/VALIDATION_0.11.md`](docs/VALIDATION_0.11.md) | Procédure de validation V0.11 conservée pour historique. |
 | [`docs/DEVELOPPEUR.md`](docs/DEVELOPPEUR.md) | Documentation développeur : classes principales, conventions, migrations, contrôles avant livraison. |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap : V0.13, IA d'analyse des traces, API keys IA, sécurité et gouvernance. |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap : IA d'analyse des traces, API keys IA, sécurité et gouvernance. |
 | [`docs/IA_ANALYSE_TRACES.md`](docs/IA_ANALYSE_TRACES.md) | Cadrage détaillé de l'analyse des traces xAPI par IA. |
 | [`docs/RELEASE_0.11.0.md`](docs/RELEASE_0.11.0.md) | Note de version stable V0.11.0, conservée pour historique. |
 | [`docs/V0.10_LRS_DIRECT_READ.md`](docs/V0.10_LRS_DIRECT_READ.md) | Décision d'architecture V0.10/V0.11 : lecture directe TRAX/LRS. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
-## Principe d'architecture V0.12.0
+## Principe d'architecture
 
 ```text
 ILIAS 10
@@ -77,7 +79,20 @@ TRAX/LRS      = source officielle du suivi xAPI pédagogique
 
 L'outbox locale `evnt_evhk_itxeb_out` peut être purgée en exploitation. Elle ne doit donc pas être utilisée comme source fonctionnelle du tableau de bord pédagogique.
 
-## Nouveautés V0.12.0
+## Nouveautés V0.15.2-dev — Analyse IA formateur
+
+La V0.15.2-dev enrichit l'onglet `Analyse` du suivi xAPI avec une aide pédagogique générée par IA à partir des données xAPI agrégées de TRAX/LRS.
+
+Fonctionnalités validées :
+
+- page `Analyse formateur` plus lisible ;
+- rendu Markdown/HTML de la réponse IA ;
+- historisation locale des analyses IA réussies ;
+- export PDF du tableau de bord incluant la dernière analyse IA historisée ;
+- stockage runtime hors Git dans `var/ai_analysis_history` ;
+- anonymisation stricte : aucune identité nominative apprenant, aucun courriel et aucun UUID brut de statement ne doit être envoyé ou stocké dans l'historique IA.
+
+## Nouveautés V0.12.0 — Dashboard pédagogique stable
 
 - Dashboard pédagogique enrichi dans `Cours > Suivi xAPI > Tableau de bord`.
 - Synthèse pédagogique visible dans `Tableau de bord` et `Analyse`.
@@ -110,9 +125,11 @@ L'outbox locale `evnt_evhk_itxeb_out` peut être purgée en exploitation. Elle n
 - Accès `Suivi xAPI` depuis l'objet cours via le plugin compagnon UIHook.
 - Tableau de bord pédagogique alimenté par TRAX/LRS.
 - Analyse des ressources alimentée par TRAX/LRS.
+- Analyse IA formateur optionnelle sur données agrégées/anonymisées.
+- Historique local des analyses IA.
 - Vue Expert alimentée par TRAX/LRS.
 - Export CSV Expert enrichi avec les colonnes pédagogiques V0.12.
-- Export PDF du tableau de bord.
+- Export PDF du tableau de bord avec analyse IA historisée si disponible.
 - Diagnostic TRAX/LRS dans l'onglet Configuration.
 - Supervision technique de l'outbox dans l'onglet Configuration.
 
@@ -127,7 +144,7 @@ Tableau de bord | Analyse | Expert | Configuration
 | Vue | Rôle |
 |---|---|
 | Tableau de bord | Synthèse pédagogique : statements TRAX, apprenants actifs, ressources utilisées, score moyen, activité par jour, actions xAPI, top ressources, compteurs OK / À surveiller / Critique / Sans trace, export PDF. |
-| Analyse | Analyse par ressource avec statut pédagogique, raison, taux d'échec, score moyen, verbes et ressources retournés par TRAX, apprenants en difficulté anonymisés. |
+| Analyse | Analyse par ressource avec statut pédagogique, raison, score moyen, tests, apprenants en difficulté anonymisés, analyse IA formatée et historique IA. |
 | Expert | Liste détaillée des statements retournés par TRAX/LRS avec export CSV enrichi des champs pédagogiques. |
 | Configuration | Activation du cours, activation des ressources, préférences dashboard, diagnostic LRS, supervision technique de l'outbox. |
 
