@@ -1,12 +1,10 @@
 # Roadmap — IliasTraxEventBridge
 
-Cette roadmap décrit les évolutions possibles après la version stable **V0.10.1**.
+Cette roadmap décrit les évolutions possibles après la version stable courante **V0.21.2** promue dans `main`.
 
 Elle n'est pas un engagement de livraison. Elle sert à cadrer les priorités fonctionnelles, techniques et pédagogiques du projet.
 
-## État actuel — V0.10.1 stable
-
-La V0.10.1 est la version stable promue sur `main`.
+## État actuel — V0.21.2 stable dans main
 
 Fonctions disponibles :
 
@@ -14,245 +12,95 @@ Fonctions disponibles :
 - génération de statements xAPI ;
 - outbox locale technique ;
 - envoi vers TRAX/LRS ;
-- activation xAPI par cours ;
-- activation xAPI par ressource ;
-- écran `Suivi xAPI` dans le cours ;
-- tableau de bord alimenté par TRAX/LRS ;
-- analyse alimentée par TRAX/LRS ;
-- vue Expert alimentée par TRAX/LRS ;
+- activation du suivi par cours et par ressource ;
+- écran `Pilotage xAPI` dans le cours ;
+- tableau de bord pédagogique ;
+- analyse formateur ;
+- analyse IA optionnelle ;
+- historique local des analyses IA ;
+- comparaison de deux analyses IA ;
+- retrait contrôlé d'une analyse IA historisée ;
+- vue Expert ;
 - export CSV ;
-- export PDF ou rapport HTML imprimable ;
+- export PDF ;
 - diagnostic TRAX/LRS ;
-- documentation complète.
+- suivi des tests ILIAS question par question ;
+- bloc `Questions à fort taux d’échec` ;
+- intégration des questions problématiques dans le payload IA.
 
 Décision d'architecture maintenue :
 
 ```text
-Outbox locale = file technique d'envoi
-TRAX/LRS      = source officielle du suivi xAPI pédagogique
+Outbox locale = file technique d'envoi.
+TRAX/LRS = cible xAPI et source principale du suivi pédagogique.
+Exception V0.21.2 = calcul des questions problématiques depuis les statements question présents dans l'outbox locale.
 ```
 
-## V0.11 — Durcissement exploitation et packaging
+## V0.22 — Consolidation post-promotion main
 
 ### Objectif
 
-Rendre le plugin plus robuste et plus simple à installer / maintenir sur différents environnements ILIAS 10.
+Stabiliser la version promue dans `main` et réduire la dette des scripts historiques.
 
 ### Pistes
 
-- Ajouter une page `Santé du plugin` dans l'administration.
-- Ajouter un diagnostic global : version plugin, tables SQL, endpoint TRAX, droits d'écriture et lecture LRS, cron actif, plugin compagnon installé.
-- Ajouter un bouton `Tester la lecture TRAX/LRS` avec résultat détaillé.
-- Ajouter un bouton `Tester l'envoi xAPI` avec statement de test contrôlé.
-- Améliorer les messages d'erreur utilisateur.
-- Ajouter une vérification de présence du marqueur `<#1>` dans `sql/dbupdate.php` dans la documentation de diagnostic.
-- Ajouter une procédure de rollback documentée.
-- Ajouter un mode maintenance empêchant temporairement la génération de nouvelles traces.
+- Supprimer ou archiver les scripts de patch devenus historiques.
+- Ajouter un script d'audit unique V0.21.2/V0.22.
+- Ajouter une page de diagnostic dédiée aux traces de questions.
+- Ajouter un contrôle automatique du companion installé.
+- Ajouter une commande de validation serveur unique.
+- Vérifier l'idempotence complète de l'installation du companion avec `ILIAS_ROOT` personnalisé.
 
-### Livrables possibles
-
-- `docs/DIAGNOSTIC.md`.
-- `docs/ROLLBACK.md`.
-- Script de diagnostic shell.
-- Écran admin de santé technique.
-
-## V0.12 — Enrichissement pédagogique du tableau de bord
+## V0.23 — Amélioration du suivi des questions
 
 ### Objectif
 
-Rendre le suivi xAPI plus utile pour un formateur ou un pilote de cours.
+Rendre le diagnostic des questions plus exploitable pour le formateur.
 
 ### Pistes
 
-- Ajouter des indicateurs de progression par ressource.
-- Ajouter des tendances par semaine ou par session.
-- Ajouter une détection des ressources peu consultées.
-- Ajouter une détection des ressources très consultées mais associées à de mauvais résultats.
-- Ajouter des indicateurs de décrochage.
-- Ajouter une vue `Parcours apprenant` anonymisée ou pseudonymisée.
-- Ajouter une vue comparative entre ressources d'un même cours.
-- Ajouter une exportation JSON ou Excel pour analyse externe.
+- Ajouter une vue détaillée d'une question problématique.
+- Ajouter l'évolution du taux d'échec dans le temps.
+- Ajouter un filtre par test dans le bloc questions.
+- Ajouter une exportation CSV des questions problématiques.
+- Ajouter des seuils configurables : `failure_rate`, `avg_score`, criticité.
+- Ajouter un lien direct vers le test ILIAS concerné.
 
-### Questions à trancher
-
-- Jusqu'où afficher des informations individuelles dans ILIAS ?
-- Faut-il anonymiser systématiquement les apprenants dans toutes les vues pédagogiques ?
-- Faut-il prévoir des droits différents entre administrateur technique, administrateur de cours et formateur ?
-
-## V0.13 — Analyse IA optionnelle des traces xAPI
+## V0.24 — Durcissement IA
 
 ### Objectif
 
-Ajouter une fonctionnalité optionnelle d'analyse des traces xAPI par IA, configurable avec une clé API IA.
-
-L'objectif n'est pas de remplacer le formateur, mais de fournir une aide à l'interprétation : synthèse, signaux faibles, ressources à surveiller, recommandations d'amélioration.
-
-### Principe général
-
-```text
-ILIAS > lecture TRAX/LRS > agrégation locale > anonymisation > appel IA optionnel > synthèse pédagogique
-```
-
-L'appel IA ne doit jamais être obligatoire pour utiliser le plugin.
-
-### Configuration envisagée
-
-Dans l'administration du plugin :
-
-| Paramètre | Description |
-|---|---|
-| Activer l'analyse IA | Active ou désactive toutes les fonctions IA. |
-| Fournisseur IA | Fournisseur compatible API HTTP. |
-| URL API IA | Endpoint du service IA. |
-| Clé API IA | Secret chiffré ou au minimum masqué en interface. |
-| Modèle IA | Nom du modèle utilisé. |
-| Timeout IA | Timeout spécifique aux appels IA. |
-| Mode anonymisation | Aucun, pseudonymisation, anonymisation stricte. |
-| Nombre maximum de traces | Limite de statements envoyés à l'IA. |
-| Journaliser les appels IA | Journal technique sans contenu sensible. |
-
-### Fonctions IA possibles
-
-- Résumé automatique de l'activité du cours sur une période.
-- Identification des ressources à surveiller.
-- Détection de ressources activées mais non utilisées.
-- Analyse des tests avec échecs fréquents.
-- Synthèse des tendances : hausse / baisse d'activité.
-- Recommandations pédagogiques pour améliorer le cours.
-- Explication en langage naturel du tableau de bord.
-- Génération d'un rapport IA exportable.
-
-### Exemple de sortie attendue
-
-```text
-Sur les 30 derniers jours, l'activité du cours est concentrée sur 3 ressources.
-Le test final présente un taux d'échec élevé.
-Deux ressources activées ne produisent aucune trace.
-Il est recommandé de vérifier les consignes du test final et de repositionner les ressources peu consultées dans le parcours.
-```
-
-### Sécurité et données personnelles
-
-Points obligatoires avant implémentation :
-
-- ne jamais envoyer le secret TRAX à l'IA ;
-- ne jamais envoyer les mots de passe ou jetons techniques ;
-- limiter les données envoyées au strict nécessaire ;
-- pseudonymiser les utilisateurs ;
-- pouvoir désactiver totalement l'IA ;
-- afficher clairement à l'administrateur qu'un service externe peut être appelé ;
-- journaliser les appels sans stocker les prompts complets si ceux-ci contiennent des données sensibles ;
-- prévoir une configuration compatible intranet / service IA interne.
-
-### Architecture technique possible
-
-Nouvelles classes possibles :
-
-```text
-classes/class.ilIliasTraxEventBridgeAiConfig.php
-classes/class.ilIliasTraxEventBridgeAiClient.php
-classes/class.ilIliasTraxEventBridgeAiPromptBuilder.php
-classes/class.ilIliasTraxEventBridgeAiAnonymizer.php
-classes/class.ilIliasTraxEventBridgeAiCourseAnalyzer.php
-classes/class.ilIliasTraxEventBridgeAiAnalysisRepository.php
-```
-
-Nouvelles tables possibles :
-
-```text
-evnt_evhk_itxeb_ai_cfg
-  Configuration IA, fournisseur, modèle, options, sans exposer la clé en clair.
-
-evnt_evhk_itxeb_ai_log
-  Journal technique des appels IA : date, cours, statut, durée, erreur éventuelle.
-
-evnt_evhk_itxeb_ai_cache
-  Cache optionnel des analyses IA pour éviter de rappeler l'API à chaque affichage.
-```
-
-### Points de vigilance
-
-- Coût des appels API IA.
-- Temps de réponse de l'interface ILIAS.
-- Dépendance à un service externe.
-- Confidentialité des traces xAPI.
-- Qualité variable des recommandations IA.
-- Risque d'interprétation erronée si peu de données.
-- Nécessité d'afficher les analyses IA comme une aide, pas comme une vérité absolue.
-
-## V0.14 — Historisation durable et gouvernance
-
-### Objectif
-
-Ajouter une couche durable indépendante de l'outbox pour conserver des indicateurs pédagogiques calculés.
+Renforcer la gouvernance de l'Analyse IA.
 
 ### Pistes
 
-- Ajouter une table d'agrégats locaux par cours / ressource / jour.
-- Ajouter une table d'archives des indicateurs, pas des statements complets.
-- Ajouter une politique de rétention configurable.
-- Ajouter une purge planifiée.
-- Ajouter des exports de conformité.
-- Ajouter une séparation plus fine des droits.
+- Ajouter une prévisualisation du payload anonymisé avant appel IA.
+- Ajouter un journal technique des appels IA sans contenu sensible.
+- Ajouter des politiques d'anonymisation plus explicites.
+- Ajouter des seuils de volume minimum avant recommandation IA.
+- Ajouter une mention visible des limites de l'analyse.
 
-### Pourquoi ne pas utiliser l'outbox ?
-
-L'outbox locale est technique et purgeable. Elle ne doit pas devenir l'archive fonctionnelle du suivi pédagogique.
-
-## V0.15 — Connecteurs et interopérabilité
+## V0.25 — Exploitation et supervision
 
 ### Objectif
 
-Faciliter l'intégration avec d'autres outils d'analyse.
+Faciliter le maintien en condition opérationnelle.
 
 ### Pistes
 
-- Export JSON des indicateurs cours.
-- Export CSV enrichi.
-- Export Excel si une dépendance fiable est retenue.
-- API interne de lecture des indicateurs.
-- Webhook optionnel vers un portail d'analyse.
-- Compatibilité avec un LRS autre que TRAX si les endpoints xAPI standards sont respectés.
+- Dashboard administrateur de santé plugin.
+- Contrôle des tables `evnt_evhk_itxeb_*`.
+- Contrôle de la présence du companion UIHook.
+- Contrôle du cron ILIAS.
+- Contrôle de l'envoi TRAX/LRS.
+- Contrôle du nombre de statements question générés.
+- Commande d'export diagnostic anonymisé.
 
-## Backlog technique transverse
+## Points de vigilance permanents
 
-- Ajouter tests unitaires sur les classes de parsing LRS.
-- Ajouter tests de non-régression sur `dbupdate.php`.
-- Ajouter vérification automatique de syntaxe PHP.
-- Ajouter script de contrôle de release.
-- Nettoyer les scripts de patch devenus inutiles après stabilisation.
-- Documenter précisément les différences ILIAS 10.5 / 10.8.
-- Renforcer la compatibilité avec les thèmes autres que Delos.
-
-## Backlog fonctionnel transverse
-
-- Ajouter plus de verbes xAPI.
-- Couvrir plus de types d'objets ILIAS.
-- Ajouter suivi des dépôts de devoirs si pertinent.
-- Ajouter suivi des forums plus fin.
-- Ajouter suivi des parcours de modules.
-- Ajouter vues par groupe si le cours utilise des groupes ILIAS.
-
-## Priorisation proposée
-
-| Priorité | Sujet | Pourquoi |
-|---|---|---|
-| Haute | Diagnostic santé plugin | Facilite l'exploitation et réduit les incidents. |
-| Haute | Documentation rollback | Utile en production. |
-| Haute | Stabilisation plugin compagnon | Point sensible de l'intégration ILIAS. |
-| Moyenne | Indicateurs pédagogiques avancés | Améliore la valeur métier. |
-| Moyenne | Analyse IA optionnelle | Forte valeur ajoutée mais nécessite cadrage sécurité. |
-| Moyenne | Cache IA | Nécessaire pour maîtriser coût et performance. |
-| Basse | Exports avancés | Utile mais non bloquant. |
-
-## Décision recommandée pour la prochaine étape
-
-Prochaine version conseillée : **V0.11 — Durcissement exploitation**.
-
-L'analyse IA est très intéressante, mais elle doit arriver après :
-
-1. un diagnostic technique fiable ;
-2. une configuration TRAX/LRS stable ;
-3. une stratégie d'anonymisation ;
-4. une validation des contraintes de sécurité ;
-5. un choix de fournisseur IA compatible avec l'environnement cible.
+- Ne pas bloquer la navigation ILIAS si le plugin rencontre une erreur.
+- Préserver l'opt-in cours/ressource.
+- Ne pas exposer les clés API IA, secrets TRAX ou mots de passe.
+- Ne pas envoyer de données nominatives apprenant à l'IA en mode strict.
+- Conserver une séparation claire entre vues pédagogiques et diagnostic Expert.
+- Maintenir la compatibilité ILIAS 10.
