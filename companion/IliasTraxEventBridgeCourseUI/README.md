@@ -6,65 +6,48 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 | Élément | Valeur |
 |---|---|
-| Version stable projet sur `main` | `0.12.0` |
-| Branche stable | `main` |
-| Tag stable | `v0.12.0` |
-| Ancien tag stable | `v0.11.0` |
+| Branche stable projet | `main` |
+| Version stable courante | `0.21.2-dev` validée et promue dans `main` |
+| Version companion UI | `0.8.5` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type | UIHook ILIAS |
-| Source pédagogique | TRAX/LRS |
-| Rôle de l'outbox locale | File technique d'envoi uniquement |
+| Compatibilité | ILIAS 10.x |
 
 ## Objectif
 
-Ce plugin compagnon ajoute l'accès au suivi xAPI directement dans l'objet cours ILIAS.
+Ce plugin compagnon ajoute l'accès au pilotage xAPI directement dans l'objet cours ILIAS.
 
-Accès attendu en V0.12.0 :
-
-```text
-Cours > Suivi xAPI
-```
-
-L'écran `Suivi xAPI` expose quatre vues :
+Accès attendu en V0.21.2 :
 
 ```text
-Tableau de bord | Analyse | Expert | Configuration
+Cours > Pilotage xAPI
 ```
 
-Le plugin principal `IliasTraxEventBridge` reste responsable de :
+L'écran expose les vues :
 
-- la captation EventHook ;
-- la génération des statements xAPI ;
-- l'outbox locale technique ;
-- le cron ;
-- l'envoi vers TRAX/LRS ;
-- la lecture directe TRAX/LRS ;
-- les tables `evnt_evhk_itxeb_*` ;
-- le filtrage avant outbox ;
-- la configuration globale TRAX/LRS ;
-- la section d'administration `Santé / Diagnostic V0.11` conservée ;
-- le calcul des indicateurs pédagogiques V0.12 à partir de TRAX/LRS.
+```text
+Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu du cours
+```
 
-Le plugin compagnon est responsable de l'intégration UI dans le cours et de l'affichage des vues de suivi.
-
-## Rôle des vues V0.12
+## Rôle des vues V0.21.2
 
 | Vue | Rôle |
 |---|---|
-| Tableau de bord | Synthèse pédagogique alimentée par TRAX/LRS, compteurs OK / À surveiller / Critique / Sans trace, activité, top ressources et export PDF. |
-| Analyse | Analyse des ressources avec statut pédagogique, raison, taux d'échec, score moyen, ressources sans trace et apprenants en difficulté anonymisés. |
-| Expert | Statements TRAX détaillés et export CSV enrichi avec les colonnes pédagogiques V0.12. |
-| Configuration | Activation cours / ressources, préférences dashboard, diagnostic LRS, supervision technique outbox. |
+| Tableau de bord | Synthèse pédagogique, activité, ressources, tests, questions à fort taux d'échec, export PDF. |
+| Analyse | Analyse formateur des ressources et questions problématiques. |
+| Analyse IA | Génération, historique, comparaison et retrait d'analyses IA. |
+| Expert | Vision technique détaillée et export CSV. |
+| Configuration | Activation cours / ressources, préférences, diagnostic LRS, supervision outbox. |
 
-## Points ergonomiques V0.12
+## Règle métier V0.21.2
 
-- Bouton `Export PDF` placé dans l'en-tête du tableau de bord.
-- Blocs et tableaux mieux encadrés.
-- Titres de blocs renforcés.
-- `À surveiller` colorisé en orange.
-- `Critique` colorisé en rouge.
-- Colonne `Raison` de l'onglet Analyse rendue plus lisible.
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = questions problématiques uniquement.
+Analyse IA = questions problématiques uniquement.
+Expert = vision technique complète.
+```
 
 ## Packaging
 
@@ -84,12 +67,6 @@ Objectif : éviter que Composer voie deux copies des mêmes classes lorsque :
 2. le compagnon est installé dans UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI.
 ```
 
-Sans ce packaging, Composer peut produire des warnings du type :
-
-```text
-Ambiguous class resolution, "ilIliasTraxEventBridgeCourseUIPlugin" was found in both ...
-```
-
 Le script d'installation matérialise les templates `.php.tpl` en vrais fichiers `.php` uniquement dans le slot actif `UserInterfaceHook`.
 
 ## Installation serveur
@@ -97,35 +74,58 @@ Le script d'installation matérialise les templates `.php.tpl` en vrais fichiers
 Depuis le serveur ILIAS, avec le dépôt principal déjà présent :
 
 ```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+export ILIAS_ROOT="/var/www/ilias"
+export HTTPD_USER="apache"
+
+cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
 
 git fetch origin
 git checkout main
-git pull origin main
+git pull --ff-only origin main
 
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 ```
 
-Ensuite reconstruire ILIAS et redémarrer les services selon la procédure habituelle de l'environnement.
+Si ILIAS n'est pas dans `/var/www/ilias`, remplacer `ILIAS_ROOT` par le chemin réel :
+
+```bash
+export ILIAS_ROOT="/data/www/ilias"
+export HTTPD_USER="apache"
+
+cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
+```
+
+Depuis V0.21.2, le script tente aussi de déduire `ILIAS_ROOT` depuis le chemin réel du plugin principal. La variable explicite reste recommandée en exploitation.
 
 ## Chemin d'installation cible
 
 Le script installe le compagnon ici :
 
 ```text
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
+$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
 ```
 
 Le plugin principal reste ici :
 
 ```text
-/var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 ```
 
-## Validation V0.12
+## Validation
+
+```bash
+COMPANION_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
+
+php -l "$COMPANION_DIR/plugin.php"
+php -l "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+
+grep -n "Questions à fort taux d’échec\|QuestionRiskRepository" \
+"$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+```
 
 La validation détaillée est décrite dans :
 
 ```text
-docs/VALIDATION_0.12.md
+docs/VALIDATION_0.21.2.md
 ```
