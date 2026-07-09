@@ -25,6 +25,7 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
 
     public function showDashboard(): void { $this->render($this->getRouterCommand('showDashboard')); }
     public function showAnalysis(): void { $this->render($this->getRouterCommand('showAnalysis')); }
+    public function showAiAnalysis(): void { $this->render($this->getRouterCommand('showAiAnalysis')); }
     public function showExpert(): void { $this->render($this->getRouterCommand('showExpert')); }
     public function showConfig(): void { $this->render($this->getRouterCommand('showConfig')); }
     public function saveConfig(): void { $this->render('saveConfig'); }
@@ -50,9 +51,8 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
                 $html = '<div class="ilFailureMessage">Suivi xAPI : aucun contenu généré.</div>';
             }
 
-            if (!$this->isExportCommand($cmd)) {
-                $html = $this->renderCourseReturnBar($this->getCourseRefId()) . $html;
-            }
+            // Le retour au cours est maintenant affiché au même niveau que les onglets xAPI.
+            // On ne préfixe plus la page avec un bandeau séparé.
 
             $this->sendContent($html);
         } catch (Throwable $e) {
@@ -106,7 +106,7 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
 
     private function normalizeCommand(string $cmd): string
     {
-        return in_array($cmd, ['showDashboard', 'showAnalysis', 'showExpert', 'showConfig', 'saveConfig', 'exportExpertCsv', 'exportDashboardPdf', 'generateAiAnalysis'], true)
+        return in_array($cmd, ['showDashboard', 'showAnalysis', 'showAiAnalysis', 'showExpert', 'showConfig', 'saveConfig', 'exportExpertCsv', 'exportDashboardPdf', 'generateAiAnalysis'], true)
             ? $cmd
             : 'showDashboard';
     }
@@ -129,6 +129,7 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
         $map = [
             'showCourseDashboard' => 'showDashboard',
             'showCourseAnalysis' => 'showAnalysis',
+            'showCourseAiAnalysis' => 'showAiAnalysis',
             'showCourseExpert' => 'showExpert',
             'showCourseTracking' => 'showConfig',
             'saveCourseTracking' => 'saveConfig',
@@ -144,6 +145,7 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
         $map = [
             'showDashboard' => 'showCourseDashboard',
             'showAnalysis' => 'showCourseAnalysis',
+            'showAiAnalysis' => 'showCourseAiAnalysis',
             'showExpert' => 'showCourseExpert',
             'showConfig' => 'showCourseTracking',
             'saveConfig' => 'saveCourseTracking',
@@ -168,13 +170,16 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
             $tabs = $GLOBALS['DIC']->tabs();
             $tabs->addTab('itxeb_xapi_dashboard', 'Tableau de bord', $this->link('showDashboard'));
             $tabs->addTab('itxeb_xapi_analysis', 'Analyse', $this->link('showAnalysis'));
+            $tabs->addTab('itxeb_xapi_ai_analysis', 'Analyse IA', $this->link('showAiAnalysis'));
             $tabs->addTab('itxeb_xapi_expert', 'Expert', $this->link('showExpert'));
             $tabs->addTab('itxeb_xapi_config', 'Configuration', $this->link('showConfig'));
+            $tabs->addTab('itxeb_xapi_return_course', 'Retour contenu du cours', $this->courseUrl($this->getCourseRefId()));
 
             $map = [
                 'showDashboard' => 'itxeb_xapi_dashboard',
                 'showAnalysis' => 'itxeb_xapi_analysis',
-                'generateAiAnalysis' => 'itxeb_xapi_analysis',
+                'showAiAnalysis' => 'itxeb_xapi_ai_analysis',
+                'generateAiAnalysis' => 'itxeb_xapi_ai_analysis',
                 'showExpert' => 'itxeb_xapi_expert',
                 'exportExpertCsv' => 'itxeb_xapi_expert',
                 'showConfig' => 'itxeb_xapi_config',
@@ -217,6 +222,7 @@ class ilIliasTraxEventBridgeCourseUIRouterGUI
         $map = [
             'showDashboard' => 'showCourseDashboard',
             'showAnalysis' => 'showCourseAnalysis',
+            'showAiAnalysis' => 'showCourseAiAnalysis',
             'showExpert' => 'showCourseExpert',
             'showConfig' => 'showCourseTracking',
             'exportExpertCsv' => 'exportCourseExpertCsv',

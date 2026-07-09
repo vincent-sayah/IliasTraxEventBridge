@@ -11,6 +11,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 {
     /** @var ilIliasTraxEventBridgeCourseUIBridge */
     private $bridge;
+    private static bool $pilotageToolbarAdded = false;
 
     public function __construct()
     {
@@ -30,6 +31,10 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         }
 
         $html = $a_par['html'];
+        $cleanHtml = $this->removeInjectedCourseEntryBlock($html);
+        if ($cleanHtml !== $html) {
+            return ['mode' => ilUIHookPluginGUI::REPLACE, 'html' => $cleanHtml];
+        }
         if (strpos($html, 'il_center_col') === false || strpos($html, 'mainspacekeeper') === false) {
             return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
         }
@@ -70,6 +75,19 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
     /** @param string $a_comp @param string $a_part @param array<string,mixed> $a_par */
     public function modifyGUI($a_comp, $a_part, $a_par = []): void
     {
+        try {
+            if (self::$pilotageToolbarAdded) { return; }
+            if ($this->isRoutedPluginRequest() || !$this->isCourseContentRequest()) { return; }
+            $context = $this->getCurrentCourseContext();
+            $courseRefId = (int) ($context['course_ref_id'] ?? 0);
+            if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage'])) { return; }
+            if (!isset($GLOBALS['DIC']) || !is_object($GLOBALS['DIC']) || !method_exists($GLOBALS['DIC'], 'toolbar')) { return; }
+            $toolbar = $GLOBALS['DIC']->toolbar();
+            if (is_object($toolbar) && method_exists($toolbar, 'addButton')) {
+                $toolbar->addButton('Pilotage xAPI', $this->buildRouterUrl($courseRefId, 'showDashboard'));
+                self::$pilotageToolbarAdded = true;
+            }
+        } catch (Throwable $ignored) {}
     }
 
     /** @return array<string,mixed> */
@@ -172,56 +190,35 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         ], '', '&');
     }
 
+    private function removeInjectedCourseEntryBlock(string $html): string
+    {
+        if (strpos($html, 'itxeb_course_xapi_entry') === false && strpos($html, 'itxeb-course-xapi-entry') === false && strpos($html, 'Ouvrir le suivi xAPI') === false) {
+            return $html;
+        }
+        if (class_exists('DOMDocument')) {
+            $internalErrors = libxml_use_internal_errors(true);
+            $dom = new DOMDocument('1.0', 'UTF-8');
+            $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+            if ($loaded) {
+                $node = $dom->getElementById('itxeb_course_xapi_entry');
+                if ($node instanceof DOMNode && $node->parentNode instanceof DOMNode) {
+                    $node->parentNode->removeChild($node);
+                    $result = $dom->saveHTML();
+                    $result = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $result) ?? (string) $result;
+                    libxml_clear_errors();
+                    libxml_use_internal_errors($internalErrors);
+                    return $result;
+                }
+            }
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+        }
+        $clean = preg_replace('/<div\s+id=("|\')itxeb_course_xapi_entry\1\b.*?<\/div>/isu', '', $html, 1);
+        return is_string($clean) ? $clean : $html;
+    }
     private function injectCourseEntryButton(string $html, string $url): string
     {
-        if (strpos($html, 'id="itxeb_course_xapi_entry"') !== false || strpos($html, "id='itxeb_course_xapi_entry'") !== false) {
-            return $html;
-        }
-
-        $entryHtml = '<div id="itxeb_course_xapi_entry" class="ilInfoScreenSec itxeb-course-xapi-entry" style="margin:0 0 15px 0;padding:12px;border:1px solid #d0d0d0;background:#f8f8f8;">'
-            . '<h3>Suivi xAPI</h3>'
-            . '<p>Consulter le tableau de bord, l’analyse pédagogique et la vue expert xAPI de ce cours.</p>'
-            . '<a class="btn btn-default" href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">Ouvrir le suivi xAPI</a>'
-            . '</div>';
-
-        if (!class_exists('DOMDocument')) {
-            $newHtml = preg_replace('/(<[^>]+id=("|\')il_center_col\2[^>]*>)/isu', '$1' . $entryHtml, $html, 1, $count);
-            return is_string($newHtml) && $count > 0 ? $newHtml : $html;
-        }
-
-        $internalErrors = libxml_use_internal_errors(true);
-        $dom = new DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-        if (!$loaded) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-
-        $center = $dom->getElementById('il_center_col');
-        if (!$center instanceof DOMElement) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-
-        $fragment = $dom->createDocumentFragment();
-        if (@$fragment->appendXML($entryHtml) === false) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($internalErrors);
-            return $html;
-        }
-        if ($center->firstChild instanceof DOMNode) {
-            $center->insertBefore($fragment, $center->firstChild);
-        } else {
-            $center->appendChild($fragment);
-        }
-
-        $result = $dom->saveHTML();
-        $result = preg_replace('/^<\?xml[^>]+>\s*/', '', (string) $result) ?? (string) $result;
-        libxml_clear_errors();
-        libxml_use_internal_errors($internalErrors);
-        return $result;
+        return $html;
     }
 
     private function replaceCenterColumnContent(string $html, string $content): string

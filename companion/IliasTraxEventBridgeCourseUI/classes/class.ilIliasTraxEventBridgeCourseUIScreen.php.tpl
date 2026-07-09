@@ -92,13 +92,13 @@ class ilIliasTraxEventBridgeCourseUIScreen
             $cmd = 'showCourseTracking';
         } elseif ($cmd === 'archiveCourseAiHistory') {
             $this->archiveAiHistory($courseRefId);
-            $cmd = 'showCourseAnalysis';
+            $cmd = 'showCourseAiAnalysis';
         }
 
         $course = $this->resolver->resolveCourse($courseRefId);
         if ($cmd === 'generateCourseAiAnalysis') {
             $this->runCourseAiAnalysis($course);
-            $cmd = 'showCourseAnalysis';
+            $cmd = 'showCourseAiAnalysis';
         }
         if ($cmd === 'exportCourseDashboardPdf') {
             $this->sendDashboardPdf($course);
@@ -110,6 +110,9 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $html = $this->renderMessage()
             . ($this->renderInnerTabs ? $this->renderInnerTabs($courseRefId, $cmd) : '')
             . $this->renderView($course, $cmd);
+        if ($cmd !== 'showCourseExpert' && $cmd !== 'exportCourseExpertCsv') {
+            $html = $this->simplifyNonExpertWording($html);
+        }
 
         return $this->renderShell($html, $courseRefId, (string) ($course['course_title'] ?? ''), $cmd);
     }
@@ -200,12 +203,93 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($cmd === 'showCourseAnalysis') {
             return $this->renderAnalysis($course);
         }
+        if ($cmd === 'showCourseAiAnalysis') {
+            return $this->renderAiAnalysis($course);
+        }
         if ($cmd === 'showCourseExpert' || $cmd === 'exportCourseExpertCsv') {
             return $this->renderExpert($course);
         }
         return $this->renderCourseSummary($course) . $this->renderConfigForm($course) . $this->renderDashboardPreferencesForm($course) . $this->renderOutboxTechnicalSupervision($course) . $this->renderLrsDirectSummary($course) . $this->renderBulkActions((int) ($course['course_ref_id'] ?? 0));
     }
 
+    private function simplifyNonExpertWording(string $html): string
+    {
+        $replacements = [
+            'Vue synthétique des statements xAPI présents dans TRAX pour ce cours.' => 'Vue synthétique des données d’apprentissage pour ce cours.',
+            'statements xAPI présents dans TRAX' => 'données d’apprentissage disponibles',
+            'statements retournés par TRAX' => 'données d’apprentissage retournées par la source',
+            'statement xAPI TRAX' => 'donnée d’apprentissage',
+            'statement xAPI' => 'donnée d’apprentissage',
+            'statements xAPI' => 'données d’apprentissage',
+            'statement TRAX' => 'donnée d’activité',
+            'statements TRAX' => 'données d’activité',
+            'Statements TRAX' => 'Données d’apprentissage',
+            'Statements xAPI' => 'Données d’apprentissage',
+            'Sans statement TRAX' => 'Ressources sans activité',
+            'Données xAPI agrégées' => 'Données d’apprentissage regroupées',
+            'données xAPI agrégées' => 'données d’apprentissage regroupées',
+            'traces xAPI/TRAX' => 'données d’apprentissage',
+            'traces xAPI' => 'données d’apprentissage',
+            'trace xAPI' => 'donnée d’apprentissage',
+            'Trace xAPI' => 'Donnée d’apprentissage',
+            'Au moins une trace' => 'Au moins une activité enregistrée',
+            'sans trace' => 'sans activité enregistrée',
+            'Sans trace' => 'Sans activité enregistrée',
+            'Ressources traçables' => 'Ressources suivies',
+            'ressources traçables' => 'ressources suivies',
+            'ressource traçable' => 'ressource suivie',
+            'Aucune ressource traçable détectée' => 'Aucune ressource suivie détectée',
+            'Activation xAPI' => 'Activation du suivi d’apprentissage',
+            'Activer les traces xAPI pour ce cours' => 'Activer le suivi des activités pour ce cours',
+            'Enregistrer la configuration xAPI' => 'Enregistrer la configuration du suivi',
+            'Configuration xAPI du cours enregistrée.' => 'Configuration du suivi d’apprentissage enregistrée.',
+            'Configuration xAPI du cours réinitialisée.' => 'Configuration du suivi d’apprentissage réinitialisée.',
+            'xAPI cours' => 'Suivi du cours',
+            'Supervision technique de l’envoi xAPI' => 'État technique du suivi',
+            'envois xAPI' => 'envois de données',
+            'file locale d’envoi vers TRAX' => 'file d’attente locale d’envoi des données',
+            'outbox locale' => 'file d’attente locale',
+            'Outbox locale' => 'File d’attente locale',
+            'Total outbox' => 'Total file d’attente',
+            'TRAX / LRS direct' => 'Source des données d’apprentissage',
+            'TRAX/LRS direct' => 'source de données principale',
+            'TRAX/LRS' => 'source de données',
+            'TRAX et les logs d’envoi' => 'la source de données et les journaux d’envoi',
+            'configuration TRAX' => 'configuration de la source de données',
+            'Lecture directe de TRAX/LRS' => 'Lecture directe des données d’apprentissage',
+            'TRAX' => 'source de données',
+            'Lecture LRS' => 'Lecture des données',
+            'Lecture directe de source de données/LRS' => 'Lecture directe des données d’apprentissage',
+            'Lecture directe de source de données' => 'Lecture directe des données d’apprentissage',
+            'Lecture des données/LRS' => 'Lecture des données',
+            'État LRS' => 'État de la source',
+            'Pages LRS' => 'Lots de données lus',
+            'Pagination LRS' => 'Lecture par lots',
+            'More LRS restant' => 'Données restantes à lire',
+            'Activité cours xAPI' => 'Activité du cours',
+            'Source du suivi xAPI' => 'Source du suivi d’apprentissage',
+            'GET /statements' => 'lecture des données',
+            'pagination' => 'lecture par lots',
+            'Pagination' => 'Lecture par lots',
+            'payload' => 'données envoyées',
+            'Payload' => 'Données envoyées',
+            'Résumé données envoyées' => 'Résumé des données',
+            'Date UTC' => 'Date',
+            'Répartition des verbes' => 'Répartition des actions',
+            'Verbes xAPI' => 'Types d’actions',
+            'verbes xAPI' => 'types d’actions',
+            'verbes' => 'actions',
+            'Verbes' => 'Actions',
+            'pseudonymes techniques' => 'codes anonymes',
+            'Pseudonymes techniques' => 'Codes anonymes',
+            'HTTP ' => 'Réponse ',
+            '>course_ref_id<' => '>Identifiant du cours<',
+            '>course_obj_id<' => '>Identifiant interne du cours<',
+            '<th>ref_id</th>' => '<th>Identifiant page</th>',
+            '<th>obj_id</th>' => '<th>Identifiant interne</th>',
+        ];
+        return strtr($html, $replacements);
+    }
     /** @param array<string,mixed> $course */
     private function renderCourseSummary(array $course): string
     {
@@ -440,7 +524,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Cocher deux analyses IA historisées pour les comparer.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderAiAnalysisAction($course) . $this->renderAiAnalysisResult() . $this->renderAiHistoryPanel($course) . $this->renderPedagogicalSynthesis($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -490,6 +574,19 @@ class ilIliasTraxEventBridgeCourseUIScreen
     }
 
     /** @param array<string,mixed> $course */
+    private function renderAiAnalysis(array $course): string
+    {
+        $html = '<section class="itxeb-cui-section itxeb-ai-page"><h2>Analyse IA</h2>'
+            . '<div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi IA</strong><ul style="margin:8px 0 0 18px"><li>Générer une synthèse IA à partir des traces TRAX/LRS.</li><li>Relire les analyses historisées du cours.</li><li>Comparer deux analyses IA pour suivre l’évolution du cours.</li></ul></div>'
+            . $this->renderPeriodSelector('showCourseAiAnalysis')
+            . $this->renderResourceFilter($course, 'showCourseAiAnalysis')
+            . $this->renderAnalyticsWarning()
+            . $this->renderAiAnalysisAction($course)
+            . $this->renderAiAnalysisResult()
+            . $this->renderAiHistoryPanel($course);
+        return $html . '</section>';
+    }
+    /** @param array<string,mixed> $course */
     private function renderAiAnalysisAction(array $course): string
     {
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
@@ -501,8 +598,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
             'itxeb_filter_obj_type' => $this->getSelectedObjectType(),
         ]);
 
-        return '<section class="itxeb-cui-section itxeb-ai-analysis-action itxeb-trainer-card"><h3>Analyse IA du cours</h3>'
-            . '<p>Génère une synthèse pédagogique à partir des données xAPI agrégées de la période sélectionnée. En anonymisation stricte, aucun nom, courriel ou identité nominative apprenant n’est envoyé.</p>'
+        return '<section class="itxeb-cui-section itxeb-ai-analysis-action"><h3>Analyse IA du cours</h3>'
+            . '<p>Génère une synthèse pédagogique.</p>'
             . '<p><a class="btn btn-primary" href="' . $this->esc($url) . '">Générer une nouvelle analyse IA</a></p>'
             . '<p><small>La dernière analyse réussie est historisée localement et reprise dans l’export PDF.</small></p>'
             . '</section>';
@@ -617,7 +714,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             if ($recordId !== '' && $recordId === $compareA) { $compareARecord = $record; }
             if ($recordId !== '' && $recordId === $compareB) { $compareBRecord = $record; }
             $detailUrl = $this->currentUrlWith([
-                'itxeb_cui_cmd' => 'showCourseAnalysis',
+                'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                 'itxeb_course_ref_id' => (string) $courseRefId,
                 'itxeb_period_days' => (string) $this->getPeriodDays(),
                 'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -633,7 +730,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 'itxeb_ai_history_id' => $recordId,
             ]);
             $compareAUrl = $this->currentUrlWith([
-                'itxeb_cui_cmd' => 'showCourseAnalysis',
+                'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                 'itxeb_course_ref_id' => (string) $courseRefId,
                 'itxeb_period_days' => (string) $this->getPeriodDays(),
                 'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -642,7 +739,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 'itxeb_ai_compare_a' => $recordId,
             ]);
             $compareBUrl = $this->currentUrlWith([
-                'itxeb_cui_cmd' => 'showCourseAnalysis',
+                'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                 'itxeb_course_ref_id' => (string) $courseRefId,
                 'itxeb_period_days' => (string) $this->getPeriodDays(),
                 'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -679,7 +776,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
         $html .= '</tbody></table></div>';
         $compareFormAction = $this->currentUrlWith([
-            'itxeb_cui_cmd' => 'showCourseAnalysis',
+            'itxeb_cui_cmd' => 'showCourseAiAnalysis',
             'itxeb_course_ref_id' => (string) $courseRefId,
             'itxeb_period_days' => (string) $this->getPeriodDays(),
             'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -689,7 +786,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             'itxeb_ai_compare_b' => '',
         ]);
         $html .= '<form id="itxeb-ai-compare-form" class="itxeb-ai-compare-submit" method="post" action="' . $this->esc($compareFormAction) . '">'
-            . '<input type="hidden" name="itxeb_cui_cmd" value="showCourseAnalysis">'
+            . '<input type="hidden" name="itxeb_cui_cmd" value="showCourseAiAnalysis">'
             . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
             . '<input type="hidden" name="itxeb_period_days" value="' . $this->esc((string) $this->getPeriodDays()) . '">'
             . '<input type="hidden" name="itxeb_filter_ref_id" value="' . $this->esc((string) $this->getSelectedResourceRefId()) . '">'
@@ -700,7 +797,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
         if ($compareA !== '' || $compareB !== '') {
             $clearUrl = $this->currentUrlWith([
-                'itxeb_cui_cmd' => 'showCourseAnalysis',
+                'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                 'itxeb_course_ref_id' => (string) $courseRefId,
                 'itxeb_period_days' => (string) $this->getPeriodDays(),
                 'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -766,7 +863,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             } else {
                 $analysis = trim((string) ($selectedRecord['analysis'] ?? ''));
                 $closeUrl = $this->currentUrlWith([
-                    'itxeb_cui_cmd' => 'showCourseAnalysis',
+                    'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                     'itxeb_course_ref_id' => (string) $courseRefId,
                     'itxeb_period_days' => (string) $this->getPeriodDays(),
                     'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -1522,7 +1619,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function renderInnerTabs(int $courseRefId, string $activeCmd): string
     {
-        $tabs = ['showCourseDashboard' => 'Tableau de bord', 'showCourseAnalysis' => 'Analyse', 'showCourseExpert' => 'Expert', 'showCourseTracking' => 'Configuration'];
+        $tabs = ['showCourseDashboard' => 'Tableau de bord', 'showCourseAnalysis' => 'Analyse', 'showCourseAiAnalysis' => 'Analyse IA', 'showCourseExpert' => 'Expert', 'showCourseTracking' => 'Configuration'];
         $html = '<nav class="itxeb-inner-tabs">';
         foreach ($tabs as $cmd => $label) {
             $html .= '<a class="itxeb-inner-tab' . ($this->normalizeCommand($activeCmd) === $cmd ? ' itxeb-active' : '') . '" href="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => $cmd, 'itxeb_course_ref_id' => (string) $courseRefId])) . '">' . $this->esc($label) . '</a>';
@@ -1552,7 +1649,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function renderShell(string $content, int $courseRefId, string $courseTitle, string $cmd): string
     {
-        $title = trim($courseTitle) !== '' ? 'Suivi xAPI — ' . $courseTitle : 'Suivi xAPI — configuration du cours';
+        $title = trim($courseTitle) !== '' ? 'Pilotage pédagogique — ' . $courseTitle : 'Pilotage pédagogique — configuration du cours';
         $normalizedCmd = $this->normalizeCommand($cmd);
         $subtitle = $normalizedCmd === 'showCourseTracking' ? 'Configuration xAPI depuis l’objet cours' : 'Feedback et analyse des traces xAPI du cours';
         $header = '<div class="itxeb-v012-header itxeb-v012-layout"><div class="itxeb-v012-header-title"><h1>' . $this->esc($title) . '</h1><p>' . $this->esc($subtitle) . ($courseRefId > 0 ? ' — course_ref_id ' . $this->esc((string) $courseRefId) : '') . '</p></div>';
@@ -1807,7 +1904,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function normalizeCommand(string $cmd): string
     {
-        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseExpert', 'exportCourseExpertCsv', 'exportCourseDashboardPdf'], true)
+        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseAiAnalysis', 'showCourseExpert', 'exportCourseExpertCsv', 'exportCourseDashboardPdf'], true)
             ? ($cmd === 'exportCourseExpertCsv' ? 'showCourseExpert' : ($cmd === 'exportCourseDashboardPdf' ? 'showCourseDashboard' : $cmd))
             : 'showCourseTracking';
     }

@@ -1,6 +1,6 @@
 <?php
 
-$id = 'itxeb';
+$id$version = '0.20.1-dev';
 $version = '0.20.0-dev';
 $ilias_min_version = '10.0.0';
 $ilias_max_version = '10.999.999';
