@@ -1,6 +1,8 @@
 <?php
 $root = getcwd();
 $hook = $root . '/companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl';
+$servicesRoot = dirname(dirname(dirname($root)));
+$liveHook = $servicesRoot . '/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php';
 
 function read_strict(string $file): string {
     $data = file_get_contents($file);
@@ -60,20 +62,30 @@ if (strpos($h, 'self::$pilotageToolbarAdded') === false || strpos($h, 'self::$pi
     echo "OK: garde anti doublon deja active\n";
 }
 
-$pattern = "/\s*\$url = \$this->buildRouterUrl\(\$courseRefId, 'showDashboard'\);\s*\$newHtml = \$this->injectCourseEntryButton\(\$html, \$url\);\s*return \$newHtml !== \$html\s*\? \['mode' => ilUIHookPluginGUI::REPLACE, 'html' => \$newHtml\]\s*: \['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''\];/s";
-$replacement = "\n        return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];";
-$new = preg_replace($pattern, $replacement, $h, 1, $count);
-if (!is_string($new)) {
-    fwrite(STDERR, "regex suppression encart impossible\n");
+$patternCall = "/\s*\$url = \$this->buildRouterUrl\(\$courseRefId, 'showDashboard'\);\s*\$newHtml = \$this->injectCourseEntryButton\(\$html, \$url\);\s*return \$newHtml !== \$html\s*\? \['mode' => ilUIHookPluginGUI::REPLACE, 'html' => \$newHtml\]\s*: \['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''\];/s";
+$h2 = preg_replace($patternCall, "\n        return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];", $h, 1, $countCall);
+if (!is_string($h2)) {
+    fwrite(STDERR, "suppression appel injection impossible\n");
     exit(1);
 }
-if ($count > 0) {
-    $h = $new;
-    echo "PATCH: suppression injection ancien bloc contenu\n";
-} else {
-    echo "OK: ancien bloc contenu deja neutralise\n";
+$h = $h2;
+echo $countCall > 0 ? "PATCH: suppression appel ancien bloc contenu\n" : "OK: appel ancien bloc deja absent\n";
+
+$patternMethod = "/    private function injectCourseEntryButton\(string \$html, string \$url\): string\n    \{.*?\n    \}\n\n    private function replaceCenterColumnContent/s";
+$replacementMethod = "    private function injectCourseEntryButton(string \$html, string \$url): string\n    {\n        return \$html;\n    }\n\n    private function replaceCenterColumnContent";
+$h2 = preg_replace($patternMethod, $replacementMethod, $h, 1, $countMethod);
+if (!is_string($h2)) {
+    fwrite(STDERR, "neutralisation methode injection impossible\n");
+    exit(1);
 }
+$h = $h2;
+echo $countMethod > 0 ? "PATCH: neutralisation methode injectCourseEntryButton\n" : "OK: methode injection deja neutralisee\n";
 
 write_if_changed($hook, $old, $h);
 
-echo "V0.20.1 correctif toolbar/bloc pret\n";
+if (!copy($hook, $liveHook)) {
+    fwrite(STDERR, "copie live impossible: $liveHook\n");
+    exit(1);
+}
+echo "COPY: $hook -> $liveHook\n";
+echo "V0.20.1 correctif bloc contenu applique\n";
