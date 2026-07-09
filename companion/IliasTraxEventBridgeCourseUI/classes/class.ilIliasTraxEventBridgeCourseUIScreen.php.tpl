@@ -426,7 +426,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $widgets = $this->dashboardWidgets((int) ($course['course_ref_id'] ?? 0));
         $html = '<section class="itxeb-cui-section"><h2>Tableau de bord du cours</h2><p>Vue synthétique des statements xAPI présents dans TRAX pour ce cours.</p>'
             . $this->renderPeriodSelector('showCourseDashboard') . $this->renderResourceFilter($course, 'showCourseDashboard') . $this->renderAnalyticsWarning()
-            . $this->renderPedagogicalSynthesis($dashboard)
+            . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course)
             . '<div class="itxeb-kpi-grid">'
             . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
             . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
@@ -515,6 +515,58 @@ class ilIliasTraxEventBridgeCourseUIScreen
         return $html . '</div>';
     }
 
+    /** @param array<string,mixed> $dashboard @param array<string,mixed> $course */
+    private function renderQuestionFailureHotspots(array $dashboard, array $course): string
+    {
+        $risks = is_array($dashboard['question_risks'] ?? null) ? $dashboard['question_risks'] : [];
+        if ($risks === []) {
+            $path = $this->bridge->getMainPluginPath() . '/classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php';
+            if (is_file($path)) {
+                require_once $path;
+            }
+            if (class_exists('ilIliasTraxEventBridgeQuestionRiskRepository')) {
+                $allowedRefIds = [];
+                foreach ((array) ($course['resources'] ?? []) as $resource) {
+                    if (is_array($resource) && (string) ($resource['obj_type'] ?? '') === 'tst') {
+                        $rid = (int) ($resource['ref_id'] ?? 0);
+                        if ($rid > 0) { $allowedRefIds[] = $rid; }
+                    }
+                }
+                try {
+                    $risks = (new ilIliasTraxEventBridgeQuestionRiskRepository())->build($this->getPeriodDays(), $allowedRefIds, $this->getSelectedResourceRefId());
+                } catch (Throwable $ignored) {
+                    $risks = [];
+                }
+            }
+        }
+
+        $html = '<section class="itxeb-cui-section itxeb-question-risks"><h3>Questions à fort taux d’échec</h3>';
+        if (count($risks) === 0) {
+            return $html . '<p><em>Aucune question à fort taux d’échec détectée sur la période sélectionnée.</em></p></section>';
+        }
+        $html .= '<p>Seules les questions problématiques sont remontées ici. Toutes les questions restent tracées dans TRAX et visibles côté Expert.</p>';
+        $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr>'
+            . '<th>Priorité</th><th>Question</th><th>Test</th><th>Réponses</th><th>Échecs / non-réponses</th><th>Taux d’échec</th><th>Score moyen</th><th>Dernière trace</th>'
+            . '</tr></thead><tbody>';
+        foreach (array_slice($risks, 0, 10) as $risk) {
+            if (!is_array($risk)) { continue; }
+            $avg = ($risk['avg_score'] ?? null) === null ? '-' : (string) $risk['avg_score'] . ' %';
+            $failure = is_numeric($risk['failure_rate'] ?? null) ? (string) $risk['failure_rate'] . ' %' : '-';
+            $label = (string) ($risk['risk_label'] ?? 'À surveiller');
+            $class = $label === 'Critique' ? 'itxeb-pedagogy-critical' : 'itxeb-pedagogy-watch';
+            $html .= '<tr>'
+                . '<td><span class="itxeb-pedagogy-badge ' . $class . '">' . $this->esc($label) . '</span></td>'
+                . '<td><strong>' . $this->esc((string) ($risk['question_title'] ?? '')) . '</strong><br><small>Question ' . $this->esc((string) ($risk['question_id'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc((string) ($risk['test_title'] ?? '')) . '<br><small>ref_id ' . $this->esc((string) ($risk['ref_id'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc((string) ($risk['attempts'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc((string) (((int) ($risk['failed'] ?? 0)) + ((int) ($risk['unanswered'] ?? 0)))) . '</td>'
+                . '<td>' . $this->esc($failure) . '</td>'
+                . '<td>' . $this->esc($avg) . '</td>'
+                . '<td>' . $this->esc((string) ($risk['last_at'] ?? '')) . '</td>'
+                . '</tr>';
+        }
+        return $html . '</tbody></table></div></section>';
+    }
     private function pedagogicalBadgeClass(string $status): string
     {
         return $status === 'critical' ? 'itxeb-pedagogy-critical' : ($status === 'watch' ? 'itxeb-pedagogy-watch' : ($status === 'ok' ? 'itxeb-pedagogy-ok' : 'itxeb-pedagogy-muted'));
@@ -524,7 +576,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }

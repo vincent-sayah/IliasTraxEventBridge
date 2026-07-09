@@ -22,6 +22,22 @@ class ilIliasTraxEventBridgeStatementFactory
 
     /**
      * @param array<string,mixed> $record
+     * @return array<int,array<string,mixed>>
+     */
+    public function createStatementsFromEventRecord(array $record): array
+    {
+        $statements = [];
+        $main = $this->createFromEventRecord($record);
+        if ($main !== null) {
+            $statements[] = $main;
+        }
+        foreach ($this->createQuestionResultStatements($record) as $questionStatement) {
+            $statements[] = $questionStatement;
+        }
+        return $statements;
+    }
+    /**
+     * @param array<string,mixed> $record
      * @return array<string,mixed>|null
      */
     public function createFromEventRecord(array $record): ?array
@@ -294,6 +310,112 @@ class ilIliasTraxEventBridgeStatementFactory
 
     /**
      * @param array<string,mixed> $record
+     * @return array<int,array<string,mixed>>
+     */
+    private function createQuestionResultStatements(array $record): array
+    {
+        $component = (string) ($record['component'] ?? '');
+        $event = (string) ($record['event_name'] ?? '');
+        if ($component !== 'components/ILIAS/Tracking' || $event !== 'updateStatus' || !$this->isTestTrackingEvent($record)) {
+            return [];
+        }
+
+        $payload = $this->decodePayload((string) ($record['payload_json'] ?? ''));
+        $status = (int) ($payload['status'] ?? -1);
+        $percentage = (float) ($payload['percentage'] ?? 0);
+        if (!($status === 2 || $status === 3 || $percentage >= 100)) {
+            return [];
+        }
+
+        require_once __DIR__ . '/class.ilIliasTraxEventBridgeTestQuestionResultExtractor.php';
+        $questions = (new ilIliasTraxEventBridgeTestQuestionResultExtractor())->extract($record);
+        $statements = [];
+        foreach ($questions as $question) {
+            $statements[] = $this->createQuestionResultStatement($record, $question);
+        }
+        return $statements;
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @param array<string,mixed> $question
+     * @return array<string,mixed>
+     */
+    private function createQuestionResultStatement(array $record, array $question): array
+    {
+        $baseUrl = $this->config->getIliasBaseUrl();
+        $payload = $this->decodePayload((string) ($record['payload_json'] ?? ''));
+        $userId = (int) ($payload['usr_id'] ?? ($payload['user_id'] ?? ($record['user_id'] ?? 0)));
+        $refId = (int) ($record['ref_id'] ?? 0);
+        $objId = (int) ($record['obj_id'] ?? 0);
+        $questionId = (int) ($question['question_id'] ?? 0);
+        $questionTitle = trim((string) ($question['question_title'] ?? ''));
+        if ($questionTitle === '') {
+            $questionTitle = 'Question ' . $questionId;
+        }
+        $testTitle = $this->resolveObjectTitle($record, 'Test ILIAS ' . ($refId > 0 ? 'ref_id ' . $refId : 'obj_id ' . $objId));
+        $scorePercent = $question['score_percent'] ?? null;
+        $points = (float) ($question['points'] ?? 0);
+        $maxPoints = (float) ($question['max_points'] ?? 0);
+        $answered = $question['answered'] ?? null;
+
+        $result = [
+            'completion' => true,
+            'extensions' => [
+                $baseUrl . '/xapi/extensions/question_id' => $questionId,
+                $baseUrl . '/xapi/extensions/question_title' => $questionTitle,
+                $baseUrl . '/xapi/extensions/question_type' => (string) ($question['question_type'] ?? ''),
+                $baseUrl . '/xapi/extensions/question_points' => $points,
+                $baseUrl . '/xapi/extensions/question_max_points' => $maxPoints,
+                $baseUrl . '/xapi/extensions/question_score_percent' => is_numeric($scorePercent) ? (float) $scorePercent : null,
+                $baseUrl . '/xapi/extensions/question_answered' => is_bool($answered) ? $answered : null,
+                $baseUrl . '/xapi/extensions/test_id' => (int) ($question['test_id'] ?? 0),
+                $baseUrl . '/xapi/extensions/test_active_id' => (int) ($question['active_id'] ?? 0),
+                $baseUrl . '/xapi/extensions/test_pass' => (int) ($question['pass'] ?? 0),
+                $baseUrl . '/xapi/extensions/test_result_id' => (int) ($question['test_result_id'] ?? 0),
+                $baseUrl . '/xapi/extensions/question_result_source' => (string) ($question['source_table'] ?? ''),
+            ]
+        ];
+        if (is_numeric($scorePercent)) {
+            $result['score'] = [
+                'scaled' => max(0, min(1, ((float) $scorePercent) / 100)),
+                'raw' => (float) $scorePercent,
+                'min' => 0,
+                'max' => 100
+            ];
+        }
+        if (is_bool($question['success'] ?? null)) {
+            $result['success'] = (bool) $question['success'];
+        }
+
+        return [
+            'id' => $this->uuid4(),
+            'actor' => $this->actor($userId),
+            'verb' => [
+                'id' => 'http://adlnet.gov/expapi/verbs/answered',
+                'display' => [
+                    'fr-FR' => 'a répondu à la question',
+                    'en-US' => 'answered question'
+                ]
+            ],
+            'object' => [
+                'id' => rtrim($this->activityId('tst', $refId, $objId), '/') . '/question/' . max(0, $questionId),
+                'objectType' => 'Activity',
+                'definition' => $this->activityDefinition(
+                    'http://adlnet.gov/expapi/activities/cmi.interaction',
+                    $testTitle . ' — ' . $questionTitle,
+                    $this->objectUrl('tst', $refId),
+                    'Résultat d’une question du test ILIAS',
+                    'ILIAS test question result'
+                )
+            ],
+            'result' => $result,
+            'context' => $this->context($record, 'test_question_result', 'tst'),
+            'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
+        ];
+    }
+    /**
+     * @param array<string,mixed> $record
      * @return array<string,mixed>
      */
     private function context(array $record, string $sourceEvent, string $objType): array
@@ -496,6 +618,10 @@ class ilIliasTraxEventBridgeStatementFactory
             return 'file_download';
         }
 
+        if ($sourceEvent === 'test_question_result') {
+            return 'test_question_result';
+        }
+
         if ($sourceEvent === 'test_tracking_status' || $objType === 'tst') {
             return 'test_tracking';
         }
@@ -511,6 +637,10 @@ class ilIliasTraxEventBridgeStatementFactory
     {
         if ($sourceEvent === 'file_downloaded') {
             return 'download';
+        }
+
+        if ($sourceEvent === 'test_question_result') {
+            return 'assessment_question';
         }
 
         if ($sourceEvent === 'test_tracking_status' || $objType === 'tst') {

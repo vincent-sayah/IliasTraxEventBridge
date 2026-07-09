@@ -107,10 +107,17 @@ class ilIliasTraxEventBridgeEventRouter
             return;
         }
 
-        $statement = $this->statementFactory->createFromEventRecord($record);
-        if ($statement !== null) {
-            $this->outboxRepository->enqueue($record, $statement, $eventLogId);
-        } else {
+        $statements = method_exists($this->statementFactory, 'createStatementsFromEventRecord')
+            ? $this->statementFactory->createStatementsFromEventRecord($record)
+            : [$this->statementFactory->createFromEventRecord($record)];
+        $enqueued = 0;
+        foreach ($statements as $statement) {
+            if (is_array($statement)) {
+                $this->outboxRepository->enqueue($record, $statement, $eventLogId);
+                $enqueued++;
+            }
+        }
+        if ($enqueued === 0) {
             $this->logDeniedTrace('unsupported_object_type', $record, 'evnt_evhk_itxeb_log', $eventLogId);
         }
     }
