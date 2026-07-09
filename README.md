@@ -118,14 +118,14 @@ TRAX / LRS
 Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13` et `RELEASE_0.15.2` sont conservés pour historique. Pour une installation ou une maintenance courante, utiliser les documents V0.21.2.
 
 ## Copie écran
-![Tableau de bord](images/1.png)
-![Tableau de bord](images/2.png)
-![Analyse](images/3.png)
-![Analyse](images/4.png)
-![Analyse](images/5.png)
-![Analyse IA](images/6.png)
-![Analyse IA](images/7.png)
-![Expert](images/8.png)
-![Configuration](images/9.png)
+![Tableau de bord](docs/images/1.png)
+![Tableau de bord](docs/images/2.png)
+![Analyse](docs/images/3.png)
+![Analyse](docs/images/4.png)
+![Analyse](docs/images/5.png)
+![Analyse IA](docs/images/6.png)
+![Analyse IA](docs/images/7.png)
+![Expert](docs/images/8.png)
+![Configuration](docs/images/9.png)
 
 
