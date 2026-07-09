@@ -1,50 +1,38 @@
-# Analyse IA des traces xAPI — cadrage futur
+# Analyse IA des traces xAPI — état V0.21.2
 
-Ce document cadre une évolution possible du plugin `IliasTraxEventBridge` : ajouter une analyse optionnelle des traces xAPI par IA à partir des données TRAX/LRS.
+## 1. Statut
 
-Cette fonctionnalité n'est pas présente dans la V0.10.1. Elle est proposée pour une version future, probablement après une V0.11 de durcissement exploitation.
+L'analyse IA n'est plus seulement un cadrage futur : elle est disponible dans la version stable courante V0.21.2 promue dans `main`.
 
-## 1. Objectif
+Elle reste optionnelle et désactivable.
+
+## 2. Objectif
 
 L'objectif est d'aider un formateur, un pilote de cours ou un administrateur de cours à comprendre plus rapidement l'activité xAPI.
 
-L'IA pourrait produire :
+L'IA produit une aide à l'interprétation : synthèse pédagogique, signaux faibles, ressources à surveiller et recommandations d'amélioration.
 
-- une synthèse pédagogique de l'activité ;
-- une explication simple du tableau de bord ;
-- une détection des ressources peu utilisées ;
-- une détection des ressources associées à des échecs ;
-- une identification de tendances ;
-- des recommandations d'amélioration du cours ;
-- un rapport exportable.
+L'IA ne décide pas à la place du formateur.
 
-L'IA doit rester une aide à l'interprétation. Elle ne doit pas décider à la place du formateur.
-
-## 2. Principe général
+## 3. Principe général
 
 ```text
-TRAX/LRS
-  ↓ lecture xAPI
+TRAX/LRS et outbox locale question
+  ↓ lecture / agrégation
 IliasTraxEventBridge
-  ↓ agrégation locale
-Anonymisation / pseudonymisation
+  ↓ anonymisation / limitation
+Payload IA agrégé
   ↓ appel IA optionnel
 Synthèse pédagogique affichée dans ILIAS
+  ↓ historisation locale si succès
+Historique des analyses IA
 ```
 
-Le plugin ne doit pas envoyer directement les statements bruts complets si ce n'est pas nécessaire.
+## 4. Activation optionnelle
 
-## 3. Activation optionnelle
+L'analyse IA doit être activée explicitement dans la configuration du plugin.
 
-L'analyse IA doit être désactivée par défaut.
-
-Elle doit être activée explicitement par un administrateur technique :
-
-```text
-Administration > Plugins > IliasTraxEventBridge > Configuration IA
-```
-
-Paramètres envisagés :
+Paramètres principaux :
 
 | Paramètre | Description |
 |---|---|
@@ -54,61 +42,54 @@ Paramètres envisagés :
 | Clé API IA | Clé d'authentification, masquée en interface. |
 | Modèle IA | Nom du modèle utilisé. |
 | Timeout IA | Timeout des requêtes IA. |
-| Mode anonymisation | Aucun, pseudonymisation, anonymisation stricte. |
-| Limite de traces | Nombre maximum de traces utilisées pour une analyse. |
-| Cache des réponses | Évite des appels répétés et coûteux. |
-| Journalisation | Journal technique des appels sans contenu sensible. |
+| Mode anonymisation | `strict`, `pseudonymized` ou `none`. |
+| Limite de traces IA | Nombre maximum d'éléments agrégés utilisés pour une analyse. |
 
-## 4. Clé API IA
+La clé API ne doit jamais être réaffichée en clair.
 
-### 4.1 Besoin
+## 5. Données envoyées à l'IA en V0.21.2
 
-La clé API IA permet au plugin d'appeler un service IA externe ou interne.
+L'IA reçoit un payload agrégé. Les statements bruts complets ne sont pas envoyés si ce n'est pas nécessaire.
 
-### 4.2 Stockage
+Sections principales :
 
-Options possibles :
-
-1. stockage dans les settings ILIAS avec masquage en interface ;
-2. stockage chiffré si une mécanique fiable est disponible ;
-3. stockage hors base dans une variable d'environnement serveur ;
-4. stockage dans un fichier de configuration serveur non versionné.
-
-Option recommandée pour un environnement sensible :
-
-```text
-clé API stockée côté serveur hors dépôt Git, injectée par variable d'environnement ou fichier protégé
-```
-
-### 4.3 Affichage
-
-La clé ne doit jamais être réaffichée en clair.
-
-L'interface peut afficher :
-
-```text
-Clé configurée : oui
-Dernière modification : date / administrateur
-```
-
-## 5. Données envoyées à l'IA
-
-### 5.1 Données autorisées
-
-Données agrégées recommandées :
-
-- nombre total de statements ;
-- activité par jour ;
-- nombre d'apprenants actifs anonymisés ;
-- ressources utilisées ;
-- ressources activées sans trace ;
-- taux de réussite / échec des tests ;
-- score moyen ;
-- verbes xAPI présents ;
+- informations de cours ;
 - période analysée ;
-- contexte pédagogique du cours si fourni par l'administrateur.
+- indicateurs globaux ;
+- indicateurs pédagogiques déterministes ;
+- activité par jour ;
+- répartition des verbes ;
+- analyse des ressources ;
+- agrégat de risques apprenants anonymisé ;
+- `question_failure_analysis`.
 
-### 5.2 Données à éviter
+## 6. Questions problématiques dans l'IA
+
+Depuis V0.21.2, le payload contient :
+
+```text
+question_failure_analysis
+```
+
+Cette section contient uniquement les questions problématiques, pas toutes les questions du test.
+
+Champs transmis :
+
+| Champ | Description |
+|---|---|
+| `question_id` | Identifiant technique de question. |
+| `question_title` | Titre de la question. |
+| `test_title` | Test concerné. |
+| `ref_id` | Référence ILIAS du test. |
+| `attempts` | Nombre de réponses prises en compte. |
+| `failed` | Nombre d'échecs. |
+| `unanswered` | Nombre de non-réponses. |
+| `failure_rate` | Taux d'échec / non-réponse. |
+| `avg_score` | Score moyen. |
+| `risk_label` | `Critique` ou `À surveiller`. |
+| `risk_reason` | Explication synthétique du risque. |
+
+## 7. Données interdites ou à éviter
 
 Ne pas envoyer :
 
@@ -119,249 +100,35 @@ Ne pas envoyer :
 - données personnelles directes si non nécessaires ;
 - noms complets des apprenants si l'anonymisation est activée ;
 - logs serveur bruts ;
-- données hors périmètre du cours.
+- données hors périmètre du cours ;
+- statements bruts complets si les agrégats suffisent.
 
-## 6. Anonymisation
+## 8. Classes concernées
 
-Modes possibles :
+```text
+classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
+classes/class.ilIliasTraxEventBridgeAiClient.php
+classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php
+classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php
+```
 
-| Mode | Description |
+## 9. Contrôles techniques
+
+```bash
+php -l classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
+php -l classes/class.ilIliasTraxEventBridgeAiClient.php
+php -l classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php
+php -l classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php
+
+grep -n "question_failure_analysis\|buildQuestionFailureAnalysis\|filterQuestionRisks" \
+classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
+```
+
+## 10. Documents liés
+
+| Document | Rôle |
 |---|---|
-| Aucun | À éviter sauf environnement maîtrisé et autorisé. |
-| Pseudonymisation | Remplace les utilisateurs par des identifiants stables non directement lisibles. |
-| Anonymisation stricte | Supprime les identifiants utilisateur et ne conserve que les agrégats. |
-
-Mode recommandé par défaut :
-
-```text
-Anonymisation stricte
-```
-
-## 7. Types d'analyse possibles
-
-### 7.1 Synthèse courte
-
-Une synthèse lisible par le formateur :
-
-```text
-Le cours présente une activité régulière sur les 30 derniers jours.
-Les ressources les plus utilisées sont le module d'introduction et le test final.
-Deux ressources activées ne génèrent aucune trace.
-```
-
-### 7.2 Analyse pédagogique
-
-Analyse plus détaillée :
-
-- ressources les plus consultées ;
-- ressources sous-utilisées ;
-- tests difficiles ;
-- rythme d'activité ;
-- anomalies d'engagement.
-
-### 7.3 Recommandations
-
-Exemples :
-
-- revoir les consignes d'un test ;
-- repositionner une ressource peu visible ;
-- ajouter une activité intermédiaire ;
-- vérifier qu'une ressource activée est bien accessible ;
-- améliorer le guidage pédagogique.
-
-### 7.4 Rapport exportable
-
-Générer un rapport IA exportable au format :
-
-- HTML imprimable ;
-- PDF ;
-- Markdown ;
-- texte simple.
-
-## 8. Prompt IA envisagé
-
-Exemple de structure de prompt :
-
-```text
-Tu es un assistant pédagogique spécialisé en analyse de traces xAPI.
-Analyse les indicateurs agrégés d'un cours ILIAS.
-Ne déduis pas d'informations absentes des données.
-Signale les limites de l'analyse.
-Produit une synthèse courte, puis des recommandations actionnables.
-```
-
-Le prompt doit recevoir des données structurées, par exemple :
-
-```json
-{
-  "course": {
-    "title": "Cours exemple",
-    "period_days": 30
-  },
-  "summary": {
-    "statements": 128,
-    "active_learners": 18,
-    "resources_with_traces": 6,
-    "resources_without_traces": 2,
-    "tests_failed": 9,
-    "tests_passed": 21
-  },
-  "resources": [
-    {
-      "title": "Test final",
-      "type": "tst",
-      "traces": 42,
-      "passed": 21,
-      "failed": 9
-    }
-  ]
-}
-```
-
-## 9. Cache des analyses
-
-Pour éviter des coûts et délais excessifs :
-
-- ne pas appeler l'IA à chaque chargement de page ;
-- prévoir un bouton `Générer l'analyse IA` ;
-- stocker temporairement le résultat ;
-- afficher la date de génération ;
-- prévoir un bouton `Régénérer`.
-
-Table possible :
-
-```text
-evnt_evhk_itxeb_ai_cache
-```
-
-Colonnes possibles :
-
-- `course_ref_id` ;
-- `period_days` ;
-- `filters_hash` ;
-- `created_at` ;
-- `created_by` ;
-- `provider` ;
-- `model` ;
-- `analysis_json` ;
-- `analysis_text` ;
-- `last_error`.
-
-## 10. Journalisation
-
-Table possible :
-
-```text
-evnt_evhk_itxeb_ai_log
-```
-
-Contenu recommandé :
-
-- date ;
-- cours ;
-- utilisateur ayant lancé l'analyse ;
-- fournisseur ;
-- modèle ;
-- statut ;
-- durée ;
-- nombre de tokens ou volume si disponible ;
-- erreur éventuelle.
-
-Ne pas stocker par défaut le prompt complet si celui-ci contient des informations sensibles.
-
-## 11. Interface utilisateur envisagée
-
-Dans `Cours > Suivi xAPI`, ajouter un onglet ou un bloc :
-
-```text
-Analyse IA
-```
-
-Ou dans le tableau de bord :
-
-```text
-Bouton : Générer une synthèse IA
-```
-
-Affichage possible :
-
-- état de configuration IA ;
-- dernière analyse générée ;
-- synthèse ;
-- points à surveiller ;
-- recommandations ;
-- limites de l'analyse ;
-- bouton exporter.
-
-## 12. Sécurité
-
-Points non négociables :
-
-- IA désactivée par défaut ;
-- clé API jamais versionnée dans Git ;
-- clé API jamais affichée en clair ;
-- secrets TRAX jamais envoyés ;
-- anonymisation disponible ;
-- limitation du volume envoyé ;
-- journal technique minimal ;
-- timeout obligatoire ;
-- message clair si le service IA est indisponible.
-
-## 13. Environnement intranet / hors internet
-
-Dans un environnement fermé, l'IA pourrait être :
-
-- désactivée ;
-- connectée à une API IA interne ;
-- connectée à une passerelle interne autorisée ;
-- utilisée uniquement sur données anonymisées exportées.
-
-Le plugin doit donc permettre de configurer l'URL du fournisseur IA, et pas seulement un fournisseur public figé.
-
-## 14. Risques
-
-| Risque | Mesure proposée |
-|---|---|
-| Fuite de données personnelles | Anonymisation stricte par défaut. |
-| Coût API élevé | Cache, limite de traces, action manuelle. |
-| Réponse IA erronée | Afficher les limites et conserver les indicateurs sources. |
-| Dépendance fournisseur | API configurable. |
-| Temps de réponse long | Timeout, traitement asynchrone futur ou cache. |
-| Non-conformité sécurité | Désactivation par défaut, documentation d'exploitation. |
-
-## 15. Positionnement recommandé
-
-L'analyse IA doit être présentée comme :
-
-```text
-une aide à la lecture des traces xAPI
-```
-
-Elle ne doit pas être présentée comme :
-
-```text
-un outil de décision automatique sur les apprenants
-```
-
-## 16. Étapes de mise en œuvre possibles
-
-1. Ajouter la configuration IA sans appel effectif.
-2. Ajouter un test de connexion IA.
-3. Ajouter l'anonymisation / agrégation.
-4. Ajouter un premier prompt de synthèse courte.
-5. Ajouter le cache.
-6. Ajouter l'affichage dans le cours.
-7. Ajouter le rapport exportable.
-8. Ajouter la documentation sécurité / exploitation.
-
-## 17. Décision recommandée
-
-Avant de développer cette fonctionnalité, valider :
-
-- fournisseur IA autorisé ;
-- mode de stockage de la clé API ;
-- politique d'anonymisation ;
-- périmètre des données envoyées ;
-- coût acceptable ;
-- droits utilisateurs ;
-- contraintes RGPD ou sécurité internes.
+| [`FONCTIONNEL_0.21.2.md`](FONCTIONNEL_0.21.2.md) | Fonctionnement formateur. |
+| [`TECHNIQUE_0.21.2.md`](TECHNIQUE_0.21.2.md) | Architecture technique. |
+| [`GUIDE_DEVELOPPEUR_0.21.2.md`](GUIDE_DEVELOPPEUR_0.21.2.md) | Classes, tables et flux. |
+| [`VALIDATION_0.21.2.md`](VALIDATION_0.21.2.md) | Validation de l'intégration IA. |
