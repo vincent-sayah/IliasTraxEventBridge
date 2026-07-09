@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ILIAS_ROOT="${ILIAS_ROOT:-/var/www/ilias}"
 HTTPD_USER="${HTTPD_USER:-apache}"
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$PLUGIN_ROOT/companion/IliasTraxEventBridgeCourseUI"
+
+# ILIAS_ROOT can be explicitly provided by the administrator.
+# If not provided, infer it from the installed EventHook path when possible.
+if [[ -n "${ILIAS_ROOT:-}" ]]; then
+  ILIAS_ROOT="$ILIAS_ROOT"
+else
+  EVENTHOOK_SUFFIX="/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
+  if [[ "$PLUGIN_ROOT" == *"$EVENTHOOK_SUFFIX" ]]; then
+    ILIAS_ROOT="${PLUGIN_ROOT%$EVENTHOOK_SUFFIX}"
+  else
+    ILIAS_ROOT="/var/www/ilias"
+  fi
+fi
+
 TARGET_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
@@ -14,13 +27,16 @@ fi
 
 if [[ ! -d "$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook" ]]; then
   echo "ILIAS UIHook plugin slot not found under: $ILIAS_ROOT" >&2
+  echo "Set ILIAS_ROOT explicitly, for example:" >&2
+  echo "  export ILIAS_ROOT=/chemin/vers/ilias" >&2
   exit 1
 fi
 
 echo "Installing IliasTraxEventBridgeCourseUI companion"
+echo "ILIAS : $ILIAS_ROOT"
 echo "Source: $SOURCE_DIR"
 echo "Target: $TARGET_DIR"
-echo "Mode  : V0.12.1 consolidated templates"
+echo "Mode  : V0.21.2 consolidated templates"
 
 rm -rf "$TARGET_DIR"
 mkdir -p "$TARGET_DIR/classes"
