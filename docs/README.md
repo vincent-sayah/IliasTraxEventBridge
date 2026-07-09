@@ -1,240 +1,98 @@
 # Documentation — IliasTraxEventBridge
 
-Ce dossier regroupe toute la documentation du plugin `IliasTraxEventBridge`.
+Ce dossier regroupe la documentation du plugin `IliasTraxEventBridge`.
 
-## Version stable et développement
+## Version stable actuelle
 
 | Élément | Valeur |
 |---|---|
-| Version stable sur `main` | `0.12.0` |
 | Branche stable | `main` |
-| Tag stable | `v0.12.0` |
-| Version de développement validée | `0.15.2-dev` |
-| Branche IA | `v0.13-ai-xapi-analysis` |
-| Consolidation en cours | `V0.16` |
-| Ancien tag stable | `v0.11.0` |
-| Ancienne stable | `0.11.0` |
+| Version stable courante | `0.21.2-dev` validée et promue dans `main` |
+| Commit de gel fonctionnel | `fad4c28` — `Freeze V0.21.2 validated implementation` |
 | Plugin principal | `IliasTraxEventBridge` |
+| Version plugin principal | `0.21.2-dev` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
-| Source pédagogique du suivi xAPI | TRAX/LRS |
-| Rôle de l'outbox locale | File technique d'envoi uniquement |
+| Version plugin compagnon | `0.8.5` |
+| Source xAPI | TRAX/LRS |
+| Rôle de l'outbox locale | File technique d'envoi et calcul robuste des questions problématiques V0.21.2 |
 
-## Lecture rapide
+## Lecture rapide — documents à utiliser maintenant
 
 | Besoin | Document à lire |
 |---|---|
-| Lire la note de release IA validée | [`RELEASE_0.15.2.md`](RELEASE_0.15.2.md) |
-| Installer le plugin sur ILIAS | [`INSTALLATION.md`](INSTALLATION.md) |
-| Comprendre ce que fait le plugin | [`FONCTIONNEL.md`](FONCTIONNEL.md) |
-| Comprendre l'architecture technique | [`TECHNIQUE.md`](TECHNIQUE.md) |
-| Exploiter et dépanner en production | [`EXPLOITATION.md`](EXPLOITATION.md) |
-| Diagnostiquer une installation | [`DIAGNOSTIC.md`](DIAGNOSTIC.md) |
-| Préparer un retour arrière | [`ROLLBACK.md`](ROLLBACK.md) |
-| Cadrer la V0.12.1 | [`V0.12.1_CONSOLIDATION_UI_COMPANION.md`](V0.12.1_CONSOLIDATION_UI_COMPANION.md) |
-| Valider la V0.12.1 | [`VALIDATION_0.12.1.md`](VALIDATION_0.12.1.md) |
-| Cadrer la V0.12 | [`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) |
-| Utiliser le dashboard pédagogique V0.12 | [`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) |
-| Valider la V0.12 | [`VALIDATION_0.12.md`](VALIDATION_0.12.md) |
-| Lire la note de release V0.11 historique | [`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) |
-| Valider la V0.11 historique | [`VALIDATION_0.11.md`](VALIDATION_0.11.md) |
-| Développer ou modifier le plugin | [`DEVELOPPEUR.md`](DEVELOPPEUR.md) |
-| Préparer la suite du projet | [`ROADMAP.md`](ROADMAP.md) |
-| Cadrer l'analyse IA des traces | [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) |
-| Comprendre la lecture directe TRAX/LRS | [`V0.10_LRS_DIRECT_READ.md`](V0.10_LRS_DIRECT_READ.md) |
-| Voir la checklist de validation V0.10.1 | [`FINAL_RELEASE_CHECKLIST_0.10.1.md`](FINAL_RELEASE_CHECKLIST_0.10.1.md) |
+| Index V0.21.2 | [`INDEX_0.21.2.md`](INDEX_0.21.2.md) |
+| Installer ou mettre à jour | [`INSTALLATION.md`](INSTALLATION.md) |
+| Lire la note de release courante | [`RELEASE_0.21.2.md`](RELEASE_0.21.2.md) |
+| Comprendre le fonctionnement métier | [`FONCTIONNEL_0.21.2.md`](FONCTIONNEL_0.21.2.md) |
+| Comprendre l'architecture technique | [`TECHNIQUE_0.21.2.md`](TECHNIQUE_0.21.2.md) |
+| Exploiter et dépanner | [`EXPLOITATION_0.21.2.md`](EXPLOITATION_0.21.2.md) |
+| Développer ou modifier le plugin | [`GUIDE_DEVELOPPEUR_0.21.2.md`](GUIDE_DEVELOPPEUR_0.21.2.md) |
+| Valider une installation | [`VALIDATION_0.21.2.md`](VALIDATION_0.21.2.md) |
+| Historique des versions | [`../CHANGELOG.md`](../CHANGELOG.md) |
 
-## Documents V0.15.2 / V0.16
+## Règle métier courante
 
-### Release V0.15.2-dev
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = questions problématiques uniquement.
+Analyse IA = questions problématiques uniquement.
+Expert = vision technique complète.
+```
 
-[`RELEASE_0.15.2.md`](RELEASE_0.15.2.md) récapitule la version IA validée :
+## Documents génériques maintenus
 
-- analyse IA formateur ;
-- rendu Markdown/HTML ;
-- historisation locale des analyses IA ;
-- export PDF enrichi avec la dernière analyse historisée ;
-- séparation code / runtime avec `var/ai_analysis_history` ignoré par Git ;
-- validations serveur et points d'attention sur le plugin companion live.
+Ces documents sont conservés comme entrées génériques, mais leur référence fonctionnelle actuelle est la V0.21.2 :
 
-### Consolidation V0.16
+| Document | Rôle |
+|---|---|
+| [`FONCTIONNEL.md`](FONCTIONNEL.md) | Renvoie vers la documentation fonctionnelle V0.21.2. |
+| [`TECHNIQUE.md`](TECHNIQUE.md) | Renvoie vers l'architecture technique V0.21.2. |
+| [`EXPLOITATION.md`](EXPLOITATION.md) | Renvoie vers l'exploitation V0.21.2. |
+| [`DEVELOPPEUR.md`](DEVELOPPEUR.md) | Renvoie vers le guide développeur V0.21.2. |
+| [`DIAGNOSTIC.md`](DIAGNOSTIC.md) | Diagnostic historique et compléments d'exploitation. |
+| [`ROLLBACK.md`](ROLLBACK.md) | Procédures de retour arrière. |
+| [`ROADMAP.md`](ROADMAP.md) | Roadmap recalée après V0.21.2. |
+| [`IA_ANALYSE_TRACES.md`](IA_ANALYSE_TRACES.md) | Cadrage IA mis à jour avec l'état V0.21.2. |
 
-La V0.16 consolide l'état V0.15.2 :
+## Documents historiques
 
-- suppression des scripts temporaires de patch V0.15.1 et V0.15.2 ;
-- mise à jour du `README.md` racine ;
-- mise à jour du `CHANGELOG.md` ;
-- mise à jour du présent index documentaire.
+Les documents suivants sont conservés pour comprendre l'historique du projet. Ils ne doivent pas être utilisés comme référence d'installation courante si leur version est antérieure à V0.21.2 :
 
-## Documents V0.12.1
+```text
+FINAL_RELEASE_CHECKLIST_0.10.1.md
+V0.10_LRS_DIRECT_READ.md
+RELEASE_0.11.0.md
+VALIDATION_0.11.md
+V0.11_DIAGNOSTIC_EXPLOITATION.md
+V0.12_DASHBOARD_PEDAGOGIQUE.md
+V0.12_GUIDE_UTILISATION.md
+VALIDATION_0.12.md
+V0.12.1_CONSOLIDATION_UI_COMPANION.md
+VALIDATION_0.12.1.md
+V0.13_AI_ANALYSE_TRACES.md
+VALIDATION_0.13.md
+RELEASE_0.15.2.md
+```
 
-### Consolidation du compagnon UI
+## Installation — rappel court
 
-[`V0.12.1_CONSOLIDATION_UI_COMPANION.md`](V0.12.1_CONSOLIDATION_UI_COMPANION.md) décrit :
+```bash
+export ILIAS_ROOT="/var/www/ilias"
+export HTTPD_USER="apache"
+export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
+export PLUGIN_NAME="IliasTraxEventBridge"
 
-- le périmètre de la V0.12.1 ;
-- la stratégie de consolidation du plugin compagnon ;
-- l'intégration de la route PDF dans le template UIHookGUI ;
-- la réduction des patchers d'installation ;
-- les critères d'acceptation ;
-- le hors périmètre V0.13, notamment l'analyse IA.
+mkdir -p "$EVENTHOOK_DIR"
+cd "$EVENTHOOK_DIR"
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
+cd "$PLUGIN_NAME"
 
-[`VALIDATION_0.12.1.md`](VALIDATION_0.12.1.md) décrit :
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
+cd "$ILIAS_ROOT"
+sudo -u "$HTTPD_USER" composer du
+sudo -u "$HTTPD_USER" php cli/setup.php build --yes
+systemctl restart httpd
+systemctl restart php-fpm
+```
 
-- la préparation de la VM ;
-- l'installation depuis les templates consolidés ;
-- l'audit technique ;
-- la validation des vues Tableau de bord, Analyse, Expert et Configuration ;
-- la validation des exports CSV et PDF ;
-- la décision de validation.
-
-## Documents V0.12
-
-### Cadrage V0.12
-
-[`V0.12_DASHBOARD_PEDAGOGIQUE.md`](V0.12_DASHBOARD_PEDAGOGIQUE.md) décrit :
-
-- le périmètre de la V0.12 ;
-- les objectifs pédagogiques ;
-- les indicateurs attendus ;
-- les critères d'acceptation ;
-- les hors périmètre, notamment l'analyse IA.
-
-### Guide d’utilisation V0.12
-
-[`V0.12_GUIDE_UTILISATION.md`](V0.12_GUIDE_UTILISATION.md) décrit :
-
-- le tableau de bord pédagogique ;
-- la synthèse pédagogique ;
-- les statuts `OK`, `À surveiller`, `Critique`, `Désactivée` ;
-- l'onglet Analyse enrichi ;
-- le bloc `Apprenants en difficulté` ;
-- l'export CSV Expert enrichi ;
-- les colonnes pédagogiques ajoutées au CSV.
-
-### Validation V0.12
-
-[`VALIDATION_0.12.md`](VALIDATION_0.12.md) décrit :
-
-- la mise à jour du plugin sur VM ILIAS ;
-- l'installation complète du compagnon UI ;
-- les contrôles fichiers installés ;
-- le rebuild ILIAS ;
-- la validation du tableau de bord ;
-- la validation de l'analyse ;
-- la validation de l'export PDF ;
-- la validation de l'export CSV Expert enrichi ;
-- la validation des filtres ;
-- la conservation des diagnostics V0.11 ;
-- les critères d'acceptation finale.
-
-## Documents V0.11 historiques
-
-### Cadrage V0.11
-
-[`V0.11_DIAGNOSTIC_EXPLOITATION.md`](V0.11_DIAGNOSTIC_EXPLOITATION.md) décrit :
-
-- le périmètre de la V0.11 ;
-- les objectifs d'exploitation ;
-- les contrôles attendus ;
-- les critères d'acceptation ;
-- le lien avec la future analyse IA.
-
-### Diagnostic
-
-[`DIAGNOSTIC.md`](DIAGNOSTIC.md) décrit :
-
-- les chemins attendus du plugin principal et du plugin compagnon ;
-- les commandes de contrôle serveur ;
-- les contrôles SQL ;
-- l'analyse de l'outbox ;
-- la vérification du cron ;
-- la vérification TRAX/LRS ;
-- les tests lecture et écriture TRAX/LRS ;
-- les symptômes fréquents.
-
-### Rollback
-
-[`ROLLBACK.md`](ROLLBACK.md) décrit :
-
-- les sauvegardes avant mise à jour ;
-- le rollback par Git ;
-- le rollback depuis archive `tar.gz` ;
-- le rollback du plugin compagnon ;
-- les précautions SQL ;
-- les contrôles après retour arrière.
-
-### Validation V0.11
-
-[`VALIDATION_0.11.md`](VALIDATION_0.11.md) décrit :
-
-- les commandes à lancer côté Git Bash ;
-- les commandes à lancer côté VM ILIAS ;
-- le rebuild ILIAS ;
-- les contrôles de la page `Santé / Diagnostic V0.11` ;
-- le test de connexion TRAX ;
-- le test de lecture TRAX/LRS ;
-- le test d'écriture TRAX/LRS ;
-- les critères d'acceptation de la V0.11.
-
-### Release V0.11.0
-
-[`RELEASE_0.11.0.md`](RELEASE_0.11.0.md) récapitule :
-
-- la version stable historique `0.11.0` ;
-- les nouveautés de diagnostic ;
-- les validations attendues ;
-- les points de vigilance.
-
-## Documents principaux
-
-### Installation
-
-[`INSTALLATION.md`](INSTALLATION.md) décrit :
-
-- les prérequis ILIAS ;
-- les prérequis TRAX/LRS ;
-- l'installation depuis `main` ;
-- l'installation depuis un tag stable ;
-- l'installation du plugin compagnon UIHook ;
-- la reconstruction ILIAS ;
-- les contrôles post-installation ;
-- les cas de dépannage.
-
-### Documentation fonctionnelle
-
-[`FONCTIONNEL.md`](FONCTIONNEL.md) décrit :
-
-- l'objectif du plugin ;
-- les profils utilisateurs concernés ;
-- le parcours d'activation d'un cours ;
-- les vues `Tableau de bord`, `Analyse`, `Expert`, `Configuration` ;
-- les objets ILIAS couverts ;
-- les limites fonctionnelles.
-
-### Documentation technique
-
-[`TECHNIQUE.md`](TECHNIQUE.md) décrit :
-
-- l'architecture EventHook / UIHook ;
-- les classes principales ;
-- les tables SQL ;
-- le flux d'envoi xAPI ;
-- le flux de lecture TRAX/LRS ;
-- la pagination LRS ;
-- l'export PDF ;
-- les règles de robustesse.
-
-### Exploitation
-
-[`EXPLOITATION.md`](EXPLOITATION.md) décrit :
-
-- la supervision de l'outbox ;
-- le cron ILIAS ;
-- les requêtes SQL utiles ;
-- les purges ;
-- les contrôles TRAX/LRS ;
-- les incidents fréquents et leur diagnostic.
-
-### Développeur
-
-[`DEVELOPPEUR.md`](DEVELOPPEUR.md) décrit les classes principales, les conventions de développement, les migrations et les contrôles avant livraison.
+Si ILIAS n'est pas dans `/var/www/ilias`, modifier `ILIAS_ROOT` avant de lancer le script compagnon.
