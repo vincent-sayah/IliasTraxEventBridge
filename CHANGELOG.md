@@ -2,7 +2,52 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.21.2 — version stable courante promue dans main
+## v0.22.4 — version stable courante promue dans main
+
+### Statut
+
+- Branche stable : `main`.
+- Branche de développement : `v0.22-dashboard-activity-timeline`.
+- Commit de gel fonctionnel : `b4fdf9a` — `V0.22.4 validate dashboard layout and AI tab fixes`.
+- Version plugin principal : `0.22.4-dev`.
+- Version plugin compagnon UI : `0.8.10`.
+- Type : version fonctionnelle validée et promue.
+- Compatibilité : ILIAS 10.x.
+
+### Objectif
+
+La V0.22.4 améliore l'ergonomie du tableau de bord, de l'analyse et de l'analyse IA sans changer la règle métier xAPI validée en V0.21.2.
+
+### Ajouts et corrections principales
+
+- Remplacement de la liste longue `Activité par jour` par un bloc `Activité dans le temps` compact.
+- Ajout du choix d'affichage : `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet`.
+- Ajout d'une synthèse d'activité : périodes actives, périodes sans activité, pic, moyenne.
+- Présentation des blocs de tableau de bord et d'analyse selon un modèle proche des formulaires ILIAS : libellé/fonctionnalité à gauche, données à droite.
+- Correction de l'alignement de la `Synthèse pédagogique` dans Tableau de bord et Analyse.
+- Correction de l'onglet actif après retrait d'une analyse IA historisée : l'utilisateur reste sur `Analyse IA`.
+- Mise à jour du companion UI en `0.8.10`.
+- Mise à jour du plugin principal en `0.22.4-dev`.
+- Documentation V0.22 ajoutée et alignée avec `main`.
+
+### Règle métier conservée
+
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = seules les questions problématiques sont remontées.
+Analyse IA = seules les questions problématiques sont intégrées au payload IA.
+Expert = vision technique complète.
+```
+
+### Validation
+
+- Bloc `Activité dans le temps` validé visuellement.
+- Présentation type ILIAS validée dans Tableau de bord et Analyse.
+- Synthèse pédagogique alignée titre/données validée.
+- Analyse IA validée après retrait d'une analyse historisée.
+- Serveur `ilias10`, poste Windows et GitHub réalignés : OK.
+
+## v0.21.2 — version stable précédente promue dans main
 
 ### Statut
 
@@ -52,71 +97,11 @@ Expert = vision technique complète.
 
 ## v0.16 — consolidation post V0.15.2
 
-### Statut
-
-- Branche concernée : `v0.13-ai-xapi-analysis`.
-- Base : `0.15.2-dev` validée.
-- Type : consolidation documentaire et nettoyage technique.
-- Source fonctionnelle du suivi xAPI : TRAX/LRS.
-- Rôle de l'outbox locale : file technique d'envoi uniquement.
-
-### Objectif
-
-La V0.16 consolide l'état validé de la V0.15.2 afin de repartir sur une base propre pour les évolutions suivantes.
-
-### Changements réalisés
-
-- Suppression du script temporaire `scripts/patch_v0151_ai_screen_markdown_history_pdf.php`.
-- Suppression du script temporaire `scripts/patch_v0152_ai_screen_template_and_live.php`.
-- Ajout de la note de release `docs/RELEASE_0.15.2.md`.
-- Mise à jour du `README.md` pour rendre visibles les fonctionnalités IA validées.
-- Mise à jour du présent `CHANGELOG.md`.
-
-### Suite préparée
-
-- Consultation détaillée d'une analyse IA historisée.
-- Suppression contrôlée d'une analyse IA historisée.
-- Comparaison de deux analyses IA.
-- Documentation plus explicite du déploiement du plugin companion UI.
+Voir les documents historiques V0.15.2/V0.16.
 
 ## v0.15.2-dev — analyse IA formateur validée
 
-### Statut
-
-- Branche concernée : `v0.13-ai-xapi-analysis`.
-- Version plugin principal : `0.15.2-dev`.
-- Version companion UI : `0.4.2`.
-- Type : évolution fonctionnelle IA et consolidation d'écran cours.
-- Source fonctionnelle du suivi xAPI : TRAX/LRS.
-- Rôle de l'outbox locale : file technique d'envoi uniquement.
-
-### Objectif
-
-La V0.15.2 rend l'analyse IA exploitable directement par le formateur dans l'onglet `Analyse` du suivi xAPI cours.
-
-Elle transforme le retour IA brut en page lisible, conserve un historique local des analyses et enrichit l'export PDF avec la dernière analyse IA historisée.
-
-### Ajouts réalisés
-
-- Ajout de `classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php`.
-- Ajout du stockage runtime local `var/ai_analysis_history`.
-- Ajout de `/var/` dans `.gitignore`.
-- Mise à jour de l'écran `Analyse` en page `Analyse formateur`.
-- Ajout du rendu Markdown/HTML de la réponse IA.
-- Ajout du bloc `Historique des analyses IA`.
-- Sauvegarde automatique des analyses IA réussies.
-- Intégration de la dernière analyse IA historisée dans l'export PDF.
-- Passage du plugin principal en `0.15.2-dev`.
-- Passage du companion UI en `0.4.2`.
-
-### Validation
-
-- Analyse IA formatée : OK.
-- Historique IA visible : OK.
-- Fichiers JSON d'historique générés : OK.
-- Export PDF avec analyse IA historisée : OK.
-- PHP lint sur les fichiers principaux : OK.
-- Plugin principal, poste Windows et serveur ILIAS réalignés sur GitHub : OK.
+Voir les documents historiques V0.15.2.
 
 ## v0.12.1 — consolidation technique du compagnon UI
 
@@ -129,7 +114,3 @@ Voir les documents historiques V0.12.
 ## v0.11.0 — diagnostic et durcissement exploitation
 
 Voir les documents historiques V0.11.
-
-## Documentation main — README, docs et roadmap IA
-
-La documentation de référence est désormais la documentation V0.21.2.
