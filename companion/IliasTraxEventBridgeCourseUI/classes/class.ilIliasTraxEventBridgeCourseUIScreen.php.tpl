@@ -182,6 +182,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
         try {
             if ($this->aiHistory->archive($courseRefId, $id)) {
                 unset($_POST['itxeb_ai_history_id'], $_GET['itxeb_ai_history_id']);
+                $_GET['itxeb_cui_cmd'] = 'showCourseAiAnalysis';
+                $_POST['itxeb_cui_cmd'] = 'showCourseAiAnalysis';
                 $this->message = 'Analyse IA historisée retirée de l’historique visible.';
                 $this->messageType = 'success';
             } else {
@@ -774,7 +776,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 'itxeb_ai_history_id' => $recordId,
             ]);
             $archiveUrl = $this->currentUrlWith([
-                'itxeb_cui_cmd' => 'archiveCourseAiHistory',
+                'itxeb_cui_cmd' => 'showCourseAiAnalysis',
                 'itxeb_course_ref_id' => (string) $courseRefId,
                 'itxeb_period_days' => (string) $this->getPeriodDays(),
                 'itxeb_filter_ref_id' => (string) $this->getSelectedResourceRefId(),
@@ -1591,7 +1593,153 @@ class ilIliasTraxEventBridgeCourseUIScreen
     /** @param array<string,mixed> $dashboard */
     private function renderActivityByDay(array $dashboard): string
     {
-        return $this->renderBarSection('Activité par jour', is_array($dashboard['by_day'] ?? null) ? $dashboard['by_day'] : []);
+        return $this->renderActivityTimeline(is_array($dashboard['by_day'] ?? null) ? $dashboard['by_day'] : []);
+    }
+
+    /** @param array<string,int|float|string> $byDay */
+    private function renderActivityTimeline(array $byDay): string
+    {
+        $periodDays = max(1, min(365, $this->getPeriodDays()));
+        $mode = $this->getActivityTimelineMode($periodDays);
+        $daily = $this->normalizeActivityDays($byDay, $periodDays);
+        $total = array_sum(array_map('intval', array_values($daily)));
+
+        $html = '<section class="itxeb-cui-section itxeb-activity-timeline"><h3>Activité dans le temps</h3>'
+            . '<p>Vue compacte de l’activité du cours. Le détail complet reste disponible sans occuper toute la page.</p>'
+            . $this->renderActivityTimelineSelector($mode);
+
+        if ($total <= 0) {
+            return $html . '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p></section>';
+        }
+
+        if ($mode === 'week') {
+            $items = $this->aggregateActivityByWeek($daily);
+            return $html . $this->renderActivityTimelineSummary($items, 'semaine(s)') . $this->renderActivityTimelineBars($items) . '</section>';
+        }
+
+        if ($mode === 'all') {
+            $items = $daily;
+            $summaryItems = $periodDays > 30 ? $this->aggregateActivityByWeek($daily) : $daily;
+            return $html
+                . $this->renderActivityTimelineSummary($summaryItems, $periodDays > 30 ? 'semaine(s)' : 'jour(s)')
+                . '<details class="itxeb-activity-details"><summary>Afficher le détail complet par jour (' . $this->esc((string) count($items)) . ' jour(s))</summary>'
+                . $this->renderActivityTimelineBars($items)
+                . '</details></section>';
+        }
+
+        $limit = (int) $mode;
+        if ($limit <= 0) { $limit = min(14, $periodDays); }
+        $limit = min($limit, $periodDays);
+        $items = array_slice($daily, -$limit, null, true);
+        return $html . $this->renderActivityTimelineSummary($items, 'jour(s)') . $this->renderActivityTimelineBars($items) . '</section>';
+    }
+
+    private function getActivityTimelineMode(int $periodDays): string
+    {
+        $raw = strtolower(trim($this->requestValue($_GET, 'itxeb_activity_view')));
+        if ($raw === '') {
+            $raw = strtolower(trim($this->requestValue($_POST, 'itxeb_activity_view')));
+        }
+        $allowed = ['7' => true, '14' => true, '30' => true, 'week' => true, 'all' => true];
+        if (isset($allowed[$raw])) {
+            return $raw;
+        }
+        return $periodDays > 30 ? 'week' : '14';
+    }
+
+    private function renderActivityTimelineSelector(string $active): string
+    {
+        $links = ['7' => '7 jours', '14' => '14 jours', '30' => '30 jours', 'week' => 'Par semaine', 'all' => 'Détail complet'];
+        $html = '<div class="itxeb-period-selector"><strong>Affichage activité :</strong> ';
+        foreach ($links as $mode => $label) {
+            $html .= '<a class="itxeb-period-link' . ($active === $mode ? ' itxeb-active' : '') . '" href="'
+                . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseDashboard', 'itxeb_activity_view' => $mode]))
+                . '">' . $this->esc($label) . '</a> ';
+        }
+        return $html . '</div>';
+    }
+
+    /** @param array<string,int|float|string> $byDay @return array<string,int> */
+    private function normalizeActivityDays(array $byDay, int $periodDays): array
+    {
+        $periodDays = max(1, min(365, $periodDays));
+        $today = strtotime(gmdate('Y-m-d') . ' 00:00:00 UTC');
+        if ($today === false) { $today = time(); }
+        $days = [];
+        for ($i = $periodDays - 1; $i >= 0; $i--) {
+            $days[gmdate('Y-m-d', $today - ($i * 86400))] = 0;
+        }
+        foreach ($byDay as $day => $count) {
+            $key = substr((string) $day, 0, 10);
+            if (isset($days[$key])) {
+                $days[$key] += (int) $count;
+            }
+        }
+        return $days;
+    }
+
+    /** @param array<string,int> $daily @return array<string,int> */
+    private function aggregateActivityByWeek(array $daily): array
+    {
+        $weeks = [];
+        foreach ($daily as $day => $count) {
+            $ts = strtotime($day . ' 00:00:00 UTC');
+            if ($ts === false) { continue; }
+            $key = 'Semaine ' . gmdate('o-W', $ts);
+            if (!isset($weeks[$key])) { $weeks[$key] = 0; }
+            $weeks[$key] += (int) $count;
+        }
+        return $weeks;
+    }
+
+    /** @param array<string,int> $items */
+    private function renderActivityTimelineSummary(array $items, string $unitLabel): string
+    {
+        $total = 0;
+        $active = 0;
+        $empty = 0;
+        $peakLabel = '-';
+        $peakCount = 0;
+        foreach ($items as $label => $count) {
+            $count = (int) $count;
+            $total += $count;
+            if ($count > 0) { $active++; } else { $empty++; }
+            if ($count > $peakCount) {
+                $peakCount = $count;
+                $peakLabel = (string) $label;
+            }
+        }
+        $average = count($items) > 0 ? round($total / count($items), 1) : 0;
+        return '<div class="itxeb-kpi-grid">'
+            . $this->metricCard('Activité affichée', (string) $total, 'données d’apprentissage')
+            . $this->metricCard('Périodes actives', (string) $active . ' / ' . (string) count($items), $unitLabel)
+            . $this->metricCard('Sans activité', (string) $empty, $unitLabel)
+            . $this->metricCard('Pic activité', $this->formatActivityTimelineLabel($peakLabel), (string) $peakCount . ' donnée(s)')
+            . $this->metricCard('Moyenne', (string) $average, 'par période affichée')
+            . '</div>';
+    }
+
+    /** @param array<string,int> $items */
+    private function renderActivityTimelineBars(array $items): string
+    {
+        if (count($items) === 0) { return '<p><em>Aucune donnée.</em></p>'; }
+        $max = max(array_map('intval', array_values($items)));
+        $html = '<div class="itxeb-bar-list itxeb-activity-bars">';
+        foreach ($items as $label => $count) {
+            $html .= $this->barRow($this->formatActivityTimelineLabel((string) $label), (int) $count, $max);
+        }
+        return $html . '</div>';
+    }
+
+    private function formatActivityTimelineLabel(string $label): string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $label) === 1) {
+            $ts = strtotime($label . ' 00:00:00 UTC');
+            if ($ts !== false) {
+                return gmdate('d/m', $ts);
+            }
+        }
+        return $label;
     }
 
     /** @param array<string,mixed> $dashboard */
@@ -1956,8 +2104,17 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function normalizeCommand(string $cmd): string
     {
-        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseAiAnalysis', 'showCourseExpert', 'exportCourseExpertCsv', 'exportCourseDashboardPdf'], true)
-            ? ($cmd === 'exportCourseExpertCsv' ? 'showCourseExpert' : ($cmd === 'exportCourseDashboardPdf' ? 'showCourseDashboard' : $cmd))
+        $aliases = [
+            'exportCourseExpertCsv' => 'showCourseExpert',
+            'exportCourseDashboardPdf' => 'showCourseDashboard',
+            'archiveCourseAiHistory' => 'showCourseAiAnalysis',
+            'generateCourseAiAnalysis' => 'showCourseAiAnalysis',
+        ];
+        if (isset($aliases[$cmd])) {
+            return $aliases[$cmd];
+        }
+        return in_array($cmd, ['showCourseDashboard', 'showCourseAnalysis', 'showCourseAiAnalysis', 'showCourseExpert'], true)
+            ? $cmd
             : 'showCourseTracking';
     }
 
@@ -2025,6 +2182,6 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     private function styles(): string
     {
-        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:1px solid #ddd;background:#fff;margin:.7rem 0 1rem;padding:.75rem;border-radius:4px}#itxeb-course-ui-screen .itxeb-pedagogy-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:.5rem 0}#itxeb-course-ui-screen .itxeb-pedagogy-lines{margin:.6rem 0 0 1.2rem}#itxeb-course-ui-screen .itxeb-pedagogy-badge{display:inline-block;padding:.25rem .45rem;border-radius:3px;font-weight:700;white-space:nowrap}#itxeb-course-ui-screen .itxeb-pedagogy-ok{background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-pedagogy-watch{background:#fcf8e3;color:#8a6d3b}#itxeb-course-ui-screen .itxeb-pedagogy-critical{background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-muted{background:#eee;color:#555}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}#itxeb-course-ui-screen .itxeb-filter-help{color:#666;margin-left:.35rem}#itxeb-course-ui-screen .itxeb-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.4rem;margin:.7rem 0}#itxeb-course-ui-screen .itxeb-widget-choice{display:block;border:1px solid #ddd;background:#fff;border-radius:4px;padding:.45rem .55rem}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-signal-warning{border-color:#f0ad4e;background:#fcf8e3;color:#8a6d3b;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal-danger{border-color:#d9534f;background:#f2dede;color:#a94442;font-weight:bold}#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}.itxeb-trainer-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}.itxeb-trainer-card{border-left:4px solid #337ab7}.itxeb-ai-markdown{border:1px solid #c8d6e5;background:#fff;padding:14px;border-radius:6px;line-height:1.55}.itxeb-ai-markdown h4{font-size:18px;margin:16px 0 8px;border-bottom:1px solid #d9e2ec;padding-bottom:4px}.itxeb-ai-markdown h5{font-size:15px;margin:12px 0 6px}.itxeb-ai-markdown ul{margin:6px 0 12px 22px}.itxeb-ai-markdown li{margin:4px 0}.itxeb-ai-table td:first-child{font-weight:700}.itxeb-ai-history table small{line-height:1.35}.itxeb-ai-history-detail{border:2px solid #c8d6e5;background:#f8fbff;padding:14px;margin-top:14px;border-radius:6px}.itxeb-ai-history-detail h4{margin-top:0}.itxeb-ai-history .btn-xs{padding:2px 7px;font-size:12px;line-height:1.4}.itxeb-ai-history-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.itxeb-ai-history-archive-form{display:inline;margin:0}.itxeb-danger{color:#8a1f11;border-color:#d8b8b2;background:#fff5f3}.itxeb-danger:hover{background:#ffe5e0}.itxeb-ai-compare{border:2px solid #c8d6e5;background:#f8fbff;padding:14px;margin-top:14px;border-radius:6px}.itxeb-ai-compare h4{margin-top:0}.itxeb-ai-compare-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.itxeb-active-compare{font-weight:700;background:#eaf4ff;border-color:#337ab7}.itxeb-ai-compare-meta{margin:8px 0 12px}.itxeb-ai-compare-summary{border:1px solid #d9e2ec;background:#fff;padding:10px;border-radius:5px;margin:10px 0}.itxeb-ai-compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:12px}.itxeb-ai-compare-grid h5{font-size:16px;font-weight:700;margin:0 0 8px}.itxeb-ai-compare-check{display:inline-flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap}.itxeb-ai-compare-check input{margin:0}.itxeb-ai-compare-submit{margin:10px 0 4px}.itxeb-ai-compare-help{margin-left:8px;color:#666}</style>';
+        return '<style>#itxeb-course-ui-screen{margin:0;padding:0}#itxeb-course-ui-screen h1{font-size:24px;margin:.2rem 0 .3rem}#itxeb-course-ui-screen h2{font-size:18px;margin:1rem 0 .5rem}#itxeb-course-ui-screen h3{font-size:15px;margin:1rem 0 .5rem}#itxeb-course-ui-screen .itxeb-cui-section{margin-bottom:18px}#itxeb-course-ui-screen .itxeb-cui-alert{padding:.65rem .8rem;margin:.4rem 0 .9rem;border:1px solid #bce8f1;background:#eef8fc;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-error{border-color:#ebccd1;background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-cui-success{border-color:#d6e9c6;background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-cui-table{width:100%;border-collapse:collapse;background:#fff}#itxeb-course-ui-screen .itxeb-cui-table th,#itxeb-course-ui-screen .itxeb-cui-table td{border:1px solid #ddd;padding:.5rem .6rem;vertical-align:top;line-height:1.35}#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:1px solid #ddd;background:#fff;margin:.7rem 0 1rem;padding:.75rem;border-radius:4px}#itxeb-course-ui-screen .itxeb-pedagogy-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:.5rem 0}#itxeb-course-ui-screen .itxeb-pedagogy-lines{margin:.6rem 0 0 1.2rem}#itxeb-course-ui-screen .itxeb-pedagogy-badge{display:inline-block;padding:.25rem .45rem;border-radius:3px;font-weight:700;white-space:nowrap}#itxeb-course-ui-screen .itxeb-pedagogy-ok{background:#dff0d8;color:#3c763d}#itxeb-course-ui-screen .itxeb-pedagogy-watch{background:#fcf8e3;color:#8a6d3b}#itxeb-course-ui-screen .itxeb-pedagogy-critical{background:#f2dede;color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-muted{background:#eee;color:#555}#itxeb-course-ui-screen .itxeb-cui-table th{background:#f7f7f7}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:4px}#itxeb-course-ui-screen .itxeb-cui-resource-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-cui-analysis-table{min-width:1250px}#itxeb-course-ui-screen .itxeb-cui-expert-table{min-width:1450px}#itxeb-course-ui-screen .itxeb-cui-watch-table{min-width:900px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-struggling-table{min-width:1050px}#itxeb-course-ui-screen .itxeb-comparison-table{max-width:900px}#itxeb-course-ui-screen .itxeb-inner-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1rem 0;border-bottom:1px solid #ddd}#itxeb-course-ui-screen .itxeb-inner-tab{display:inline-block;padding:.55rem .8rem;border:1px solid #ddd;border-bottom:0;background:#f7f7f7;text-decoration:none;border-radius:4px 4px 0 0}#itxeb-course-ui-screen .itxeb-inner-tab.itxeb-active{background:#fff;font-weight:bold;position:relative;top:1px}#itxeb-course-ui-screen .itxeb-period-selector{margin:.6rem 0 .5rem}#itxeb-course-ui-screen .itxeb-period-link{display:inline-block;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #ddd;border-radius:4px;text-decoration:none;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-period-link.itxeb-active{font-weight:bold;background:#fff}#itxeb-course-ui-screen .itxeb-resource-filter{margin:.5rem 0 1rem;padding:.55rem;border:1px solid #ddd;background:#fff;border-radius:4px}#itxeb-course-ui-screen .itxeb-resource-filter select{max-width:560px}#itxeb-course-ui-screen .itxeb-type-filter{display:inline-block;margin-left:.75rem}#itxeb-course-ui-screen .itxeb-filter-help{color:#666;margin-left:.35rem}#itxeb-course-ui-screen .itxeb-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.4rem;margin:.7rem 0}#itxeb-course-ui-screen .itxeb-widget-choice{display:block;border:1px solid #ddd;background:#fff;border-radius:4px;padding:.45rem .55rem}#itxeb-course-ui-screen .itxeb-export-button{margin:.2rem 0 .7rem}#itxeb-course-ui-screen .itxeb-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0}#itxeb-course-ui-screen .itxeb-kpi-card{border:1px solid #ddd;border-radius:6px;background:#fff;padding:.8rem}#itxeb-course-ui-screen .itxeb-kpi-label{font-size:12px;text-transform:uppercase;color:#666}#itxeb-course-ui-screen .itxeb-kpi-value{font-size:24px;font-weight:bold;margin:.25rem 0}#itxeb-course-ui-screen .itxeb-kpi-hint{font-size:12px;color:#777}#itxeb-course-ui-screen .itxeb-bar-list{border:1px solid #ddd;border-radius:4px;background:#fff;padding:.6rem}#itxeb-course-ui-screen .itxeb-bar-row{display:grid;grid-template-columns:minmax(140px,260px) 1fr 50px;gap:.6rem;align-items:center;margin:.35rem 0}#itxeb-course-ui-screen .itxeb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#itxeb-course-ui-screen .itxeb-bar-track{height:14px;background:#eee;border-radius:10px;overflow:hidden}#itxeb-course-ui-screen .itxeb-bar-fill{height:14px;background:#777;border-radius:10px}#itxeb-course-ui-screen .itxeb-bar-value{text-align:right;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal{display:inline-block;padding:.15rem .35rem;border:1px solid #ddd;border-radius:4px;background:#f7f7f7}#itxeb-course-ui-screen .itxeb-signal-warning{border-color:#f0ad4e;background:#fcf8e3;color:#8a6d3b;font-weight:bold}#itxeb-course-ui-screen .itxeb-signal-danger{border-color:#d9534f;background:#f2dede;color:#a94442;font-weight:bold}#itxeb-course-ui-screen .itxeb-v012-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:2px solid #c8d6e5;background:#f8fbff;padding:12px 14px;margin:0 0 16px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-v012-header h1{font-size:28px;font-weight:700;margin:0 0 4px;line-height:1.2}#itxeb-course-ui-screen .itxeb-v012-header p{margin:0;color:#444}#itxeb-course-ui-screen .itxeb-v012-header-actions{white-space:nowrap;padding-top:3px}#itxeb-course-ui-screen .itxeb-v012-pdf{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-section h2{font-size:24px;font-weight:700;border-bottom:2px solid #c8d6e5;padding-bottom:.4rem;margin-top:1.1rem}#itxeb-course-ui-screen .itxeb-cui-section h3{font-weight:700}#itxeb-course-ui-screen .itxeb-kpi-card,#itxeb-course-ui-screen .itxeb-pedagogy-summary{border:2px solid #c8d6e5;box-shadow:0 1px 4px rgba(0,0,0,.08)}#itxeb-course-ui-screen .itxeb-kpi-label{font-weight:700}#itxeb-course-ui-screen .itxeb-cui-table{border:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-table th{font-weight:700;border-bottom:2px solid #c8d6e5}#itxeb-course-ui-screen .itxeb-cui-analysis-table td:nth-child(2) small{font-size:13px;line-height:1.45;color:#333}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2){border-color:#f0ad4e;background:#fff4df}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(2) .itxeb-kpi-value{color:#8a5a00}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3){border-color:#d9534f;background:#fdeaea}#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-label,#itxeb-course-ui-screen .itxeb-pedagogy-kpis .itxeb-kpi-card:nth-child(3) .itxeb-kpi-value{color:#a94442}#itxeb-course-ui-screen .itxeb-pedagogy-critical{border:2px solid #a94442;background:#f2dede;color:#8a1f11}#itxeb-course-ui-screen .itxeb-pedagogy-watch{border:2px solid #8a6d3b;background:#fcf8e3;color:#684f1d}.itxeb-trainer-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}.itxeb-trainer-card{border-left:4px solid #337ab7}.itxeb-ai-markdown{border:1px solid #c8d6e5;background:#fff;padding:14px;border-radius:6px;line-height:1.55}.itxeb-ai-markdown h4{font-size:18px;margin:16px 0 8px;border-bottom:1px solid #d9e2ec;padding-bottom:4px}.itxeb-ai-markdown h5{font-size:15px;margin:12px 0 6px}.itxeb-ai-markdown ul{margin:6px 0 12px 22px}.itxeb-ai-markdown li{margin:4px 0}.itxeb-ai-table td:first-child{font-weight:700}.itxeb-ai-history table small{line-height:1.35}.itxeb-ai-history-detail{border:2px solid #c8d6e5;background:#f8fbff;padding:14px;margin-top:14px;border-radius:6px}.itxeb-ai-history-detail h4{margin-top:0}.itxeb-ai-history .btn-xs{padding:2px 7px;font-size:12px;line-height:1.4}.itxeb-ai-history-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.itxeb-ai-history-archive-form{display:inline;margin:0}.itxeb-danger{color:#8a1f11;border-color:#d8b8b2;background:#fff5f3}.itxeb-danger:hover{background:#ffe5e0}.itxeb-ai-compare{border:2px solid #c8d6e5;background:#f8fbff;padding:14px;margin-top:14px;border-radius:6px}.itxeb-ai-compare h4{margin-top:0}.itxeb-ai-compare-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.itxeb-active-compare{font-weight:700;background:#eaf4ff;border-color:#337ab7}.itxeb-ai-compare-meta{margin:8px 0 12px}.itxeb-ai-compare-summary{border:1px solid #d9e2ec;background:#fff;padding:10px;border-radius:5px;margin:10px 0}.itxeb-ai-compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:12px}.itxeb-ai-compare-grid h5{font-size:16px;font-weight:700;margin:0 0 8px}.itxeb-ai-compare-check{display:inline-flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap}.itxeb-ai-compare-check input{margin:0}.itxeb-ai-compare-submit{margin:10px 0 4px}.itxeb-ai-compare-help{margin-left:8px;color:#666}/* V0.22.4 alignment and AI tab fixes */#itxeb-course-ui-screen .itxeb-cui-section{display:grid;grid-template-columns:260px minmax(0,1fr);column-gap:24px;row-gap:8px;border-top:1px solid #d9d9d9;padding:14px 0;margin:0;background:#fff}#itxeb-course-ui-screen .itxeb-cui-section>h2,#itxeb-course-ui-screen .itxeb-cui-section>h3,#itxeb-course-ui-screen .itxeb-cui-section>h4{grid-column:1;margin:0!important;padding:5px 0 0!important;border:0!important;font-size:16px!important;line-height:1.35;color:#333}#itxeb-course-ui-screen .itxeb-cui-section>:not(h2):not(h3):not(h4){grid-column:2;min-width:0;margin-top:0}#itxeb-course-ui-screen .itxeb-cui-section>p{color:#555}#itxeb-course-ui-screen .itxeb-cui-section .itxeb-cui-section{grid-column:1 / -1}#itxeb-course-ui-screen .itxeb-period-selector,#itxeb-course-ui-screen .itxeb-resource-filter{border:0;background:transparent;padding:0;margin:0 0 8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}#itxeb-course-ui-screen .itxeb-period-selector strong,#itxeb-course-ui-screen .itxeb-resource-filter strong{min-width:96px;color:#333}#itxeb-course-ui-screen .itxeb-kpi-grid{margin:.2rem 0 1rem}#itxeb-course-ui-screen .itxeb-cui-table-wrapper{margin:.2rem 0 1rem}#itxeb-course-ui-screen .itxeb-pedagogy-summary{grid-column:1 / -1!important;display:grid!important;grid-template-columns:260px minmax(0,1fr)!important;column-gap:24px!important;row-gap:8px!important;border-top:1px solid #d9d9d9!important;border-left:0!important;border-right:0!important;border-bottom:0!important;box-shadow:none!important;border-radius:0!important;padding:14px 0!important;margin:0!important;background:#fff!important}#itxeb-course-ui-screen .itxeb-pedagogy-summary>h3{grid-column:1!important;margin:0!important;padding:5px 0 0!important;border:0!important;font-size:16px!important;line-height:1.35!important;color:#333!important}#itxeb-course-ui-screen .itxeb-pedagogy-summary>.itxeb-pedagogy-kpis{grid-column:2!important;margin:0!important;min-width:0}#itxeb-course-ui-screen .itxeb-pedagogy-summary>.itxeb-pedagogy-lines{grid-column:2!important;margin:10px 0 0 22px!important;min-width:0}#itxeb-course-ui-screen .itxeb-trainer-summary{grid-column:2;margin-top:0}#itxeb-course-ui-screen .itxeb-ai-markdown,#itxeb-course-ui-screen .itxeb-ai-history,#itxeb-course-ui-screen .itxeb-ai-compare{min-width:0}#itxeb-course-ui-screen .itxeb-cui-section form{min-width:0}#itxeb-course-ui-screen .itxeb-widget-grid{margin-top:0}@media(max-width:900px){#itxeb-course-ui-screen .itxeb-cui-section,#itxeb-course-ui-screen .itxeb-pedagogy-summary{grid-template-columns:1fr!important;column-gap:0!important}#itxeb-course-ui-screen .itxeb-cui-section>h2,#itxeb-course-ui-screen .itxeb-cui-section>h3,#itxeb-course-ui-screen .itxeb-cui-section>h4,#itxeb-course-ui-screen .itxeb-cui-section>:not(h2):not(h3):not(h4),#itxeb-course-ui-screen .itxeb-pedagogy-summary>h3,#itxeb-course-ui-screen .itxeb-pedagogy-summary>.itxeb-pedagogy-kpis,#itxeb-course-ui-screen .itxeb-pedagogy-summary>.itxeb-pedagogy-lines{grid-column:1!important}}/* END V0.22.4 alignment and AI tab fixes */</style>';
     }
 }
