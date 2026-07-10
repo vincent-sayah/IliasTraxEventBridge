@@ -41,9 +41,32 @@ function v0221_set_version(string $file, string $version): void
     v0221_write($file, $old, $new);
 }
 
-function v0221_patch_optional(string &$s, string $old, string $new, string $label, string $marker = ''): void
+function v0221_replace_regex(string &$s, string $pattern, string $replacement, string $label, string $marker): void
 {
     if ($marker !== '' && strpos($s, $marker) !== false) {
+        echo "OK: $label\n";
+        return;
+    }
+    $new = preg_replace($pattern, $replacement, $s, 1, $count);
+    if (!is_string($new)) {
+        fwrite(STDERR, "REGEX invalide: $label\n");
+        exit(1);
+    }
+    if ($count !== 1) {
+        echo "SKIP: bloc introuvable $label\n";
+        return;
+    }
+    $s = $new;
+    echo "PATCH: $label\n";
+}
+
+function v0221_replace_string(string &$s, string $old, string $new, string $label, string $marker = ''): void
+{
+    if ($marker !== '' && strpos($s, $marker) !== false) {
+        echo "OK: $label\n";
+        return;
+    }
+    if (strpos($s, $new) !== false) {
         echo "OK: $label\n";
         return;
     }
@@ -91,14 +114,14 @@ if (strpos($s, 'itxeb-ilias-row') === false) {
 }
 
 if (strpos($s, 'private function renderIliasLikeRow(') === false) {
-    $needle = <<<'PHP'
+    $needle = <<<'PHP_CODE'
     private function row(string $label, string $value): string
     {
         return '<tr><td><strong>' . $this->esc($label) . '</strong></td><td>' . $this->esc($value) . '</td></tr>';
     }
 
-PHP;
-    $helper = <<<'PHP'
+PHP_CODE;
+    $helper = <<<'PHP_CODE'
     private function renderIliasLikeRow(string $label, string $content, string $hint = ''): string
     {
         $labelHtml = $this->esc($label);
@@ -108,31 +131,11 @@ PHP;
         return '<div class="itxeb-ilias-row"><div class="itxeb-ilias-label">' . $labelHtml . '</div><div class="itxeb-ilias-value">' . $content . '</div></div>';
     }
 
-PHP;
-    $pos = strpos($s, $needle);
-    if ($pos === false) {
-        fwrite(STDERR, "Point insertion renderIliasLikeRow introuvable\n");
-        exit(1);
-    }
-    $s = substr($s, 0, $pos) . $helper . substr($s, $pos);
-    echo "PATCH: helper renderIliasLikeRow\n";
-} else {
-    echo "OK: helper renderIliasLikeRow\n";
+PHP_CODE;
+    v0221_replace_string($s, $needle, $helper . $needle, 'helper renderIliasLikeRow', 'private function renderIliasLikeRow(');
 }
 
-$oldKpi = <<<'PHP'
-            . '<div class="itxeb-kpi-grid">'
-            . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
-            . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
-            . $this->metricCard('Ressources utilisées', (string) ($summary['resources_with_traces'] ?? 0) . ' / ' . (string) ($summary['resources_total'] ?? 0), 'Au moins une trace')
-            . $this->metricCard('Sans statement TRAX', (string) $this->countEnabledWithoutTraceResources($dashboard), 'À surveiller')
-            . $this->metricCard('Pages LRS', (string) ($dashboard['pages'] ?? 0), 'pagination')
-            . $this->metricCard('Critiques', (string) ($dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')
-            . $this->metricCard('À surveiller', (string) ($dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')
-            . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
-            . '</div>';
-PHP;
-$newKpi = <<<'PHP'
+$kpiReplacement = <<<'PHP_CODE'
             . $this->renderIliasLikeRow('Indicateurs clés', '<div class="itxeb-kpi-grid">'
                 . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
                 . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
@@ -143,26 +146,16 @@ $newKpi = <<<'PHP'
                 . $this->metricCard('À surveiller', (string) ($dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')
                 . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
                 . '</div>', 'Résumé de la période sélectionnée');
-PHP;
-v0221_patch_optional($s, $oldKpi, $newKpi, 'dashboard KPI ILIAS-like', "renderIliasLikeRow('Indicateurs clés'");
+PHP_CODE;
+v0221_replace_regex(
+    $s,
+    "~\n\s+\. '<div class=\"itxeb-kpi-grid\">'\n\s+\. \$this->metricCard\('Statements TRAX'.*?\n\s+\. '</div>';~s",
+    "\n" . $kpiReplacement,
+    'dashboard KPI ILIAS-like',
+    "renderIliasLikeRow('Indicateurs clés'"
+);
 
-$oldBar = <<<'PHP'
-    /** @param array<string,int> $items */
-    private function renderBarSection(string $title, array $items): string
-    {
-        if (count($items) === 0) {
-            return '<section class="itxeb-cui-section"><h3>' . $this->esc($title) . '</h3><p><em>Aucune donnée.</em></p></section>';
-        }
-        $max = max(array_map('intval', array_values($items)));
-        $html = '<section class="itxeb-cui-section"><h3>' . $this->esc($title) . '</h3><div class="itxeb-bar-list">';
-        foreach ($items as $label => $count) {
-            $html .= $this->barRow((string) $label, (int) $count, $max);
-        }
-        return $html . '</div></section>';
-    }
-
-PHP;
-$newBar = <<<'PHP'
+$barReplacement = <<<'PHP_CODE'
     /** @param array<string,int> $items */
     private function renderBarSection(string $title, array $items): string
     {
@@ -178,35 +171,17 @@ $newBar = <<<'PHP'
         return $section . $this->renderIliasLikeRow('Données', $content . '</div>') . '</section>';
     }
 
-PHP;
-v0221_patch_optional($s, $oldBar, $newBar, 'bar sections ILIAS-like', 'itxeb-ilias-like-section"><h3>' . $this->esc($title)');
+    private function renderInnerTabs
+PHP_CODE;
+v0221_replace_regex(
+    $s,
+    "~\n    /\*\* @param array<string,int> \\$items \*/\n    private function renderBarSection\(string \\$title, array \\$items\): string\n    \{.*?\n    \}\n\n    private function renderInnerTabs~s",
+    "\n" . $barReplacement,
+    'bar sections ILIAS-like',
+    'itxeb-ilias-like-section"><h3>'
+);
 
-$oldPedago = <<<'PHP'
-    /** @param array<string,mixed> $dashboard */
-    private function renderPedagogicalSynthesis(array $dashboard): string
-    {
-        $pedagogy = is_array($dashboard['pedagogy'] ?? null) ? $dashboard['pedagogy'] : [];
-        $lines = is_array($pedagogy['synthesis_lines'] ?? null) ? $pedagogy['synthesis_lines'] : [];
-        $html = '<div class="itxeb-pedagogy-summary"><h3>Synthèse pédagogique</h3><div class="itxeb-pedagogy-kpis">'
-            . $this->metricCard('OK', (string) ($pedagogy['ok_count'] ?? 0), 'Ressources sans signal')
-            . $this->metricCard('À surveiller', (string) ($pedagogy['watch_count'] ?? 0), 'Signal faible')
-            . $this->metricCard('Critiques', (string) ($pedagogy['critical_count'] ?? 0), 'Priorité')
-            . $this->metricCard('Sans trace', (string) ($pedagogy['resources_without_trace'] ?? 0), 'Sans statement TRAX')
-            . '</div>';
-        if (count($lines) > 0) {
-            $html .= '<ul class="itxeb-pedagogy-lines">';
-            foreach ($lines as $line) {
-                if (is_scalar($line) && trim((string) $line) !== '') {
-                    $html .= '<li>' . $this->esc((string) $line) . '</li>';
-                }
-            }
-            $html .= '</ul>';
-        }
-        return $html . '</div>';
-    }
-
-PHP;
-$newPedago = <<<'PHP'
+$pedagoReplacement = <<<'PHP_CODE'
     /** @param array<string,mixed> $dashboard */
     private function renderPedagogicalSynthesis(array $dashboard): string
     {
@@ -232,17 +207,23 @@ $newPedago = <<<'PHP'
             . $this->renderIliasLikeRow('Résumé', $content, 'Indicateurs et signaux de la période')
             . '</section>';
     }
-
-PHP;
-v0221_patch_optional($s, $oldPedago, $newPedago, 'pedagogical synthesis ILIAS-like', "renderIliasLikeRow('Résumé', $content");
+    /** @param array<string,mixed> $dashboard @param array<string,mixed> $course */
+PHP_CODE;
+v0221_replace_regex(
+    $s,
+    "~\n    /\*\* @param array<string,mixed> \\$dashboard \*/\n    private function renderPedagogicalSynthesis\(array \\$dashboard\): string\n    \{.*?\n    \}\n    /\*\* @param array<string,mixed> \\$dashboard @param array<string,mixed> \\$course \*/~s",
+    "\n" . $pedagoReplacement,
+    'pedagogical synthesis ILIAS-like',
+    "renderIliasLikeRow('Résumé'"
+);
 
 $activityPatches = [
-    ["return $" . "html . '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p></section>';", "return $" . "html . $" . "this->renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p>') . '</section>';", 'activity empty', "renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée"],
-    ["return $" . "html . $" . "this->renderActivityTimelineSummary($" . "items, 'semaine(s)') . $" . "this->renderActivityTimelineBars($" . "items) . '</section>';", "return $" . "html . $" . "this->renderIliasLikeRow('Vue hebdomadaire', $" . "this->renderActivityTimelineSummary($" . "items, 'semaine(s)') . $" . "this->renderActivityTimelineBars($" . "items)) . '</section>';", 'activity week', "renderIliasLikeRow('Vue hebdomadaire'"],
-    ["return $" . "html . $" . "this->renderActivityTimelineSummary($" . "items, 'jour(s)') . $" . "this->renderActivityTimelineBars($" . "items) . '</section>';", "return $" . "html . $" . "this->renderIliasLikeRow('Vue quotidienne', $" . "this->renderActivityTimelineSummary($" . "items, 'jour(s)') . $" . "this->renderActivityTimelineBars($" . "items)) . '</section>';", 'activity day', "renderIliasLikeRow('Vue quotidienne'"]
+    ["return \$html . '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p></section>';", "return \$html . \$this->renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p>') . '</section>';", 'activity empty', "renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée"],
+    ["return \$html . \$this->renderActivityTimelineSummary(\$items, 'semaine(s)') . \$this->renderActivityTimelineBars(\$items) . '</section>';", "return \$html . \$this->renderIliasLikeRow('Vue hebdomadaire', \$this->renderActivityTimelineSummary(\$items, 'semaine(s)') . \$this->renderActivityTimelineBars(\$items)) . '</section>';", 'activity week', "renderIliasLikeRow('Vue hebdomadaire'"],
+    ["return \$html . \$this->renderActivityTimelineSummary(\$items, 'jour(s)') . \$this->renderActivityTimelineBars(\$items) . '</section>';", "return \$html . \$this->renderIliasLikeRow('Vue quotidienne', \$this->renderActivityTimelineSummary(\$items, 'jour(s)') . \$this->renderActivityTimelineBars(\$items)) . '</section>';", 'activity day', "renderIliasLikeRow('Vue quotidienne'"],
 ];
 foreach ($activityPatches as $p) {
-    v0221_patch_optional($s, $p[0], $p[1], $p[2], $p[3]);
+    v0221_replace_string($s, $p[0], $p[1], $p[2], $p[3]);
 }
 
 v0221_write($screen, $old, $s);
