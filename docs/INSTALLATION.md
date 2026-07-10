@@ -1,10 +1,10 @@
-# Installation — IliasTraxEventBridge V0.21.2
+# Installation — IliasTraxEventBridge V0.22.4
 
-Ce document décrit l'installation complète de la version validée V0.21.2 du plugin `IliasTraxEventBridge` sur ILIAS 10.
+Ce document décrit l'installation complète de la version stable validée V0.22.4 du plugin `IliasTraxEventBridge` sur ILIAS 10.
 
 ## 1. Périmètre
 
-La V0.21.2 contient :
+La V0.22.4 contient :
 
 - le plugin principal EventHook `IliasTraxEventBridge` ;
 - le plugin compagnon UIHook `IliasTraxEventBridgeCourseUI` ;
@@ -14,9 +14,12 @@ La V0.21.2 contient :
 - le suivi des tests ILIAS avec traces question par question ;
 - le bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse ;
 - l'intégration des questions problématiques dans le payload Analyse IA ;
+- le bloc `Activité dans le temps` compact ;
+- une présentation titre/données proche des formulaires ILIAS ;
+- la correction du retour d'onglet après retrait d'une analyse IA ;
 - l'export CSV Expert ;
 - l'export PDF du tableau de bord ;
-- la documentation V0.21.2.
+- la documentation V0.22.4.
 
 ## 2. Pré-requis
 
@@ -116,8 +119,8 @@ grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 Résultat attendu :
 
 ```text
-$version = '0.21.2-dev';
-$version = '0.8.5';
+$version = '0.22.4-dev';
+$version = '0.8.10';
 ```
 
 Vérifier la syntaxe PHP :
@@ -167,16 +170,6 @@ cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHo
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 ```
 
-Exemple avec un utilisateur web différent :
-
-```bash
-export ILIAS_ROOT="/srv/ilias"
-export HTTPD_USER="www-data"
-
-cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
-bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
-
 Depuis V0.21.2, le script tente aussi de déduire automatiquement `ILIAS_ROOT` à partir du chemin réel du plugin principal. La variable explicite reste toutefois recommandée en exploitation.
 
 ### 4.3 Contrôle du compagnon
@@ -189,10 +182,10 @@ php -l "$COMPANION_DIR/plugin.php"
 php -l "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 ```
 
-Contrôler la présence du bloc V0.21.2 :
+Contrôler les marqueurs V0.22.4 :
 
 ```bash
-grep -n "Questions à fort taux d’échec\|QuestionRiskRepository" \
+grep -n "Activité dans le temps\|V0.22.4 alignment\|showCourseAiAnalysis" \
 "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 ```
 
@@ -240,36 +233,13 @@ Aller dans :
 Administration > Plugins > IliasTraxEventBridge > Configurer
 ```
 
-Renseigner :
-
-| Champ | Valeur attendue |
-|---|---|
-| Endpoint xAPI TRAX | URL xAPI racine ou URL `/statements`. |
-| Identifiant client TRAX | Compte Basic HTTP xAPI. |
-| Secret client TRAX | Mot de passe ou secret du compte xAPI. |
-| Version xAPI | `1.0.3`. |
-| Timeout HTTP | Exemple : `10`. |
-| Taille batch | Exemple : `20` ou `50`. |
-| Max retry | Exemple : `5`. |
-| Base URL ILIAS forcée | Optionnel, utile si ILIAS est derrière reverse proxy. |
-
-Enregistrer, puis utiliser le test de connexion TRAX si disponible dans l'interface.
+Renseigner : endpoint xAPI TRAX, identifiant, secret, version xAPI `1.0.3`, timeout HTTP, taille batch, max retry et éventuellement une Base URL ILIAS forcée.
 
 ## 8. Configuration IA optionnelle
 
-Dans la configuration du plugin, renseigner uniquement si l'analyse IA doit être utilisée :
+Dans la configuration du plugin, renseigner uniquement si l'analyse IA doit être utilisée : fournisseur IA, URL API, modèle, timeout, anonymisation et limite de traces.
 
-| Champ | Exemple |
-|---|---|
-| Activer l'analyse IA | `oui` |
-| Fournisseur IA | `genial`, `mistral`, `vibe`, passerelle interne |
-| URL API IA | Endpoint compatible chat/completions |
-| Modèle IA | Nom du modèle côté fournisseur |
-| Timeout IA | Entre 2 et 120 secondes |
-| Mode anonymisation | `strict` recommandé |
-| Limite de traces IA | Limite des données agrégées envoyées |
-
-La clé API peut être fournie dans l'interface administrateur ou via variable serveur selon la configuration du plugin.
+La clé API ne doit jamais être affichée en clair.
 
 ## 9. Configuration d'un cours
 
@@ -295,19 +265,7 @@ statement généré = cours activé ET ressource activée
 
 ## 10. Activation du cron
 
-Dans la configuration du plugin, activer :
-
-```text
-Activer le cron plugin
-```
-
-Puis dans ILIAS :
-
-```text
-Administration > Paramètres système et maintenance > Tâches cron
-```
-
-Activer le job :
+Dans la configuration du plugin, activer le cron plugin puis dans ILIAS activer le job :
 
 ```text
 IliasTraxEventBridge — envoi outbox vers TRAX
@@ -319,54 +277,19 @@ Identifiant technique :
 itxeb_send_outbox_to_trax
 ```
 
-Le cron envoie les statements présents dans l'outbox locale vers TRAX/LRS.
-
 ## 11. Mise à jour depuis une ancienne version
-
-Se placer dans le plugin existant :
 
 ```bash
 export ILIAS_ROOT="/var/www/ilias"
 cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
-```
 
-Sauvegarder l'état local :
-
-```bash
-git status
-cp plugin.php plugin.php.bak.$(date +%Y%m%d_%H%M%S)
-cp sql/dbupdate.php sql/dbupdate.php.bak.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
-```
-
-Mettre à jour vers `main` :
-
-```bash
 git fetch origin
 git checkout main
 git pull --ff-only origin main
-```
 
-Vérifier :
-
-```bash
-grep -n '\$version' plugin.php
-php -l plugin.php
-php -l classes/class.ilIliasTraxEventBridgeTestQuestionResultExtractor.php
-php -l classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php
-php -l classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
-```
-
-Réinstaller le plugin compagnon :
-
-```bash
-export ILIAS_ROOT="$ILIAS_ROOT"
 export HTTPD_USER="apache"
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
 
-Rebuild ILIAS :
-
-```bash
 cd "$ILIAS_ROOT"
 sudo -u "$HTTPD_USER" composer du
 sudo -u "$HTTPD_USER" php cli/setup.php build --yes
@@ -381,54 +304,45 @@ Administration > Plugins > IliasTraxEventBridge > Mettre à jour
 Administration > Plugins > IliasTraxEventBridgeCourseUI > Mettre à jour
 ```
 
-## 12. Cas particulier : anciennes tables SQL
+## 12. Contrôles post-installation
 
-Si une ancienne version a été désinstallée avant installation de la V0.21.2, il peut rester des tables SQL `evnt_evhk_itxeb_*`.
-
-La V0.21.2 est prévue pour gérer les tables existantes avec des tests `tableExists` et `tableColumnExists`.
-
-Contrôler les tables :
-
-```sql
-SHOW TABLES LIKE 'evnt_evhk_itxeb%';
-```
-
-Ne supprimer les tables que si l'objectif est de repartir de zéro et après sauvegarde.
-
-Suppression complète possible, uniquement si les traces et configurations peuvent être perdues :
-
-```sql
-DROP TABLE IF EXISTS evnt_evhk_itxeb_dlog;
-DROP TABLE IF EXISTS evnt_evhk_itxeb_rcfg;
-DROP TABLE IF EXISTS evnt_evhk_itxeb_ccfg;
-DROP TABLE IF EXISTS evnt_evhk_itxeb_read;
-DROP TABLE IF EXISTS evnt_evhk_itxeb_out;
-DROP TABLE IF EXISTS evnt_evhk_itxeb_log;
-```
-
-## 13. Contrôles post-installation
-
-### 13.1 Contrôle plugin
+### 12.1 Contrôle plugin
 
 ```bash
 cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
 
 grep -n '\$version' plugin.php
+grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 find . -name "*.php" -print0 | xargs -0 -n1 php -l
 ```
 
-### 13.2 Contrôle SQL
+### 12.2 Contrôle fonctionnel V0.22.4
 
-```sql
-SHOW TABLES LIKE 'evnt_evhk_itxeb%';
+Dans ILIAS :
 
-SELECT id, event_type, status, created_at, sent_at, last_error
-FROM evnt_evhk_itxeb_out
-ORDER BY id DESC
-LIMIT 20;
+```text
+Pilotage xAPI > Tableau de bord
 ```
 
-### 13.3 Contrôle des questions de test
+Vérifier :
+
+- bloc `Activité dans le temps` ;
+- choix `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet` ;
+- présentation titre/données alignée ;
+- `Synthèse pédagogique` alignée comme les autres blocs.
+
+Dans :
+
+```text
+Pilotage xAPI > Analyse IA
+```
+
+Vérifier :
+
+- retrait d'une analyse IA historisée ;
+- après validation, l'onglet `Analyse IA` reste sélectionné.
+
+### 12.3 Contrôle SQL questions de test
 
 Après une tentative de test ILIAS :
 
@@ -440,21 +354,9 @@ ORDER BY id DESC
 LIMIT 20;
 ```
 
-### 13.4 Contrôle fonctionnel
+## 13. Dépannage rapide
 
-1. ouvrir un cours ;
-2. aller dans `Pilotage xAPI > Configuration` ;
-3. activer le cours ;
-4. activer une ressource ou un test ;
-5. ouvrir la ressource ou terminer un test avec un utilisateur ;
-6. lancer le cron ou l'envoi manuel ;
-7. vérifier que TRAX reçoit les statements ;
-8. vérifier les onglets `Tableau de bord`, `Analyse`, `Analyse IA`, `Expert` ;
-9. vérifier le bloc `Questions à fort taux d’échec` si un test est disponible.
-
-## 14. Dépannage rapide
-
-### 14.1 Le script compagnon cherche `/var/www/ilias` alors que l'installation est ailleurs
+### Le script compagnon cherche `/var/www/ilias` alors que l'installation est ailleurs
 
 Définir explicitement `ILIAS_ROOT` avant de lancer le script :
 
@@ -464,63 +366,11 @@ cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHo
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 ```
 
-Contrôler le slot UIHook :
+### Le lien `Pilotage xAPI` n'apparaît pas
 
-```bash
-ls -ld "$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook"
-```
+Contrôler que le plugin compagnon est installé puis relancer le script compagnon avec le bon `ILIAS_ROOT`.
 
-### 14.2 Erreur `Undefined array key ...` à l'installation
-
-Contrôler le début de `sql/dbupdate.php` si le fichier est présent :
-
-```bash
-head -5 sql/dbupdate.php
-```
-
-Le fichier doit commencer par :
-
-```text
-<#1>
-<?php
-```
-
-### 14.3 Le lien `Pilotage xAPI` n'apparaît pas
-
-Contrôler que le plugin compagnon est installé :
-
-```text
-Administration > Plugins > IliasTraxEventBridgeCourseUI
-```
-
-Relancer avec le bon `ILIAS_ROOT` :
-
-```bash
-export ILIAS_ROOT="/chemin/reel/vers/ilias"
-export HTTPD_USER="apache"
-cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
-bash scripts/install_course_ui_companion_with_standalone_fix.sh
-cd "$ILIAS_ROOT"
-sudo -u "$HTTPD_USER" composer du
-sudo -u "$HTTPD_USER" php cli/setup.php build --yes
-systemctl restart httpd
-systemctl restart php-fpm
-```
-
-### 14.4 Aucune donnée dans le tableau de bord
-
-Vérifier :
-
-- configuration TRAX complète ;
-- cours activé ;
-- ressources activées ;
-- statements réellement reçus dans TRAX ;
-- compte TRAX autorisé à lire les statements ;
-- cohérence de la base URL ILIAS utilisée dans les activités xAPI.
-
-### 14.5 Statements générés mais non envoyés
-
-Vérifier l'outbox :
+### Statements générés mais non envoyés
 
 ```sql
 SELECT status, COUNT(*) AS total
@@ -528,15 +378,15 @@ FROM evnt_evhk_itxeb_out
 GROUP BY status;
 ```
 
-Vérifier le cron ILIAS et le diagnostic du plugin.
+Vérifier ensuite le cron ILIAS et le diagnostic du plugin.
 
-## 15. Tag stable recommandé
+## 14. Tag stable recommandé
 
-La V0.21.2 est actuellement promue dans `main`.
+La V0.22.4 est promue dans `main`.
 
 Si un tag de release doit être créé après validation finale :
 
 ```bash
-git tag -a v0.21.2 -m "Release stable v0.21.2"
-git push origin v0.21.2
+git tag -a v0.22.4 -m "Release stable v0.22.4"
+git push origin v0.22.4
 ```
