@@ -34,7 +34,8 @@ function set_version(string $file, string $version): void
         return;
     }
     $old = rf($file);
-    $new = preg_replace('/\$version = \'[^\']*\';/', '$version = \' . "'" . $version . "'" . ';', $old, 1);
+    $replacement = '$version = \'' . $version . '\';';
+    $new = preg_replace('/\$version = \'[^\']*\';/', $replacement, $old, 1);
     if (!is_string($new)) {
         fwrite(STDERR, "Version impossible: $file\n");
         exit(1);
