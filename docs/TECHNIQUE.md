@@ -2,12 +2,20 @@
 
 ## Référence courante
 
-La version stable courante est la V0.21.2 promue dans `main`.
+La version stable courante est la V0.22.4 promue dans `main`.
 
-La documentation technique de référence est :
+La documentation technique de base reste :
 
 ```text
 docs/TECHNIQUE_0.21.2.md
+```
+
+Elle est complétée pour la version courante par :
+
+```text
+docs/RELEASE_0.22.4.md
+docs/V0.22_ACTIVITY_TIMELINE.md
+docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md
 ```
 
 ## Architecture actuelle
@@ -28,7 +36,7 @@ ILIAS 10
      └─ affiche Pilotage xAPI dans le cours
 ```
 
-## Classes clés V0.21.2
+## Classes clés V0.22.4
 
 ```text
 classes/class.ilIliasTraxEventBridgeEventRouter.php
@@ -38,6 +46,8 @@ classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php
 classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
 companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 ```
+
+La V0.22.4 modifie principalement le rendu de `class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`.
 
 ## Tables principales
 
@@ -50,7 +60,7 @@ evnt_evhk_itxeb_ccfg
 evnt_evhk_itxeb_rcfg
 ```
 
-Tables ILIAS test utilisées en V0.21.2 :
+Tables ILIAS test utilisées :
 
 ```text
 tst_tests
@@ -63,7 +73,8 @@ qpl_questions
 
 | Besoin | Document |
 |---|---|
-| Architecture complète | [`TECHNIQUE_0.21.2.md`](TECHNIQUE_0.21.2.md) |
+| Architecture complète de base | [`TECHNIQUE_0.21.2.md`](TECHNIQUE_0.21.2.md) |
+| Release courante | [`RELEASE_0.22.4.md`](RELEASE_0.22.4.md) |
 | Guide développeur | [`GUIDE_DEVELOPPEUR_0.21.2.md`](GUIDE_DEVELOPPEUR_0.21.2.md) |
 | Installation | [`INSTALLATION.md`](INSTALLATION.md) |
 | Exploitation | [`EXPLOITATION_0.21.2.md`](EXPLOITATION_0.21.2.md) |
