@@ -7,8 +7,8 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 | Élément | Valeur |
 |---|---|
 | Branche stable projet | `main` |
-| Version stable courante | `0.21.2-dev` validée et promue dans `main` |
-| Version companion UI | `0.8.5` |
+| Version stable courante | `0.22.4-dev` validée et promue dans `main` |
+| Version companion UI | `0.8.10` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type | UIHook ILIAS |
@@ -18,7 +18,7 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 Ce plugin compagnon ajoute l'accès au pilotage xAPI directement dans l'objet cours ILIAS.
 
-Accès attendu en V0.21.2 :
+Accès attendu :
 
 ```text
 Cours > Pilotage xAPI
@@ -30,17 +30,17 @@ L'écran expose les vues :
 Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu du cours
 ```
 
-## Rôle des vues V0.21.2
+## Rôle des vues V0.22.4
 
 | Vue | Rôle |
 |---|---|
-| Tableau de bord | Synthèse pédagogique, activité, ressources, tests, questions à fort taux d'échec, export PDF. |
-| Analyse | Analyse formateur des ressources et questions problématiques. |
+| Tableau de bord | Synthèse pédagogique, activité dans le temps, ressources, tests, questions à fort taux d'échec, export PDF. |
+| Analyse | Analyse formateur des ressources, priorités et questions problématiques. |
 | Analyse IA | Génération, historique, comparaison et retrait d'analyses IA. |
 | Expert | Vision technique détaillée et export CSV. |
 | Configuration | Activation cours / ressources, préférences, diagnostic LRS, supervision outbox. |
 
-## Règle métier V0.21.2
+## Règle métier
 
 ```text
 TRAX = toutes les questions de test ILIAS sont tracées.
@@ -48,6 +48,14 @@ Tableau de bord / Analyse = questions problématiques uniquement.
 Analyse IA = questions problématiques uniquement.
 Expert = vision technique complète.
 ```
+
+## Améliorations V0.22.4
+
+- Bloc `Activité dans le temps` compact.
+- Choix d'affichage : `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet`.
+- Présentation titre/données proche des formulaires ILIAS.
+- Alignement corrigé de la `Synthèse pédagogique`.
+- Correction de l'onglet actif après retrait d'une analyse IA historisée.
 
 ## Packaging
 
@@ -120,12 +128,12 @@ COMPANION_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponen
 php -l "$COMPANION_DIR/plugin.php"
 php -l "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 
-grep -n "Questions à fort taux d’échec\|QuestionRiskRepository" \
+grep -n "Activité dans le temps\|V0.22.4 alignment\|showCourseAiAnalysis" \
 "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 ```
 
 La validation détaillée est décrite dans :
 
 ```text
-docs/VALIDATION_0.21.2.md
+docs/VALIDATION_0.22.4.md
 ```
