@@ -7,15 +7,15 @@ Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS 
 | Élément | Valeur |
 |---|---|
 | Branche stable officielle | `main` |
-| Version stable courante | `0.21.2-dev` validée et promue dans `main` |
-| Commit de gel fonctionnel | `fad4c28` — `Freeze V0.21.2 validated implementation` |
+| Version stable courante | `0.22.4-dev` validée et promue dans `main` |
+| Commit de gel fonctionnel | `b4fdf9a` — `V0.22.4 validate dashboard layout and AI tab fixes` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
-| Version plugin compagnon | `0.8.5` |
+| Version plugin compagnon | `0.8.10` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type plugin compagnon | `UIHook` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
-| Branche historique IA | `v0.13-ai-xapi-analysis` |
+| Branche de développement V0.22 | `v0.22-dashboard-activity-timeline` |
 | Anciennes branches/tags | conservés pour historique uniquement |
 
 Pour une installation stable courante, utiliser `main` :
@@ -26,12 +26,12 @@ git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEven
 
 Ne plus utiliser les anciennes branches d'installation comme `v0.10-lrs-direct-read` pour une nouvelle installation.
 
-## Règle métier V0.21.2
+## Règle métier V0.22.4
 
 ```text
 TRAX/LRS = destination xAPI et source principale de suivi pédagogique.
 Outbox locale = file technique d'envoi.
-Exception V0.21.2 = calcul robuste des questions problématiques depuis les statements question disponibles dans l'outbox locale.
+Exception validée = calcul robuste des questions problématiques depuis les statements question disponibles dans l'outbox locale.
 ```
 
 Règle fonctionnelle validée :
@@ -52,11 +52,13 @@ Expert = vision technique complète.
 - Activation stricte par cours et par ressource.
 - Accès `Pilotage xAPI` depuis l'objet cours via le plugin compagnon UIHook.
 - Tableau de bord pédagogique.
+- Activité dans le temps avec choix d'affichage : 7 jours, 14 jours, 30 jours, par semaine, détail complet.
+- Présentation des blocs de type formulaire ILIAS : intitulé à gauche, données à droite.
 - Analyse formateur.
 - Onglet `Analyse IA` séparé.
 - Historique local des analyses IA.
 - Comparaison d'analyses IA historisées.
-- Retrait contrôlé d'analyses IA historisées.
+- Retrait contrôlé d'analyses IA historisées avec retour correct sur l'onglet Analyse IA.
 - Vue Expert technique.
 - Export CSV Expert.
 - Export PDF du tableau de bord.
@@ -74,8 +76,8 @@ Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu
 
 | Vue | Rôle |
 |---|---|
-| Tableau de bord | Synthèse pédagogique du cours, activité, ressources, tests, questions problématiques, export PDF. |
-| Analyse | Lecture formateur des ressources et questions à surveiller. |
+| Tableau de bord | Synthèse pédagogique du cours, activité dans le temps, ressources, tests, questions problématiques, export PDF. |
+| Analyse | Lecture formateur des ressources, priorités et questions à surveiller. |
 | Analyse IA | Génération, historique, comparaison et retrait d'analyses IA. |
 | Expert | Vue technique détaillée des statements et export CSV. |
 | Configuration | Activation cours/ressources, préférences, diagnostic LRS, supervision outbox. |
@@ -105,17 +107,19 @@ TRAX / LRS
 
 | Document | Rôle |
 |---|---|
-| [`docs/INDEX_0.21.2.md`](docs/INDEX_0.21.2.md) | Index de référence de la V0.21.2. |
+| [`docs/INDEX_0.22.4.md`](docs/INDEX_0.22.4.md) | Index de référence de la V0.22.4. |
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation et mise à jour depuis `main`, avec `ILIAS_ROOT` personnalisable. |
-| [`docs/RELEASE_0.21.2.md`](docs/RELEASE_0.21.2.md) | Note de release V0.21.2. |
-| [`docs/FONCTIONNEL_0.21.2.md`](docs/FONCTIONNEL_0.21.2.md) | Documentation fonctionnelle actuelle. |
-| [`docs/TECHNIQUE_0.21.2.md`](docs/TECHNIQUE_0.21.2.md) | Architecture technique actuelle. |
-| [`docs/GUIDE_DEVELOPPEUR_0.21.2.md`](docs/GUIDE_DEVELOPPEUR_0.21.2.md) | Guide développeur actuel : classes, tables, flux. |
+| [`docs/RELEASE_0.22.4.md`](docs/RELEASE_0.22.4.md) | Note de release V0.22.4. |
+| [`docs/V0.22_ACTIVITY_TIMELINE.md`](docs/V0.22_ACTIVITY_TIMELINE.md) | Cadrage du bloc Activité dans le temps. |
+| [`docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md`](docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md) | Cadrage de la présentation type formulaire ILIAS. |
+| [`docs/FONCTIONNEL_0.21.2.md`](docs/FONCTIONNEL_0.21.2.md) | Base fonctionnelle V0.21.2, complétée par la release V0.22.4. |
+| [`docs/TECHNIQUE_0.21.2.md`](docs/TECHNIQUE_0.21.2.md) | Base technique V0.21.2, complétée par la release V0.22.4. |
+| [`docs/GUIDE_DEVELOPPEUR_0.21.2.md`](docs/GUIDE_DEVELOPPEUR_0.21.2.md) | Guide développeur : classes, tables, flux. |
 | [`docs/EXPLOITATION_0.21.2.md`](docs/EXPLOITATION_0.21.2.md) | Exploitation et diagnostic courant. |
-| [`docs/VALIDATION_0.21.2.md`](docs/VALIDATION_0.21.2.md) | Checklist de validation. |
+| [`docs/VALIDATION_0.22.4.md`](docs/VALIDATION_0.22.4.md) | Checklist de validation V0.22.4. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
-Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13` et `RELEASE_0.15.2` sont conservés pour historique. Pour une installation ou une maintenance courante, utiliser les documents V0.21.2.
+Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13`, `RELEASE_0.15.2` et `V0.21.2` sont conservés pour historique et continuité. Pour une installation ou une maintenance courante, utiliser `main` et les documents V0.22.4.
 
 ## Copie écran
 ![Tableau de bord](docs/images/1.png)
@@ -135,6 +139,3 @@ Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13` et `RELEASE_0.15.2` sont conser
 ![Expert](docs/images/8.png)
 
 ![Configuration](docs/images/9.png)
-
-
-
