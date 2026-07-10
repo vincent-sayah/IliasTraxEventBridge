@@ -2,15 +2,23 @@
 
 ## Référence courante
 
-La version stable courante est la V0.21.2 promue dans `main`.
+La version stable courante est la V0.22.4 promue dans `main`.
 
-Le guide développeur de référence est :
+Le guide développeur de base reste :
 
 ```text
 docs/GUIDE_DEVELOPPEUR_0.21.2.md
 ```
 
-## Ce que contient le guide V0.21.2
+Il est complété par :
+
+```text
+docs/RELEASE_0.22.4.md
+docs/V0.22_ACTIVITY_TIMELINE.md
+docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md
+```
+
+## Ce que contient le guide de base
 
 - Structure du plugin principal EventHook.
 - Structure du plugin compagnon UIHook.
@@ -24,7 +32,7 @@ docs/GUIDE_DEVELOPPEUR_0.21.2.md
 - Contrôles avant livraison.
 - Règles de sécurité et d'anonymisation.
 
-## Classes critiques V0.21.2
+## Classes critiques V0.22.4
 
 ```text
 classes/class.ilIliasTraxEventBridgeEventRouter.php
@@ -36,6 +44,8 @@ classes/class.ilIliasTraxEventBridgeAiClient.php
 classes/class.ilIliasTraxEventBridgeAiAnalysisHistory.php
 companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 ```
+
+La V0.22.4 touche principalement le rendu dans `class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`.
 
 ## Contrôles développeur rapides
 
@@ -51,15 +61,17 @@ php -l classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
 php -l companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 
 grep -n '\$version' plugin.php companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
+grep -n "Activité dans le temps\|V0.22.4 alignment\|showCourseAiAnalysis" companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 ```
 
 ## Documents à lire
 
 | Besoin | Document |
 |---|---|
-| Guide développeur complet | [`GUIDE_DEVELOPPEUR_0.21.2.md`](GUIDE_DEVELOPPEUR_0.21.2.md) |
+| Guide développeur complet de base | [`GUIDE_DEVELOPPEUR_0.21.2.md`](GUIDE_DEVELOPPEUR_0.21.2.md) |
+| Release courante | [`RELEASE_0.22.4.md`](RELEASE_0.22.4.md) |
 | Architecture technique | [`TECHNIQUE_0.21.2.md`](TECHNIQUE_0.21.2.md) |
 | Installation | [`INSTALLATION.md`](INSTALLATION.md) |
-| Validation | [`VALIDATION_0.21.2.md`](VALIDATION_0.21.2.md) |
+| Validation | [`VALIDATION_0.22.4.md`](VALIDATION_0.22.4.md) |
 
 Les anciennes consignes V0.10/V0.11/V0.12 sont historiques et ne doivent pas être utilisées comme référence de développement courante.
