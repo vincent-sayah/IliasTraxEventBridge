@@ -30,7 +30,9 @@ function v0221_write(string $file, string $old, string $new): void
 
 function v0221_set_version(string $file, string $version): void
 {
-    if (!is_file($file)) { return; }
+    if (!is_file($file)) {
+        return;
+    }
     $old = v0221_read($file);
     $replacement = '$version = ' . "'" . $version . "'" . ';';
     $new = preg_replace('/\$version = \'[^\']*\';/', $replacement, $old, 1);
@@ -41,55 +43,83 @@ function v0221_set_version(string $file, string $version): void
     v0221_write($file, $old, $new);
 }
 
-function v0221_replace_regex(string &$s, string $pattern, string $replacement, string $label, string $marker): void
+function v0221_replace_method(string &$s, string $methodName, string $newMethod): void
 {
-    if ($marker !== '' && strpos($s, $marker) !== false) {
-        echo "OK: $label\n";
+    if (strpos($s, $newMethod) !== false) {
+        echo "OK: méthode $methodName\n";
         return;
     }
-    $new = preg_replace($pattern, $replacement, $s, 1, $count);
-    if (!is_string($new)) {
-        fwrite(STDERR, "REGEX invalide: $label\n");
-        exit(1);
-    }
-    if ($count !== 1) {
-        echo "SKIP: bloc introuvable $label\n";
-        return;
-    }
-    $s = $new;
-    echo "PATCH: $label\n";
-}
-
-function v0221_replace_string(string &$s, string $old, string $new, string $label, string $marker = ''): void
-{
-    if ($marker !== '' && strpos($s, $marker) !== false) {
-        echo "OK: $label\n";
-        return;
-    }
-    if (strpos($s, $new) !== false) {
-        echo "OK: $label\n";
-        return;
-    }
-    $pos = strpos($s, $old);
+    $needle = 'private function ' . $methodName . '(';
+    $pos = strpos($s, $needle);
     if ($pos === false) {
-        echo "SKIP: bloc introuvable $label\n";
+        echo "SKIP: méthode introuvable $methodName\n";
         return;
     }
-    $s = substr($s, 0, $pos) . $new . substr($s, $pos + strlen($old));
-    echo "PATCH: $label\n";
-}
-
-foreach ([$screen, $plugin, $companionPlugin] as $file) {
-    if (!is_file($file)) {
-        fwrite(STDERR, "Fichier absent: $file\n");
+    $lineStart = strrpos(substr($s, 0, $pos), "\n");
+    $start = $lineStart === false ? 0 : $lineStart + 1;
+    $brace = strpos($s, '{', $pos);
+    if ($brace === false) {
+        fwrite(STDERR, "Accolade introuvable pour $methodName\n");
         exit(1);
     }
+    $depth = 0;
+    $len = strlen($s);
+    $end = null;
+    for ($i = $brace; $i < $len; $i++) {
+        $ch = $s[$i];
+        if ($ch === '{') {
+            $depth++;
+        } elseif ($ch === '}') {
+            $depth--;
+            if ($depth === 0) {
+                $end = $i + 1;
+                if ($end < $len && $s[$end] === "\r") { $end++; }
+                if ($end < $len && $s[$end] === "\n") { $end++; }
+                break;
+            }
+        }
+    }
+    if ($end === null) {
+        fwrite(STDERR, "Fin méthode introuvable pour $methodName\n");
+        exit(1);
+    }
+    $s = substr($s, 0, $start) . $newMethod . "\n" . substr($s, $end);
+    echo "PATCH: méthode $methodName\n";
 }
 
-$old = v0221_read($screen);
-$s = $old;
+function v0221_insert_helper(string &$s): void
+{
+    if (strpos($s, 'private function renderIliasLikeRow(') !== false) {
+        echo "OK: helper renderIliasLikeRow\n";
+        return;
+    }
+    $needle = '    private function row(string $label, string $value): string';
+    $pos = strpos($s, $needle);
+    if ($pos === false) {
+        fwrite(STDERR, "Point insertion renderIliasLikeRow introuvable\n");
+        exit(1);
+    }
+    $helper = <<<'PHP'
+    private function renderIliasLikeRow(string $label, string $content, string $hint = ''): string
+    {
+        $labelHtml = $this->esc($label);
+        if ($hint !== '') {
+            $labelHtml .= '<span class="itxeb-ilias-hint">' . $this->esc($hint) . '</span>';
+        }
+        return '<div class="itxeb-ilias-row"><div class="itxeb-ilias-label">' . $labelHtml . '</div><div class="itxeb-ilias-value">' . $content . '</div></div>';
+    }
 
-if (strpos($s, 'itxeb-ilias-row') === false) {
+PHP;
+    $s = substr($s, 0, $pos) . $helper . substr($s, $pos);
+    echo "PATCH: helper renderIliasLikeRow\n";
+}
+
+function v0221_insert_css(string &$s): void
+{
+    if (strpos($s, 'itxeb-ilias-row') !== false) {
+        echo "OK: CSS ILIAS-like\n";
+        return;
+    }
     $css = '#itxeb-course-ui-screen .itxeb-ilias-like-section{border-top:1px solid #ddd;padding-top:8px}'
         . '#itxeb-course-ui-screen .itxeb-ilias-row{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;border-top:1px solid #e5e5e5;padding:12px 0;align-items:start}'
         . '#itxeb-course-ui-screen .itxeb-ilias-row:first-of-type{border-top:0}'
@@ -109,79 +139,66 @@ if (strpos($s, 'itxeb-ilias-row') === false) {
     }
     $s = substr($s, 0, $pos) . $css . substr($s, $pos);
     echo "PATCH: CSS ILIAS-like\n";
-} else {
-    echo "OK: CSS ILIAS-like\n";
 }
 
-if (strpos($s, 'private function renderIliasLikeRow(') === false) {
-    $needle = <<<'PHP_CODE'
-    private function row(string $label, string $value): string
-    {
-        return '<tr><td><strong>' . $this->esc($label) . '</strong></td><td>' . $this->esc($value) . '</td></tr>';
+foreach ([$screen, $plugin, $companionPlugin] as $file) {
+    if (!is_file($file)) {
+        fwrite(STDERR, "Fichier absent: $file\n");
+        exit(1);
     }
-
-PHP_CODE;
-    $helper = <<<'PHP_CODE'
-    private function renderIliasLikeRow(string $label, string $content, string $hint = ''): string
-    {
-        $labelHtml = $this->esc($label);
-        if ($hint !== '') {
-            $labelHtml .= '<span class="itxeb-ilias-hint">' . $this->esc($hint) . '</span>';
-        }
-        return '<div class="itxeb-ilias-row"><div class="itxeb-ilias-label">' . $labelHtml . '</div><div class="itxeb-ilias-value">' . $content . '</div></div>';
-    }
-
-PHP_CODE;
-    v0221_replace_string($s, $needle, $helper . $needle, 'helper renderIliasLikeRow', 'private function renderIliasLikeRow(');
 }
 
-$kpiReplacement = <<<'PHP_CODE'
-            . $this->renderIliasLikeRow('Indicateurs clés', '<div class="itxeb-kpi-grid">'
-                . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
-                . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
-                . $this->metricCard('Ressources utilisées', (string) ($summary['resources_with_traces'] ?? 0) . ' / ' . (string) ($summary['resources_total'] ?? 0), 'Au moins une trace')
-                . $this->metricCard('Sans statement TRAX', (string) $this->countEnabledWithoutTraceResources($dashboard), 'À surveiller')
-                . $this->metricCard('Pages LRS', (string) ($dashboard['pages'] ?? 0), 'pagination')
-                . $this->metricCard('Critiques', (string) ($dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')
-                . $this->metricCard('À surveiller', (string) ($dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')
-                . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
-                . '</div>', 'Résumé de la période sélectionnée');
-PHP_CODE;
-v0221_replace_regex(
-    $s,
-    "~\n\s+\. '<div class=\"itxeb-kpi-grid\">'\n\s+\. \$this->metricCard\('Statements TRAX'.*?\n\s+\. '</div>';~s",
-    "\n" . $kpiReplacement,
-    'dashboard KPI ILIAS-like',
-    "renderIliasLikeRow('Indicateurs clés'"
-);
+$old = v0221_read($screen);
+$s = $old;
 
-$barReplacement = <<<'PHP_CODE'
-    /** @param array<string,int> $items */
-    private function renderBarSection(string $title, array $items): string
+v0221_insert_css($s);
+v0221_insert_helper($s);
+
+$renderDashboard = <<<'PHP'
+    /** @param array<string,mixed> $course */
+    private function renderDashboard(array $course): string
     {
-        $section = '<section class="itxeb-cui-section itxeb-ilias-like-section"><h3>' . $this->esc($title) . '</h3>';
-        if (count($items) === 0) {
-            return $section . $this->renderIliasLikeRow('Données', '<p><em>Aucune donnée.</em></p>') . '</section>';
+        $dashboard = $this->loadDashboard($course);
+        $summary = is_array($dashboard['summary'] ?? null) ? $dashboard['summary'] : [];
+        $widgets = $this->dashboardWidgets((int) ($course['course_ref_id'] ?? 0));
+        $filters = $this->renderPeriodSelector('showCourseDashboard') . $this->renderResourceFilter($course, 'showCourseDashboard') . $this->renderAnalyticsWarning();
+        $kpis = '<div class="itxeb-kpi-grid">'
+            . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
+            . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
+            . $this->metricCard('Ressources utilisées', (string) ($summary['resources_with_traces'] ?? 0) . ' / ' . (string) ($summary['resources_total'] ?? 0), 'Au moins une trace')
+            . $this->metricCard('Sans statement TRAX', (string) $this->countEnabledWithoutTraceResources($dashboard), 'À surveiller')
+            . $this->metricCard('Pages LRS', (string) ($dashboard['pages'] ?? 0), 'pagination')
+            . $this->metricCard('Critiques', (string) ($dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')
+            . $this->metricCard('À surveiller', (string) ($dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')
+            . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
+            . '</div>';
+
+        $html = '<section class="itxeb-cui-section itxeb-ilias-like-section"><h2>Tableau de bord du cours</h2><p>Vue synthétique des statements xAPI présents dans TRAX pour ce cours.</p>'
+            . $this->renderIliasLikeRow('Filtres', $filters, 'Période et ressource suivie')
+            . $this->renderIliasLikeRow('Indicateurs clés', $kpis, 'Résumé de la période sélectionnée')
+            . '</section>'
+            . $this->renderPedagogicalSynthesis($dashboard)
+            . $this->renderQuestionFailureHotspots($dashboard, $course);
+        if (!empty($widgets['comparison'])) {
+            $html .= $this->renderPeriodComparison($course);
         }
-        $max = max(array_map('intval', array_values($items)));
-        $content = '<div class="itxeb-bar-list">';
-        foreach ($items as $label => $count) {
-            $content .= $this->barRow((string) $label, (int) $count, $max);
+        if (!empty($widgets['activity_by_day'])) {
+            $html .= $this->renderActivityByDay($dashboard);
         }
-        return $section . $this->renderIliasLikeRow('Données', $content . '</div>') . '</section>';
+        if (!empty($widgets['verb_distribution'])) {
+            $html .= $this->renderVerbDistribution($dashboard);
+        }
+        if (!empty($widgets['top_resources'])) {
+            $html .= $this->renderTopResources($dashboard);
+        }
+        if (!empty($widgets['enabled_without_trace'])) {
+            $html .= $this->renderEnabledWithoutTraceResources($dashboard);
+        }
+        return $html;
     }
+PHP;
 
-    private function renderInnerTabs
-PHP_CODE;
-v0221_replace_regex(
-    $s,
-    "~\n    /\*\* @param array<string,int> \\$items \*/\n    private function renderBarSection\(string \\$title, array \\$items\): string\n    \{.*?\n    \}\n\n    private function renderInnerTabs~s",
-    "\n" . $barReplacement,
-    'bar sections ILIAS-like',
-    'itxeb-ilias-like-section"><h3>'
-);
-
-$pedagoReplacement = <<<'PHP_CODE'
+$renderPedagogicalSynthesis = <<<'PHP'
     /** @param array<string,mixed> $dashboard */
     private function renderPedagogicalSynthesis(array $dashboard): string
     {
@@ -207,23 +224,129 @@ $pedagoReplacement = <<<'PHP_CODE'
             . $this->renderIliasLikeRow('Résumé', $content, 'Indicateurs et signaux de la période')
             . '</section>';
     }
-    /** @param array<string,mixed> $dashboard @param array<string,mixed> $course */
-PHP_CODE;
-v0221_replace_regex(
-    $s,
-    "~\n    /\*\* @param array<string,mixed> \\$dashboard \*/\n    private function renderPedagogicalSynthesis\(array \\$dashboard\): string\n    \{.*?\n    \}\n    /\*\* @param array<string,mixed> \\$dashboard @param array<string,mixed> \\$course \*/~s",
-    "\n" . $pedagoReplacement,
-    'pedagogical synthesis ILIAS-like',
-    "renderIliasLikeRow('Résumé'"
-);
+PHP;
 
-$activityPatches = [
-    ["return \$html . '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p></section>';", "return \$html . \$this->renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p>') . '</section>';", 'activity empty', "renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée"],
-    ["return \$html . \$this->renderActivityTimelineSummary(\$items, 'semaine(s)') . \$this->renderActivityTimelineBars(\$items) . '</section>';", "return \$html . \$this->renderIliasLikeRow('Vue hebdomadaire', \$this->renderActivityTimelineSummary(\$items, 'semaine(s)') . \$this->renderActivityTimelineBars(\$items)) . '</section>';", 'activity week', "renderIliasLikeRow('Vue hebdomadaire'"],
-    ["return \$html . \$this->renderActivityTimelineSummary(\$items, 'jour(s)') . \$this->renderActivityTimelineBars(\$items) . '</section>';", "return \$html . \$this->renderIliasLikeRow('Vue quotidienne', \$this->renderActivityTimelineSummary(\$items, 'jour(s)') . \$this->renderActivityTimelineBars(\$items)) . '</section>';", 'activity day', "renderIliasLikeRow('Vue quotidienne'"],
-];
-foreach ($activityPatches as $p) {
-    v0221_replace_string($s, $p[0], $p[1], $p[2], $p[3]);
+$renderBarSection = <<<'PHP'
+    /** @param array<string,int> $items */
+    private function renderBarSection(string $title, array $items): string
+    {
+        $section = '<section class="itxeb-cui-section itxeb-ilias-like-section"><h3>' . $this->esc($title) . '</h3>';
+        if (count($items) === 0) {
+            return $section . $this->renderIliasLikeRow('Données', '<p><em>Aucune donnée.</em></p>') . '</section>';
+        }
+        $max = max(array_map('intval', array_values($items)));
+        $content = '<div class="itxeb-bar-list">';
+        foreach ($items as $label => $count) {
+            $content .= $this->barRow((string) $label, (int) $count, $max);
+        }
+        return $section . $this->renderIliasLikeRow('Données', $content . '</div>') . '</section>';
+    }
+PHP;
+
+$renderQuestionFailureHotspots = <<<'PHP'
+    /** @param array<string,mixed> $dashboard @param array<string,mixed> $course */
+    private function renderQuestionFailureHotspots(array $dashboard, array $course): string
+    {
+        $risks = is_array($dashboard['question_risks'] ?? null) ? $dashboard['question_risks'] : [];
+        if ($risks === []) {
+            $path = $this->bridge->getMainPluginPath() . '/classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php';
+            if (is_file($path)) {
+                require_once $path;
+            }
+            if (class_exists('ilIliasTraxEventBridgeQuestionRiskRepository')) {
+                $allowedRefIds = [];
+                foreach ((array) ($course['resources'] ?? []) as $resource) {
+                    if (is_array($resource) && (string) ($resource['obj_type'] ?? '') === 'tst') {
+                        $rid = (int) ($resource['ref_id'] ?? 0);
+                        if ($rid > 0) { $allowedRefIds[] = $rid; }
+                    }
+                }
+                try {
+                    $risks = (new ilIliasTraxEventBridgeQuestionRiskRepository())->build($this->getPeriodDays(), $allowedRefIds, $this->getSelectedResourceRefId());
+                } catch (Throwable $ignored) {
+                    $risks = [];
+                }
+            }
+        }
+
+        $html = '<section class="itxeb-cui-section itxeb-question-risks itxeb-ilias-like-section"><h3>Questions à fort taux d’échec</h3>';
+        if (count($risks) === 0) {
+            return $html . $this->renderIliasLikeRow('Questions', '<p><em>Aucune question à fort taux d’échec détectée sur la période sélectionnée.</em></p>') . '</section>';
+        }
+        $content = '<p>Seules les questions problématiques sont remontées ici. Toutes les questions restent tracées dans TRAX et visibles côté Expert.</p>';
+        $content .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr>'
+            . '<th>Priorité</th><th>Question</th><th>Test</th><th>Réponses</th><th>Échecs / non-réponses</th><th>Taux d’échec</th><th>Score moyen</th><th>Dernière trace</th>'
+            . '</tr></thead><tbody>';
+        foreach (array_slice($risks, 0, 10) as $risk) {
+            if (!is_array($risk)) { continue; }
+            $avg = ($risk['avg_score'] ?? null) === null ? '-' : (string) $risk['avg_score'] . ' %';
+            $failure = is_numeric($risk['failure_rate'] ?? null) ? (string) $risk['failure_rate'] . ' %' : '-';
+            $label = (string) ($risk['risk_label'] ?? 'À surveiller');
+            $class = $label === 'Critique' ? 'itxeb-pedagogy-critical' : 'itxeb-pedagogy-watch';
+            $content .= '<tr>'
+                . '<td><span class="itxeb-pedagogy-badge ' . $class . '">' . $this->esc($label) . '</span></td>'
+                . '<td><strong>' . $this->esc((string) ($risk['question_title'] ?? '')) . '</strong><br><small>Question ' . $this->esc((string) ($risk['question_id'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc((string) ($risk['test_title'] ?? '')) . '<br><small>ref_id ' . $this->esc((string) ($risk['ref_id'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc((string) ($risk['attempts'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc((string) (((int) ($risk['failed'] ?? 0)) + ((int) ($risk['unanswered'] ?? 0)))) . '</td>'
+                . '<td>' . $this->esc($failure) . '</td>'
+                . '<td>' . $this->esc($avg) . '</td>'
+                . '<td>' . $this->esc((string) ($risk['last_at'] ?? '')) . '</td>'
+                . '</tr>';
+        }
+        $content .= '</tbody></table></div>';
+        return $html . $this->renderIliasLikeRow('Questions', $content, 'Questions problématiques détectées') . '</section>';
+    }
+PHP;
+
+$renderActivityTimeline = <<<'PHP'
+    /** @param array<string,int|float|string> $byDay */
+    private function renderActivityTimeline(array $byDay): string
+    {
+        $periodDays = max(1, min(365, $this->getPeriodDays()));
+        $mode = $this->getActivityTimelineMode($periodDays);
+        $daily = $this->normalizeActivityDays($byDay, $periodDays);
+        $total = array_sum(array_map('intval', array_values($daily)));
+
+        $html = '<section class="itxeb-cui-section itxeb-activity-timeline itxeb-ilias-like-section"><h3>Activité dans le temps</h3>';
+        $controls = '<p>Vue compacte de l’activité du cours. Le détail complet reste disponible sans occuper toute la page.</p>' . $this->renderActivityTimelineSelector($mode);
+        $html .= $this->renderIliasLikeRow('Affichage', $controls, 'Choix de la granularité');
+
+        if ($total <= 0) {
+            return $html . $this->renderIliasLikeRow('Vue', '<p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p>') . '</section>';
+        }
+
+        if ($mode === 'week') {
+            $items = $this->aggregateActivityByWeek($daily);
+            return $html . $this->renderIliasLikeRow('Vue hebdomadaire', $this->renderActivityTimelineSummary($items, 'semaine(s)') . $this->renderActivityTimelineBars($items)) . '</section>';
+        }
+
+        if ($mode === 'all') {
+            $items = $daily;
+            $summaryItems = $periodDays > 30 ? $this->aggregateActivityByWeek($daily) : $daily;
+            $content = $this->renderActivityTimelineSummary($summaryItems, $periodDays > 30 ? 'semaine(s)' : 'jour(s)')
+                . '<details class="itxeb-activity-details"><summary>Afficher le détail complet par jour (' . $this->esc((string) count($items)) . ' jour(s))</summary>'
+                . $this->renderActivityTimelineBars($items)
+                . '</details>';
+            return $html . $this->renderIliasLikeRow('Détail complet', $content, 'Vue repliable par jour') . '</section>';
+        }
+
+        $limit = (int) $mode;
+        if ($limit <= 0) { $limit = min(14, $periodDays); }
+        $limit = min($limit, $periodDays);
+        $items = array_slice($daily, -$limit, null, true);
+        return $html . $this->renderIliasLikeRow('Vue quotidienne', $this->renderActivityTimelineSummary($items, 'jour(s)') . $this->renderActivityTimelineBars($items), (string) $limit . ' dernier(s) jour(s)') . '</section>';
+    }
+PHP;
+
+v0221_replace_method($s, 'renderDashboard', $renderDashboard);
+v0221_replace_method($s, 'renderPedagogicalSynthesis', $renderPedagogicalSynthesis);
+v0221_replace_method($s, 'renderBarSection', $renderBarSection);
+v0221_replace_method($s, 'renderQuestionFailureHotspots', $renderQuestionFailureHotspots);
+if (strpos($s, 'private function renderActivityTimeline(') !== false) {
+    v0221_replace_method($s, 'renderActivityTimeline', $renderActivityTimeline);
+} else {
+    echo "SKIP: méthode renderActivityTimeline absente, lancer apply_v022_activity_timeline.php avant pour l'activité compacte\n";
 }
 
 v0221_write($screen, $old, $s);
