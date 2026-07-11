@@ -51,6 +51,10 @@ class ilIliasTraxEventBridgeStatementFactory
             return null;
         }
 
+        if ($this->isMediaCastClientEvent($record)) {
+            return $this->createMediaCastMediaStatement($record);
+        }
+
         if ($component === 'components/ILIAS/ILIASObject'
             && $event === 'update'
             && $type === 'file'
@@ -137,6 +141,154 @@ class ilIliasTraxEventBridgeStatementFactory
         return in_array($type, ['blog', 'webr', 'mcst', 'frm', 'wiki', 'htlm', 'lm', 'sahs'], true);
     }
 
+    /**
+     * @param array<string,mixed> $record
+     */
+    private function isMediaCastClientEvent(array $record): bool
+    {
+        if ((string) ($record['obj_type'] ?? '') !== 'mcst') {
+            return false;
+        }
+        $params = $this->mediaCastClientEventParams($record);
+        $event = (string) ($params['itxeb_mcst_event'] ?? '');
+        return in_array($event, ['media_played', 'external_media_opened'], true);
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,mixed>
+     */
+    private function createMediaCastMediaStatement(array $record): array
+    {
+        $params = $this->mediaCastClientEventParams($record);
+        $event = (string) ($params['itxeb_mcst_event'] ?? 'media_played');
+        $isExternal = $event === 'external_media_opened'
+            || stripos((string) ($params['itxeb_mcst_media_mime'] ?? ''), 'youtube') !== false
+            || stripos((string) ($params['itxeb_mcst_media_url'] ?? ''), 'youtube.') !== false
+            || stripos((string) ($params['itxeb_mcst_media_url'] ?? ''), 'youtu.be') !== false;
+
+        $userId = (int) ($record['user_id'] ?? 0);
+        $refId = (int) ($record['ref_id'] ?? 0);
+        $objId = (int) ($record['obj_id'] ?? 0);
+        $baseUrl = $this->config->getIliasBaseUrl();
+
+        $mediaId = $this->sanitizeMediaText((string) ($params['itxeb_mcst_media_id'] ?? ''), 128);
+        $mediaTitle = $this->sanitizeMediaText((string) ($params['itxeb_mcst_media_title'] ?? ''), 255);
+        $mediaMime = $this->sanitizeMediaText((string) ($params['itxeb_mcst_media_mime'] ?? ''), 128);
+        $mediaUrl = $this->sanitizeMediaUrl((string) ($params['itxeb_mcst_media_url'] ?? ''));
+        $mediaProvider = $this->sanitizeMediaText((string) ($params['itxeb_mcst_media_provider'] ?? ''), 64);
+        if ($mediaProvider === '') {
+            $mediaProvider = $isExternal ? 'external' : 'ilias';
+        }
+        if ($mediaTitle === '') {
+            $mediaTitle = $mediaId !== '' ? 'Média MediaCast ' . $mediaId : 'Média MediaCast';
+        }
+
+        $safeMediaId = $mediaId !== '' ? rawurlencode($mediaId) : substr(sha1($mediaTitle . '|' . $mediaUrl), 0, 16);
+        $objectType = $isExternal ? 'mcst_media_link' : 'mcst_media';
+        $sourceEvent = $isExternal ? 'mediacast_external_media_opened' : 'mediacast_media_played';
+
+        $resultExtensions = [
+            $baseUrl . '/xapi/extensions/mediacast_ref_id' => $refId,
+            $baseUrl . '/xapi/extensions/mediacast_obj_id' => $objId,
+            $baseUrl . '/xapi/extensions/media_id' => $mediaId,
+            $baseUrl . '/xapi/extensions/media_title' => $mediaTitle,
+            $baseUrl . '/xapi/extensions/media_mime' => $mediaMime,
+            $baseUrl . '/xapi/extensions/media_provider' => $mediaProvider,
+            $baseUrl . '/xapi/extensions/media_client_event' => $event,
+        ];
+        if ($mediaUrl !== '') {
+            $resultExtensions[$baseUrl . '/xapi/extensions/media_url'] = $mediaUrl;
+        }
+
+        return [
+            'id' => $this->uuid4(),
+            'actor' => $this->actor($userId),
+            'verb' => $this->mediaCastMediaVerb($isExternal),
+            'object' => [
+                'id' => rtrim($this->activityId('mcst', $refId, $objId), '/') . '/media/' . $safeMediaId,
+                'objectType' => 'Activity',
+                'definition' => $this->activityDefinition(
+                    $this->mediaCastMediaActivityType($isExternal),
+                    $mediaTitle,
+                    $mediaUrl !== '' ? $mediaUrl : $this->objectUrl('mcst', $refId),
+                    $isExternal ? 'Média externe sélectionné dans un MediaCast ILIAS' : 'Vidéo interne lancée dans un MediaCast ILIAS',
+                    $isExternal ? 'External media selected in an ILIAS MediaCast' : 'Internal video played in an ILIAS MediaCast'
+                )
+            ],
+            'result' => [
+                'completion' => false,
+                'extensions' => $resultExtensions,
+            ],
+            'context' => $this->context($record, $sourceEvent, $objectType),
+            'timestamp' => $this->isoTimestamp((string) ($record['created_at'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $record
+     * @return array<string,string>
+     */
+    private function mediaCastClientEventParams(array $record): array
+    {
+        $uri = (string) ($record['request_uri'] ?? '');
+        $query = (string) (parse_url($uri, PHP_URL_QUERY) ?: '');
+        if ($query === '') {
+            return [];
+        }
+        parse_str($query, $values);
+        $params = [];
+        foreach ($values as $key => $value) {
+            if (strpos((string) $key, 'itxeb_mcst_') !== 0) {
+                continue;
+            }
+            if (is_scalar($value)) {
+                $params[(string) $key] = substr((string) $value, 0, 2000);
+            }
+        }
+        return $params;
+    }
+
+    private function sanitizeMediaText(string $value, int $maxLength): string
+    {
+        $value = trim(strip_tags($value));
+        $value = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value) ?? $value;
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+        return mb_substr($value, 0, max(1, $maxLength));
+    }
+
+    private function sanitizeMediaUrl(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        if (strpos($value, '//') === 0) {
+            $value = 'https:' . $value;
+        }
+        if (!preg_match('~^https?://~i', $value)) {
+            return '';
+        }
+        return substr($value, 0, 2000);
+    }
+
+    /** @return array<string,mixed> */
+    private function mediaCastMediaVerb(bool $external): array
+    {
+        $baseUrl = $this->config->getIliasBaseUrl();
+        return [
+            'id' => $external ? $baseUrl . '/xapi/verbs/opened-external-media' : $baseUrl . '/xapi/verbs/played-media',
+            'display' => [
+                'fr-FR' => $external ? 'a ouvert un média externe MediaCast' : 'a lancé une vidéo MediaCast',
+                'en-US' => $external ? 'opened external MediaCast media' : 'played MediaCast video',
+            ],
+        ];
+    }
+
+    private function mediaCastMediaActivityType(bool $external): string
+    {
+        return $this->config->getIliasBaseUrl() . '/xapi/activity-type/' . ($external ? 'ilias-mediacast-external-media' : 'ilias-mediacast-media');
+    }
     /**
      * @param array<string,mixed> $record
      * @return array<string,mixed>
@@ -622,6 +774,10 @@ class ilIliasTraxEventBridgeStatementFactory
             return 'test_question_result';
         }
 
+        if ($sourceEvent === 'mediacast_media_played' || $sourceEvent === 'mediacast_external_media_opened') {
+            return 'mediacast_media_client';
+        }
+
         if ($sourceEvent === 'test_tracking_status' || $objType === 'tst') {
             return 'test_tracking';
         }
@@ -641,6 +797,14 @@ class ilIliasTraxEventBridgeStatementFactory
 
         if ($sourceEvent === 'test_question_result') {
             return 'assessment_question';
+        }
+
+        if ($sourceEvent === 'mediacast_media_played') {
+            return 'media_play';
+        }
+
+        if ($sourceEvent === 'mediacast_external_media_opened') {
+            return 'external_media_open';
         }
 
         if ($sourceEvent === 'test_tracking_status' || $objType === 'tst') {

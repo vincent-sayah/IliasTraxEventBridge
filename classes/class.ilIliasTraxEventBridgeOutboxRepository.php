@@ -344,6 +344,10 @@ class ilIliasTraxEventBridgeOutboxRepository
         $type = (string) ($eventRecord['obj_type'] ?? '');
         $uri = (string) ($eventRecord['request_uri'] ?? '');
 
+        if ($component === 'components/ILIAS/ReadEvent' && $event === 'access' && $type === 'mcst' && strpos($uri, 'itxeb_mcst_event=') !== false) {
+            return 'mediacast_media_client_event';
+        }
+
         if ($component === 'components/ILIAS/ILIASObject' && $event === 'update' && $type === 'file' && strpos($uri, 'cmd=sendfile') !== false) {
             return 'file_downloaded';
         }
