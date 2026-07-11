@@ -2,7 +2,59 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
-## v0.22.4 — version stable courante promue dans main
+## v0.23.8 — MediaCast validé pour promotion dans main
+
+### Statut
+
+- Branche stable cible : `main`.
+- Branche de développement : `v0.23-mediacast-media-tracking`.
+- Commit de gel fonctionnel : `630ad8e` — `V0.23.8 validate MediaCast analysis view and external titles`.
+- Version plugin principal : `0.23.8-dev`.
+- Version plugin compagnon UI : `0.8.19`.
+- Type : version fonctionnelle validée, prête pour promotion.
+- Compatibilité : ILIAS 10.x.
+
+### Objectif
+
+La V0.23.8 ajoute le suivi MediaCast au pilotage xAPI du cours : ouverture de MediaCast, lancement de vidéo interne, ouverture de média externe et affichage formateur des médias vus dans l'onglet Analyse.
+
+### Ajouts et corrections principales
+
+- Détection des objets MediaCast `mcst`.
+- Génération de statements xAPI lors du lancement d'une vidéo interne MediaCast.
+- Génération de statements xAPI lors de l'ouverture d'un média externe MediaCast, par exemple YouTube/Vimeo.
+- Déduplication des beacons MediaCast côté client et côté serveur.
+- Ajout des verbes `played-media` et `opened-external-media`.
+- Ajout des extensions xAPI MediaCast : `media_title`, `media_provider`, `media_mime`, `media_url`, `media_client_event`, `mediacast_ref_id`, `mediacast_obj_id`.
+- Lecture des traces MediaCast depuis TRAX/LRS pour les vues pédagogiques.
+- Ajout du bloc `Médias MediaCast vus` dans l'onglet Analyse uniquement.
+- Retrait du bloc MediaCast de l'onglet Tableau de bord.
+- Affichage du titre réel d'un média externe lorsque le titre est fourni par la playlist MediaCast ILIAS.
+- Mise à jour du companion UI en `0.8.19`.
+- Mise à jour du plugin principal en `0.23.8-dev`.
+
+### Règle métier conservée
+
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = seules les questions problématiques sont remontées.
+Analyse IA = seules les questions problématiques sont intégrées au payload IA.
+Expert = vision technique complète.
+Analyse = détail MediaCast des vidéos internes lues et médias externes ouverts.
+```
+
+### Validation
+
+- Ouverture MediaCast visible dans Expert : OK.
+- Vidéo interne `vid5.mp4` tracée avec `played-media` : OK.
+- Média externe YouTube tracé avec `opened-external-media` : OK.
+- Envoi outbox vers TRAX/LRS avec statut `sent` : OK.
+- Traces visibles dans Expert : OK.
+- Bloc `Médias MediaCast vus` visible uniquement dans Analyse : OK.
+- Titre réel du média externe affiché après nouvelle trace : OK.
+- Serveur `ilias10`, poste Windows et GitHub réalignés sur la branche V0.23 : OK.
+
+## v0.22.4 — version stable précédente promue dans main
 
 ### Statut
 
