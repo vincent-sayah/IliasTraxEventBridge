@@ -578,7 +578,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course) . $this->renderMediaCastMediaDashboard($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -1025,6 +1025,130 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     /** @param array<string,mixed> $course */
     /** @param array<string,mixed> $dashboard */
+    /** @param array<string,mixed> $dashboard */
+    private function renderMediaCastMediaDashboard(array $dashboard): string
+    {
+        $rows = $this->mediaCastMediaRows($dashboard);
+        $summary = is_array($dashboard['summary'] ?? null) ? $dashboard['summary'] : [];
+        $html = '<section class="itxeb-cui-section itxeb-mediacast-media-dashboard"><h3>Médias MediaCast vus</h3>'
+            . '<p>Vue des vidéos internes lancées et des médias externes sélectionnés dans les objets MediaCast.</p>'
+            . '<div class="itxeb-kpi-grid">'
+            . $this->metricCard('Vidéos internes', (string) ($summary['mediacast_internal_played'] ?? 0), 'lancements')
+            . $this->metricCard('Médias externes', (string) ($summary['mediacast_external_opened'] ?? 0), 'ouvertures')
+            . $this->metricCard('Médias différents', (string) ($summary['mediacast_media_unique'] ?? 0), 'MediaCast')
+            . $this->metricCard('Apprenants', (string) ($summary['mediacast_media_learners'] ?? 0), 'ayant vu un média')
+            . '</div>';
+        if (count($rows) === 0) {
+            return $html . '<p><em>Aucune vidéo ou média externe MediaCast détecté sur la période sélectionnée.</em></p></section>';
+        }
+
+        $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr><th>Média</th><th>Type</th><th>Actions</th><th>Apprenants</th><th>MediaCast</th><th>Dernière trace</th></tr></thead><tbody>';
+        foreach (array_slice($rows, 0, 8) as $media) {
+            $html .= '<tr>'
+                . '<td><strong>' . $this->esc((string) ($media['media_title'] ?? '')) . '</strong><br><small>' . $this->esc((string) ($media['media_provider'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc($this->mediaCastMediaTypeLabel($media)) . '</td>'
+                . '<td>' . $this->esc($this->mediaCastMediaActionText($media)) . '</td>'
+                . '<td>' . $this->esc((string) ($media['learners_count'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc((string) ($media['parent_title'] ?? '')) . '<br><small>ref_id ' . $this->esc((string) ($media['parent_ref_id'] ?? '')) . '</small></td>'
+                . '<td>' . $this->esc((string) ($media['last_at'] ?? '')) . '</td>'
+                . '</tr>';
+        }
+        return $html . '</tbody></table></div></section>';
+    }
+
+    /** @param array<string,mixed> $dashboard */
+    private function renderMediaCastMediaAnalysisGroupedByParent(array $dashboard): string
+    {
+        $groups = $this->mediaCastMediaRowsGroupedByParent($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-mediacast-media-analysis"><h3>Analyse des vidéos MediaCast</h3>'
+            . '<p>Les vidéos et médias externes sont regroupés par objet MediaCast afin de voir précisément ce qui a été lu dans chaque MediaCast.</p>';
+        if (count($groups) === 0) {
+            return $html . '<p><em>Aucun média MediaCast détecté sur la période et le filtre sélectionnés.</em></p></section>';
+        }
+
+        foreach ($groups as $group) {
+            $rows = is_array($group['rows'] ?? null) ? $group['rows'] : [];
+            $html .= '<div class="itxeb-cui-section" style="margin-top:12px">'
+                . '<h4>MediaCast : ' . $this->esc((string) ($group['parent_title'] ?? '')) . '</h4>'
+                . '<p><small>ref_id ' . $this->esc((string) ($group['parent_ref_id'] ?? '')) . ' — ' . $this->esc((string) count($rows)) . ' média(s) détecté(s)</small></p>'
+                . '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table"><thead><tr>'
+                . '<th>Vidéo / média lu</th><th>Type</th><th>Actions</th><th>Apprenants</th><th>Dernière trace</th><th>URL</th>'
+                . '</tr></thead><tbody>';
+            foreach ($rows as $media) {
+                $html .= '<tr>'
+                    . '<td><strong>' . $this->esc((string) ($media['media_title'] ?? '')) . '</strong><br><small>' . $this->esc((string) ($media['media_provider'] ?? '')) . '</small></td>'
+                    . '<td>' . $this->esc($this->mediaCastMediaTypeLabel($media)) . '</td>'
+                    . '<td>' . $this->esc($this->mediaCastMediaActionText($media)) . '</td>'
+                    . '<td>' . $this->esc((string) ($media['learners_count'] ?? 0)) . '</td>'
+                    . '<td>' . $this->esc((string) ($media['last_at'] ?? '')) . '</td>'
+                    . '<td><small>' . $this->esc($this->shorten((string) ($media['media_url'] ?? ''), 120)) . '</small></td>'
+                    . '</tr>';
+            }
+            $html .= '</tbody></table></div></div>';
+        }
+
+        return $html . '</section>';
+    }
+
+    /** @param array<string,mixed> $dashboard @return array<int,array<string,mixed>> */
+    private function mediaCastMediaRows(array $dashboard): array
+    {
+        $rows = [];
+        foreach ((array) ($dashboard['by_mediacast_media'] ?? []) as $media) {
+            if (is_array($media)) {
+                $rows[] = $media;
+            }
+        }
+        usort($rows, static function (array $a, array $b): int {
+            $total = (int) ($b['total'] ?? 0) <=> (int) ($a['total'] ?? 0);
+            if ($total !== 0) { return $total; }
+            return strcmp((string) ($a['media_title'] ?? ''), (string) ($b['media_title'] ?? ''));
+        });
+        return $rows;
+    }
+
+    /** @param array<string,mixed> $dashboard @return array<int,array<string,mixed>> */
+    private function mediaCastMediaRowsGroupedByParent(array $dashboard): array
+    {
+        $groups = [];
+        foreach ($this->mediaCastMediaRows($dashboard) as $media) {
+            $parentRefId = (int) ($media['parent_ref_id'] ?? 0);
+            $parentTitle = trim((string) ($media['parent_title'] ?? ''));
+            if ($parentTitle === '') {
+                $parentTitle = $parentRefId > 0 ? 'MediaCast ref_id ' . $parentRefId : 'MediaCast';
+            }
+            $key = 'mcst:' . $parentRefId . ':' . $parentTitle;
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'parent_ref_id' => $parentRefId,
+                    'parent_title' => $parentTitle,
+                    'rows' => [],
+                ];
+            }
+            $groups[$key]['rows'][] = $media;
+        }
+        uasort($groups, static function (array $a, array $b): int {
+            return strcmp((string) ($a['parent_title'] ?? ''), (string) ($b['parent_title'] ?? ''));
+        });
+        return array_values($groups);
+    }
+
+    /** @param array<string,mixed> $media */
+    private function mediaCastMediaTypeLabel(array $media): string
+    {
+        return (string) ($media['media_type'] ?? '') === 'external' ? 'Média externe' : 'Vidéo interne';
+    }
+
+    /** @param array<string,mixed> $media */
+    private function mediaCastMediaActionText(array $media): string
+    {
+        $internal = (int) ($media['played_internal'] ?? 0);
+        $external = (int) ($media['opened_external'] ?? 0);
+        $parts = [];
+        if ($internal > 0) { $parts[] = $internal . ' lancement(s)'; }
+        if ($external > 0) { $parts[] = $external . ' ouverture(s) externe(s)'; }
+        return $parts === [] ? '0' : implode(' / ', $parts);
+    }
     private function renderStrugglingLearners(array $dashboard): string
     {
         $rows = is_array($dashboard['expert_rows'] ?? null) ? $dashboard['expert_rows'] : [];

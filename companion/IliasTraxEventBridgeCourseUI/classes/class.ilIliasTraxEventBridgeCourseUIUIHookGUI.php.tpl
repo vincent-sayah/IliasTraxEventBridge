@@ -370,6 +370,62 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
     /* ITXEB V0.23.3 external iframe tracking */
     var externalFrameObserverStarted = false;
 
+    /* ITXEB V0.23.8 external playlist title */
+    function isGenericExternalTitle(title) {
+        title = String(title || '').toLowerCase().trim();
+        return title === ''
+            || title === 'vidéo youtube mediacast'
+            || title === 'video youtube mediacast'
+            || title === 'média externe mediacast'
+            || title === 'media externe mediacast'
+            || title === 'youtube video player'
+            || title === 'youtube';
+    }
+
+    function youtubeMediaId(value) {
+        value = String(value || '');
+        if (value === '') { return ''; }
+        var patterns = [
+            /youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{6,})/i,
+            /youtube(?:-nocookie)?\.com\/watch\?[^#]*v=([A-Za-z0-9_-]{6,})/i,
+            /youtu\.be\/([A-Za-z0-9_-]{6,})/i
+        ];
+        for (var i = 0; i < patterns.length; i++) {
+            var m = value.match(patterns[i]);
+            if (m && m[1]) { return m[1]; }
+        }
+        return '';
+    }
+
+    function vimeoMediaId(value) {
+        value = String(value || '');
+        var m = value.match(/vimeo\.com\/(?:video\/)?([0-9]{5,})/i);
+        return m && m[1] ? m[1] : '';
+    }
+
+    function bestExternalPlaylistItemForFrame(src) {
+        parseItemsFromInlineScripts();
+        var selected = selectedItem(state.selectedId);
+        if (selected && isExternal(selected) && !isGenericExternalTitle(selected.title || '')) {
+            return selected;
+        }
+
+        var yt = youtubeMediaId(src);
+        var vi = vimeoMediaId(src);
+        var fallback = selected && isExternal(selected) ? selected : null;
+        for (var id in state.items) {
+            if (!Object.prototype.hasOwnProperty.call(state.items, id)) { continue; }
+            var item = state.items[id];
+            if (!item || !isExternal(item)) { continue; }
+            var resource = String(item.resource || '');
+            if (resource !== '' && src.indexOf(resource) !== -1) { return item; }
+            if (yt !== '' && youtubeMediaId(resource) === yt) { return item; }
+            if (vi !== '' && vimeoMediaId(resource) === vi) { return item; }
+            if (!fallback && !isGenericExternalTitle(item.title || '')) { fallback = item; }
+        }
+        return fallback;
+    }
+
     function externalItemFromFrame(frame) {
         if (!frame) { return null; }
         var src = String(frame.getAttribute('src') || frame.src || frame.getAttribute('data-src') || '');
@@ -379,21 +435,24 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
         var isVimeo = lower.indexOf('vimeo.') !== -1;
         if (!isYoutube && !isVimeo) { return null; }
 
-        var playlistItem = selectedItem(state.selectedId);
+        var playlistItem = bestExternalPlaylistItemForFrame(src);
         var title = String(frame.getAttribute('title') || frame.getAttribute('aria-label') || '');
-        if ((!title || title === '') && playlistItem && isExternal(playlistItem)) {
-            title = playlistItem.title || '';
+        if (playlistItem && isExternal(playlistItem) && !isGenericExternalTitle(playlistItem.title || '')) {
+            title = playlistItem.title || title;
         }
-        if (!title || title === '') {
+        if (isGenericExternalTitle(title) && playlistItem && isExternal(playlistItem)) {
+            title = playlistItem.title || title;
+        }
+        if (isGenericExternalTitle(title)) {
             title = isYoutube ? 'Vidéo YouTube MediaCast' : 'Média externe MediaCast';
         }
 
         return normalizeItem({
             id: (playlistItem && playlistItem.id) ? playlistItem.id : (state.selectedId || src),
             title: title,
-            mime: isYoutube ? 'video/youtube' : 'video/external',
-            resource: src,
-            provider: isYoutube ? 'youtube' : (isVimeo ? 'vimeo' : 'external')
+            mime: (playlistItem && playlistItem.mime) ? playlistItem.mime : (isYoutube ? 'video/youtube' : 'video/external'),
+            resource: (playlistItem && playlistItem.resource) ? playlistItem.resource : src,
+            provider: (playlistItem && playlistItem.provider) ? playlistItem.provider : (isYoutube ? 'youtube' : (isVimeo ? 'vimeo' : 'external'))
         });
     }
 

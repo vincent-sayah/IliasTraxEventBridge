@@ -70,6 +70,11 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 'tests_attempted' => 0,
                 'tests_passed' => 0,
                 'tests_failed' => 0,
+                'mediacast_internal_played' => 0,
+                'mediacast_external_opened' => 0,
+                'mediacast_media_total' => 0,
+                'mediacast_media_unique' => 0,
+                'mediacast_media_learners' => 0,
             ],
             'pedagogy' => [
                 'ok_count' => 0,
@@ -85,6 +90,8 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'by_verb' => [],
             'by_status' => [],
             'by_resource' => [],
+            'by_mediacast_media' => [],
+            'mediacast_media_learners' => [],
             'expert_rows' => [],
         ];
 
@@ -267,6 +274,8 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         }
         $summary['by_verb'][$verbId]['count']++;
 
+        $this->addMediaCastMediaStatement($summary, $statement, $resource, $actorKey, $timestamp, $verbId);
+
         $key = (string) ($resource['key'] ?? 'unknown');
         if (!isset($summary['by_resource'][$key])) {
             $summary['by_resource'][$key] = $resource + [
@@ -342,6 +351,85 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         ];
     }
 
+    /** @param array<string,mixed> $summary @param array<string,mixed> $statement @param array<string,mixed> $resource */
+    private function addMediaCastMediaStatement(array &$summary, array $statement, array $resource, string $actorKey, string $timestamp, string $verbId): void
+    {
+        $resultExtensions = is_array($statement['result']['extensions'] ?? null) ? $statement['result']['extensions'] : [];
+        $mediaEvent = (string) $this->extensionValue($resultExtensions, '/media_client_event');
+        $mediaTitle = trim((string) $this->extensionValue($resultExtensions, '/media_title'));
+        $mediaProvider = trim((string) $this->extensionValue($resultExtensions, '/media_provider'));
+        $mediaMime = trim((string) $this->extensionValue($resultExtensions, '/media_mime'));
+        $mediaUrl = trim((string) $this->extensionValue($resultExtensions, '/media_url'));
+        $mediaId = trim((string) $this->extensionValue($resultExtensions, '/media_id'));
+
+        $isInternal = $mediaEvent === 'media_played' || stripos($verbId, '/played-media') !== false;
+        $isExternal = $mediaEvent === 'external_media_opened' || stripos($verbId, '/opened-external-media') !== false;
+        if (!$isInternal && !$isExternal) {
+            return;
+        }
+
+        if ($mediaTitle === '') {
+            $mediaTitle = $this->resourceTitle($statement, 'Média MediaCast');
+        }
+        if ($mediaProvider === '') {
+            $mediaProvider = $isExternal ? 'external' : 'ilias';
+        }
+
+        $parentRefId = (int) ($resource['ref_id'] ?? 0);
+        $parentTitle = trim((string) ($resource['title'] ?? ''));
+        if ($parentTitle === '') {
+            $parentTitle = $parentRefId > 0 ? 'MediaCast ref_id ' . $parentRefId : 'MediaCast';
+        }
+
+        $identity = $mediaId !== '' ? $mediaId : ($mediaUrl !== '' ? $mediaUrl : $mediaTitle);
+        $type = $isExternal ? 'external' : 'internal';
+        $key = 'mcst:' . $parentRefId . ':' . $type . ':' . sha1($identity);
+
+        if (!isset($summary['by_mediacast_media']) || !is_array($summary['by_mediacast_media'])) {
+            $summary['by_mediacast_media'] = [];
+        }
+        if (!isset($summary['mediacast_media_learners']) || !is_array($summary['mediacast_media_learners'])) {
+            $summary['mediacast_media_learners'] = [];
+        }
+        if (!isset($summary['by_mediacast_media'][$key])) {
+            $summary['by_mediacast_media'][$key] = [
+                'key' => $key,
+                'media_id' => $mediaId,
+                'media_title' => $mediaTitle,
+                'media_type' => $type,
+                'media_provider' => $mediaProvider,
+                'media_mime' => $mediaMime,
+                'media_url' => $mediaUrl,
+                'parent_ref_id' => $parentRefId,
+                'parent_obj_id' => (int) ($resource['obj_id'] ?? 0),
+                'parent_title' => $parentTitle,
+                'total' => 0,
+                'played_internal' => 0,
+                'opened_external' => 0,
+                'learners' => [],
+                'learners_count' => 0,
+                'last_at' => '',
+            ];
+        }
+
+        $summary['by_mediacast_media'][$key]['total']++;
+        if ($isExternal) {
+            $summary['by_mediacast_media'][$key]['opened_external']++;
+            $summary['summary']['mediacast_external_opened'] = (int) ($summary['summary']['mediacast_external_opened'] ?? 0) + 1;
+        } else {
+            $summary['by_mediacast_media'][$key]['played_internal']++;
+            $summary['summary']['mediacast_internal_played'] = (int) ($summary['summary']['mediacast_internal_played'] ?? 0) + 1;
+        }
+        $summary['summary']['mediacast_media_total'] = (int) ($summary['summary']['mediacast_media_total'] ?? 0) + 1;
+
+        if ($actorKey !== '') {
+            $summary['by_mediacast_media'][$key]['learners'][$actorKey] = true;
+            $summary['mediacast_media_learners'][$actorKey] = true;
+        }
+        if ($timestamp !== '' && ((string) ($summary['by_mediacast_media'][$key]['last_at'] ?? '') === '' || strcmp($timestamp, (string) $summary['by_mediacast_media'][$key]['last_at']) > 0)) {
+            $summary['by_mediacast_media'][$key]['last_at'] = $timestamp;
+        }
+    }
     /** @param array<string,mixed> $summary @return array<string,mixed> */
     private function finalize(array $summary): array
     {
@@ -371,6 +459,22 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         unset($resource);
 
         $summary['pedagogy'] = $this->finalizePedagogy($pedagogy, $summary);
+
+        if (isset($summary['by_mediacast_media']) && is_array($summary['by_mediacast_media'])) {
+            foreach ($summary['by_mediacast_media'] as &$media) {
+                $media['learners_count'] = count((array) ($media['learners'] ?? []));
+                unset($media['learners']);
+            }
+            unset($media);
+            uasort($summary['by_mediacast_media'], static function (array $a, array $b): int {
+                $total = (int) ($b['total'] ?? 0) <=> (int) ($a['total'] ?? 0);
+                if ($total !== 0) { return $total; }
+                return strcmp((string) ($a['media_title'] ?? ''), (string) ($b['media_title'] ?? ''));
+            });
+            $summary['summary']['mediacast_media_unique'] = count($summary['by_mediacast_media']);
+        }
+        $summary['summary']['mediacast_media_learners'] = count((array) ($summary['mediacast_media_learners'] ?? []));
+        unset($summary['mediacast_media_learners']);
 
         uasort($summary['by_resource'], static function (array $a, array $b): int {
             $rank = ['critical' => 4, 'watch' => 3, 'ok' => 2, 'disabled' => 1];
@@ -506,6 +610,11 @@ class ilIliasTraxEventBridgeLrsCourseSummary
 
         if ((int) $pedagogy['resources_without_trace'] > 0) {
             $lines[] = $pedagogy['resources_without_trace'] . ' ressource(s) activée(s) ne présentent aucune trace TRAX sur la période.';
+        }
+
+        $mediaTotal = (int) ($summary['summary']['mediacast_media_total'] ?? 0);
+        if ($mediaTotal > 0) {
+            $lines[] = $mediaTotal . ' action(s) MediaCast détectée(s) sur des vidéos ou médias externes.';
         }
 
         if ((int) $pedagogy['critical_count'] > 0) {
