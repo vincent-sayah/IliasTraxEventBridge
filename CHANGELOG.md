@@ -2,6 +2,69 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.25.6 — affichage login apprenant validé
+
+### Statut
+
+- Branche stable cible : `main`.
+- Branche de développement : `v0.25-learner-identity-display`.
+- Commit de gel fonctionnel : `8d97685` — `V0.25.6 validate learner login display`.
+- Version plugin principal : `0.25.6-dev`.
+- Version plugin compagnon UI : `0.8.44`.
+- Type : version fonctionnelle validée, prête pour promotion.
+- Compatibilité : ILIAS 10.x.
+
+### Objectif
+
+La V0.25.6 finalise l'affichage nominatif des apprenants dans les vues de pilotage du cours. Les formateurs voient le login ILIAS dans le tableau `Apprenants en difficulté` et dans une nouvelle colonne `Apprenant` de la vue Expert.
+
+### Ajouts et corrections principales
+
+- Ajout de `learner_identity` dans les lignes Expert lues depuis TRAX/LRS.
+- Résolution de l'acteur xAPI `ilias-user-ID` vers le login ILIAS.
+- Recherche du login via `ilObjUser::_lookupLogin()`, puis via `$DIC->database()`, puis via `$ilDB` et `usr_data.login`.
+- Ajout d'un cache local de résolution des logins pendant la requête.
+- Remplacement de l'ancien pseudonyme `Apprenant xxxxxxxx` dans `Analyse > Apprenants en difficulté`.
+- Ajout de la colonne `Apprenant` entre `User ID` et `Verbe` dans la vue Expert.
+- Ajout de la colonne `learner_identity` dans l'export CSV Expert.
+- Conservation de `User ID` comme identifiant technique pseudonymisé.
+- Mise à jour du compagnon UI en `0.8.44`.
+- Mise à jour du plugin principal en `0.25.6-dev`.
+
+### Périmètre inchangé
+
+- Génération des statements xAPI inchangée.
+- Outbox locale inchangée.
+- Envoi TRAX/LRS inchangé.
+- Règle d'activation cours/ressource inchangée.
+- Tableau de bord V0.24.17 conservé.
+- Suivi MediaCast V0.23.8 conservé.
+- Analyse IA inchangée.
+- Filtrage des questions problématiques inchangé.
+
+### Règle métier conservée
+
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = seules les questions problématiques sont remontées.
+Analyse IA = seules les questions problématiques sont intégrées au payload IA.
+Expert = vision technique complète.
+Analyse = détail MediaCast des vidéos internes lues et médias externes ouverts.
+Analyse / Expert = affichage du login ILIAS lorsque le login est résolu.
+```
+
+### Validation
+
+- V0.25.5 appliquée avec préflight Python 3.6 : OK.
+- Affichage initial de type `ilias-user-6` / `ilias-user-401` constaté : OK.
+- Correctif V0.25.6 appliqué pour résoudre `ilias-user-ID` vers le login ILIAS : OK.
+- `php -l` sur les fichiers critiques : OK.
+- Redémarrage `php-fpm` et `httpd` : OK.
+- Onglet Analyse fonctionnel avec affichage du login : OK.
+- Onglet Expert fonctionnel avec colonne `Apprenant` : OK.
+- Export CSV Expert enrichi avec `learner_identity` : OK.
+- Bundle serveur importé puis poussé via Git Bash Windows : OK.
+
 ## v0.24.17 — tableau de bord pédagogique validé
 
 ### Statut
@@ -117,96 +180,11 @@ Analyse = détail MediaCast des vidéos internes lues et médias externes ouvert
 
 ## v0.22.4 — version stable précédente promue dans main
 
-### Statut
-
-- Branche stable : `main`.
-- Branche de développement : `v0.22-dashboard-activity-timeline`.
-- Commit de gel fonctionnel : `b4fdf9a` — `V0.22.4 validate dashboard layout and AI tab fixes`.
-- Version plugin principal : `0.22.4-dev`.
-- Version plugin compagnon UI : `0.8.10`.
-- Type : version fonctionnelle validée et promue.
-- Compatibilité : ILIAS 10.x.
-
-### Objectif
-
-La V0.22.4 améliore l'ergonomie du tableau de bord, de l'analyse et de l'analyse IA sans changer la règle métier xAPI validée en V0.21.2.
-
-### Ajouts et corrections principales
-
-- Remplacement de la liste longue `Activité par jour` par un bloc `Activité dans le temps` compact.
-- Ajout du choix d'affichage : `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet`.
-- Ajout d'une synthèse d'activité : périodes actives, périodes sans activité, pic, moyenne.
-- Présentation des blocs de tableau de bord et d'analyse selon un modèle proche des formulaires ILIAS : libellé/fonctionnalité à gauche, données à droite.
-- Correction de l'alignement de la `Synthèse pédagogique` dans Tableau de bord et Analyse.
-- Correction de l'onglet actif après retrait d'une analyse IA historisée : l'utilisateur reste sur `Analyse IA`.
-- Mise à jour du companion UI en `0.8.10`.
-- Mise à jour du plugin principal en `0.22.4-dev`.
-- Documentation V0.22 ajoutée et alignée avec `main`.
-
-### Règle métier conservée
-
-```text
-TRAX = toutes les questions de test ILIAS sont tracées.
-Tableau de bord / Analyse = seules les questions problématiques sont remontées.
-Analyse IA = seules les questions problématiques sont intégrées au payload IA.
-Expert = vision technique complète.
-```
-
-### Validation
-
-- Bloc `Activité dans le temps` validé visuellement.
-- Présentation type ILIAS validée dans Tableau de bord et Analyse.
-- Synthèse pédagogique alignée titre/données validée.
-- Analyse IA validée après retrait d'une analyse historisée.
-- Serveur `ilias10`, poste Windows et GitHub réalignés : OK.
+Voir `docs/RELEASE_0.22.4.md`.
 
 ## v0.21.2 — version stable précédente promue dans main
 
-### Statut
-
-- Branche stable : `main`.
-- Commit de gel fonctionnel : `fad4c28` — `Freeze V0.21.2 validated implementation`.
-- Version plugin principal : `0.21.2-dev`.
-- Version plugin compagnon UI : `0.8.5`.
-- Type : version fonctionnelle validée et promue.
-- Compatibilité : ILIAS 10.x.
-
-### Objectif
-
-La V0.21.2 finalise le pilotage pédagogique xAPI avec suivi des tests ILIAS question par question et intégration des questions problématiques dans les vues formateur et l'Analyse IA.
-
-### Règle métier validée
-
-```text
-TRAX = toutes les questions de test ILIAS sont tracées.
-Tableau de bord / Analyse = seules les questions problématiques sont remontées.
-Analyse IA = seules les questions problématiques sont intégrées au payload IA.
-Expert = vision technique complète.
-```
-
-### Ajouts principaux
-
-- Génération de plusieurs statements depuis un même événement ILIAS de test.
-- Ajout de `classes/class.ilIliasTraxEventBridgeTestQuestionResultExtractor.php`.
-- Lecture des résultats question dans les tables ILIAS `tst_tests`, `tst_active`, `tst_test_result`, `qpl_questions`.
-- Ajout de `classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php`.
-- Calcul des questions à fort taux d'échec depuis les statements question disponibles dans l'outbox locale.
-- Ajout du bloc `Questions à fort taux d’échec` dans `Tableau de bord` et `Analyse`.
-- Ajout de `question_failure_analysis` dans le payload de l'Analyse IA.
-- Mise à jour du companion UI en `0.8.5`.
-- Documentation V0.21.2 complète : release, fonctionnel, technique, exploitation, validation, guide développeur.
-- Correction du script compagnon pour supporter les installations ILIAS hors `/var/www/ilias` via `ILIAS_ROOT`.
-- Correction de `docs/INSTALLATION.md` : installation depuis `main` et non plus depuis l'ancienne branche `v0.10-lrs-direct-read`.
-
-### Validation
-
-- Génération de statements par question : OK.
-- Statements contenant `question_id` : OK.
-- Correction `source_event = test_question_result` : OK.
-- Bloc `Questions à fort taux d’échec` visible : OK.
-- Intégration Analyse IA : OK.
-- `php -l` sur les classes critiques : OK.
-- Serveur `ilias10`, poste Windows et GitHub `main` réalignés : OK.
+Voir `docs/FONCTIONNEL_0.21.2.md`, `docs/TECHNIQUE_0.21.2.md`, `docs/GUIDE_DEVELOPPEUR_0.21.2.md` et `docs/EXPLOITATION_0.21.2.md`.
 
 ## v0.16 — consolidation post V0.15.2
 
