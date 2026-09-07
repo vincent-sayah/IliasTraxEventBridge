@@ -2,6 +2,67 @@
 
 Toutes les évolutions notables du plugin sont listées ici.
 
+## v0.24.17 — tableau de bord pédagogique validé
+
+### Statut
+
+- Branche stable cible : `main`.
+- Branche de développement : `v0.24-dashboard-synthesis-layout`.
+- Commit de gel fonctionnel : `3a05d77` — `V0.24.17 validate dashboard synthesis and activity layout`.
+- Version plugin principal : `0.24.17-dev`.
+- Version plugin compagnon UI : `0.8.37`.
+- Type : version fonctionnelle validée, prête pour promotion.
+- Compatibilité : ILIAS 10.x.
+
+### Objectif
+
+La V0.24.17 améliore la lisibilité du `Tableau de bord` du pilotage xAPI : synthèse pédagogique regroupée, suppression des tuiles doublonnées, graphique d'activité linéaire et alignement visuel du bloc `Activité dans le temps` avec `Top ressources`.
+
+### Ajouts et corrections principales
+
+- Intégration des indicateurs pédagogiques dans le bloc `Synthèse pédagogique`.
+- Suppression des doublons visuels des tuiles `ressources sans activité`, `critique` et `à surveiller`.
+- Ajout d'icônes dans les cartes KPI.
+- Filtrage du bloc `Questions à fort taux d’échec` selon le contexte : vue globale, tous types, type test ou ressource test.
+- Masquage du bloc `Questions à fort taux d’échec` lorsqu'une ressource non-test est sélectionnée.
+- Remplacement de l'ancien graphique horizontal d'activité par un graphique linéaire SVG.
+- Conservation des modes d'affichage de l'activité : 7 jours, 14 jours, 30 jours, par semaine, détail complet.
+- Alignement du titre `Activité dans le temps` avec les autres titres de sections ILIAS.
+- Alignement de `Top ressources` sur la même ligne que la carte `Progression de l’activité`.
+- Mise à jour du companion UI en `0.8.37`.
+- Mise à jour du plugin principal en `0.24.17-dev`.
+
+### Périmètre inchangé
+
+- Génération des statements xAPI inchangée.
+- Outbox locale inchangée.
+- Envoi TRAX/LRS inchangé.
+- Suivi MediaCast V0.23.8 conservé.
+- Analyse IA inchangée hors présentation des données déjà disponibles.
+- Vue Expert inchangée.
+- Configuration inchangée.
+
+### Règle métier conservée
+
+```text
+TRAX = toutes les questions de test ILIAS sont tracées.
+Tableau de bord / Analyse = seules les questions problématiques sont remontées.
+Analyse IA = seules les questions problématiques sont intégrées au payload IA.
+Expert = vision technique complète.
+Analyse = détail MediaCast des vidéos internes lues et médias externes ouverts.
+```
+
+### Validation
+
+- Restauration depuis `main` puis réapplication des scripts sûrs : OK.
+- `private $repository`, `__construct()` et `handle()` présents dans la classe écran : OK.
+- `php -l` sur les fichiers critiques : OK.
+- Redémarrage `php-fpm` et `httpd` : OK.
+- Tableau de bord accessible dans le navigateur : OK.
+- Graphique linéaire `Progression de l’activité` affiché : OK.
+- `Top ressources` aligné avec la carte du graphique : OK.
+- GitHub réaligné sur le commit validé `3a05d77` : OK.
+
 ## v0.23.8 — MediaCast validé pour promotion dans main
 
 ### Statut
@@ -158,11 +219,3 @@ Voir les documents historiques V0.15.2.
 ## v0.12.1 — consolidation technique du compagnon UI
 
 Voir les documents historiques V0.12.1.
-
-## v0.12.0 — enrichissement pédagogique du tableau de bord
-
-Voir les documents historiques V0.12.
-
-## v0.11.0 — diagnostic et durcissement exploitation
-
-Voir les documents historiques V0.11.
