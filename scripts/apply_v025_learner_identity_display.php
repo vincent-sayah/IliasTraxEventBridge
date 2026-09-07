@@ -28,7 +28,7 @@ $liveCompanionPlugin = $liveCompanion . '/plugin.php';
 
 function fail_v025(string $message): void
 {
-    fwrite(STDERR, "ERREUR: " . $message . PHP_EOL);
+    fwrite(STDERR, 'ERREUR: ' . $message . PHP_EOL);
     exit(1);
 }
 
@@ -122,15 +122,22 @@ function replace_in_method_v025(string $content, string $methodName, callable $c
 
 function patch_lrs_summary_v025(string $content): string
 {
-    $content = replace_once_v025(
-        $content,
-        "            'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),\n            'verb_label' => $verbLabel,",
-        "            'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),\n            'learner_identity' => $this->actorDisplayName($statement, $actorKey),\n            'verb_label' => $verbLabel,",
-        'ajout learner_identity dans expert_rows'
-    );
+    $search = <<<'PHP'
+            'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),
+            'verb_label' => $verbLabel,
+PHP;
+    $replace = <<<'PHP'
+            'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),
+            'learner_identity' => $this->actorDisplayName($statement, $actorKey),
+            'verb_label' => $verbLabel,
+PHP;
+    $content = replace_once_v025($content, $search, $replace, 'ajout learner_identity dans expert_rows');
 
     if (strpos($content, 'private function actorDisplayName(') === false) {
-        $marker = "    /** @param array<string,mixed> $statement */\n    private function actorKey(array $statement): string";
+        $marker = <<<'PHP'
+    /** @param array<string,mixed> $statement */
+    private function actorKey(array $statement): string
+PHP;
         $method = <<<'PHP'
     /** @param array<string,mixed> $statement */
     private function actorDisplayName(array $statement, string $actorKey = ''): string
@@ -174,26 +181,68 @@ PHP;
 function patch_screen_v025(string $content): string
 {
     // Corrige au passage une mauvaise quote HTML déjà observée localement sur le template V0.24.17.
-    $content = str_replace("<div class= itxeb-dashboard-top-card\"", "<div class=\"itxeb-dashboard-top-card\"", $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
+    $content = str_replace('<div class= itxeb-dashboard-top-card"', '<div class="itxeb-dashboard-top-card"', $content);
 
     $content = replace_in_method_v025($content, 'renderStrugglingLearners', static function (string $method): string {
-        $method = replace_once_v025(
-            $method,
-            "            $userId = (int) ($row['user_id'] ?? 0);\n            if ($userId <= 0) {\n                continue;\n            }",
-            "            $learnerIdentity = trim((string) ($row['learner_identity'] ?? ''));\n            $userId = trim((string) ($row['user_id'] ?? ''));\n            $learnerKey = $learnerIdentity !== '' ? $learnerIdentity : $userId;\n            if ($learnerKey === '') {\n                continue;\n            }",
-            'renderStrugglingLearners identite apprenant'
-        );
+        $search = <<<'PHP'
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId <= 0) {
+                continue;
+            }
+PHP;
+        $replace = <<<'PHP'
+            $learnerIdentity = trim((string) ($row['learner_identity'] ?? ''));
+            $userId = trim((string) ($row['user_id'] ?? ''));
+            $learnerKey = $learnerIdentity !== '' ? $learnerIdentity : $userId;
+            if ($learnerKey === '') {
+                continue;
+            }
+PHP;
+        $method = replace_once_v025($method, $search, $replace, 'renderStrugglingLearners identite apprenant');
 
-        $method = replace_once_v025(
-            $method,
-            "            if (!isset($learners[$userId])) {\n                $learners[$userId] = [\n                    'anonymous_id' => 'Apprenant ' . substr(sha1('itxeb:' . (string) $userId), 0, 8),",
-            "            if (!isset($learners[$learnerKey])) {\n                $learners[$learnerKey] = [\n                    'learner_identity' => $learnerIdentity !== '' ? $learnerIdentity : $userId,",
-            'renderStrugglingLearners suppression pseudonyme'
-        );
+        $search = <<<'PHP'
+            if (!isset($learners[$userId])) {
+                $learners[$userId] = [
+                    'anonymous_id' => 'Apprenant ' . substr(sha1('itxeb:' . (string) $userId), 0, 8),
+PHP;
+        $replace = <<<'PHP'
+            if (!isset($learners[$learnerKey])) {
+                $learners[$learnerKey] = [
+                    'learner_identity' => $learnerIdentity !== '' ? $learnerIdentity : $userId,
+PHP;
+        $method = replace_once_v025($method, $search, $replace, 'renderStrugglingLearners suppression pseudonyme');
 
         $method = str_replace('$learners[$userId]', '$learners[$learnerKey]', $method);
-        $method = str_replace("Vue anonymisée : aucun nom ni courriel n’est affiché. Les identifiants sont des pseudonymes techniques.", "Vue nominative : les apprenants sont affichés avec l’identité transmise par TRAX/LRS afin de faciliter le suivi formateur.", $method);
-        $method = str_replace("$learner['anonymous_id']", "$learner['learner_identity']", $method);
+        $method = str_replace('Vue anonymisée : aucun nom ni courriel n’est affiché. Les identifiants sont des pseudonymes techniques.', 'Vue nominative : les apprenants sont affichés avec l’identité transmise par TRAX/LRS afin de faciliter le suivi formateur.', $method);
+        $method = str_replace('$learner[\'anonymous_id\']', '$learner[\'learner_identity\']', $method);
 
         if (strpos($method, 'anonymous_id') !== false) {
             fail_v025('anonymous_id encore present dans renderStrugglingLearners');
@@ -211,33 +260,44 @@ function patch_screen_v025(string $content): string
         'colonne Apprenant tableau Expert'
     );
 
-    $content = replace_once_v025(
-        $content,
-        "            $html .= '<tr><td>' . $this->esc((string) ($row['created_at'] ?? '')) . '</td><td>' . $this->esc((string) ($row['user_id'] ?? 0)) . '</td>'\n                . '<td>' . $this->esc((string) ($row['verb_label'] ?? '')) . '<br><small>' . $this->esc((string) ($row['verb_id'] ?? '')) . '</small></td>';",
-        "            $html .= '<tr><td>' . $this->esc((string) ($row['created_at'] ?? '')) . '</td><td>' . $this->esc((string) ($row['user_id'] ?? 0)) . '</td>'\n                . '<td>' . $this->esc((string) ($row['learner_identity'] ?? '')) . '</td>'\n                . '<td>' . $this->esc((string) ($row['verb_label'] ?? '')) . '<br><small>' . $this->esc((string) ($row['verb_id'] ?? '')) . '</small></td>';",
-        'valeur colonne Apprenant tableau Expert'
-    );
+    $search = <<<'PHP'
+            $html .= '<tr><td>' . $this->esc((string) ($row['created_at'] ?? '')) . '</td><td>' . $this->esc((string) ($row['user_id'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc((string) ($row['verb_label'] ?? '')) . '<br><small>' . $this->esc((string) ($row['verb_id'] ?? '')) . '</small></td>';
+PHP;
+    $replace = <<<'PHP'
+            $html .= '<tr><td>' . $this->esc((string) ($row['created_at'] ?? '')) . '</td><td>' . $this->esc((string) ($row['user_id'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc((string) ($row['learner_identity'] ?? '')) . '</td>'
+                . '<td>' . $this->esc((string) ($row['verb_label'] ?? '')) . '<br><small>' . $this->esc((string) ($row['verb_id'] ?? '')) . '</small></td>';
+PHP;
+    $content = replace_once_v025($content, $search, $replace, 'valeur colonne Apprenant tableau Expert');
 
-    $content = replace_once_v025(
-        $content,
-        "                'date', 'course_ref_id', 'filter_ref_id', 'user_id',\n                'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type',",
-        "                'date', 'course_ref_id', 'filter_ref_id', 'user_id', 'learner_identity',\n                'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type',",
-        'colonne learner_identity CSV Expert'
-    );
+    $search = <<<'PHP'
+                'date', 'course_ref_id', 'filter_ref_id', 'user_id',
+                'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type',
+PHP;
+    $replace = <<<'PHP'
+                'date', 'course_ref_id', 'filter_ref_id', 'user_id', 'learner_identity',
+                'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type',
+PHP;
+    $content = replace_once_v025($content, $search, $replace, 'colonne learner_identity CSV Expert');
 
-    $content = replace_once_v025(
-        $content,
-        "                    (string) ($row['user_id'] ?? 0),\n                    (string) ($row['verb_label'] ?? ''),",
-        "                    (string) ($row['user_id'] ?? 0),\n                    (string) ($row['learner_identity'] ?? ''),\n                    (string) ($row['verb_label'] ?? ''),",
-        'valeur learner_identity CSV Expert'
-    );
+    $search = <<<'PHP'
+                    (string) ($row['user_id'] ?? 0),
+                    (string) ($row['verb_label'] ?? ''),
+PHP;
+    $replace = <<<'PHP'
+                    (string) ($row['user_id'] ?? 0),
+                    (string) ($row['learner_identity'] ?? ''),
+                    (string) ($row['verb_label'] ?? ''),
+PHP;
+    $content = replace_once_v025($content, $search, $replace, 'valeur learner_identity CSV Expert');
 
     return $content;
 }
 
-function patch_version_v025(string $content, string $version, string $label): string
+function patch_version_v025(string $content, string $newVersion, string $label): string
 {
-    $updated = preg_replace("/\\$version\\s*=\\s*'[^']+';/", "\$version = '" . $version . "';", $content, 1, $count);
+    $updated = preg_replace("/\\$version\\s*=\\s*'[^']+';/", "\$version = '" . $newVersion . "';", $content, 1, $count);
     if (!is_string($updated) || $count !== 1) {
         fail_v025('version introuvable: ' . $label);
     }
@@ -298,5 +358,5 @@ foreach ([$summaryFile, $screenTemplate, $liveScreen] as $file) {
     }
 }
 
-echo "V0.25.0 appliquee : identite apprenant non anonymisee dans Analyse et Expert." . PHP_EOL;
-echo "Backups: " . $backupDir . PHP_EOL;
+echo 'V0.25.0 appliquee : identite apprenant non anonymisee dans Analyse et Expert.' . PHP_EOL;
+echo 'Backups: ' . $backupDir . PHP_EOL;
