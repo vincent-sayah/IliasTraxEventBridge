@@ -17,6 +17,9 @@ class ilIliasTraxEventBridgeLrsCourseSummary
     /** @var ilIliasTraxEventBridgeLrsReadClient */
     private $client;
 
+    /** @var array<int,string> */
+    private $actorLoginCache = [];
+
     public function __construct()
     {
         $this->config = new ilIliasTraxEventBridgeConfig();
@@ -335,6 +338,7 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $summary['expert_rows'][] = [
             'created_at' => $timestamp,
             'user_id' => $actorKey === '' ? '' : substr(sha1($actorKey), 0, 10),
+            'learner_identity' => $this->actorDisplayName($statement, $actorKey),
             'verb_label' => $verbLabel,
             'verb_id' => $verbId,
             'object_title' => (string) ($resource['title'] ?? ''),
@@ -707,6 +711,132 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         $parts = preg_split('/[\/#]/', $verbId);
         $last = is_array($parts) ? end($parts) : false;
         return is_string($last) && $last !== '' ? $last : $verbId;
+    }
+
+    /** @param array<string,mixed> $statement */
+    private function actorDisplayName(array $statement, string $actorKey = ''): string
+    {
+        // ITXEB V0.25.6 learner login resolution.
+        $accountName = $statement['actor']['account']['name'] ?? '';
+
+        if (is_scalar($accountName)) {
+            $login = $this->lookupIliasLoginFromActorValue((string) $accountName);
+            if ($login !== '') { return $login; }
+        }
+
+        if ($actorKey !== '') {
+            $login = $this->lookupIliasLoginFromActorValue($actorKey);
+            if ($login !== '') { return $login; }
+        }
+
+        $name = $statement['actor']['name'] ?? '';
+        if (is_scalar($name) && trim((string) $name) !== '') {
+            $nameText = trim((string) $name);
+            $login = $this->lookupIliasLoginFromActorValue($nameText);
+            return $login !== '' ? $login : $nameText;
+        }
+
+        $mbox = $statement['actor']['mbox'] ?? '';
+        if (is_scalar($mbox) && trim((string) $mbox) !== '') {
+            $mail = preg_replace('/^mailto:/i', '', trim((string) $mbox));
+            return is_string($mail) && $mail !== '' ? $mail : trim((string) $mbox);
+        }
+
+        if (is_scalar($accountName) && trim((string) $accountName) !== '') {
+            return trim((string) $accountName);
+        }
+
+        return $actorKey;
+    }
+
+    private function lookupIliasLoginFromActorValue(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') { return ''; }
+
+        if (strpos($value, 'account:') === 0) {
+            $value = trim(substr($value, 8));
+        }
+
+        if (preg_match('/^ilias-user-([0-9]+)$/', $value, $m) === 1) {
+            return $this->lookupIliasLogin((int) $m[1]);
+        }
+
+        return '';
+    }
+
+    private function lookupIliasLogin(int $userId): string
+    {
+        if ($userId <= 0) { return ''; }
+
+        if (isset($this->actorLoginCache[$userId])) {
+            return $this->actorLoginCache[$userId];
+        }
+
+        $login = '';
+
+        try {
+            if (class_exists('ilObjUser') && is_callable(['ilObjUser', '_lookupLogin'])) {
+                $v = ilObjUser::_lookupLogin($userId);
+                if (is_scalar($v) && trim((string) $v) !== '') {
+                    $login = trim((string) $v);
+                }
+            }
+        } catch (Throwable $ignored) {
+            $login = '';
+        }
+
+        if ($login === '') {
+            $login = $this->lookupIliasLoginWithDIC($userId);
+        }
+
+        if ($login === '') {
+            $login = $this->lookupIliasLoginWithGlobalDb($userId);
+        }
+
+        $this->actorLoginCache[$userId] = $login;
+        return $login;
+    }
+
+    private function lookupIliasLoginWithDIC(int $userId): string
+    {
+        try {
+            global $DIC;
+            if (!isset($DIC) || !is_object($DIC) || !method_exists($DIC, 'database')) {
+                return '';
+            }
+            return $this->lookupIliasLoginWithDb($DIC->database(), $userId);
+        } catch (Throwable $ignored) {
+            return '';
+        }
+    }
+
+    private function lookupIliasLoginWithGlobalDb(int $userId): string
+    {
+        try {
+            global $ilDB;
+            if (!isset($ilDB) || !is_object($ilDB)) {
+                return '';
+            }
+            return $this->lookupIliasLoginWithDb($ilDB, $userId);
+        } catch (Throwable $ignored) {
+            return '';
+        }
+    }
+
+    private function lookupIliasLoginWithDb($db, int $userId): string
+    {
+        if (!is_object($db) || !method_exists($db, 'query') || !method_exists($db, 'fetchAssoc') || !method_exists($db, 'quote')) {
+            return '';
+        }
+
+        try {
+            $res = $db->query('SELECT login FROM usr_data WHERE usr_id = ' . $db->quote($userId, 'integer'));
+            $row = $db->fetchAssoc($res);
+            return is_array($row) && is_scalar($row['login'] ?? null) ? trim((string) $row['login']) : '';
+        } catch (Throwable $ignored) {
+            return '';
+        }
     }
 
     /** @param array<string,mixed> $statement */

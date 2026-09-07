@@ -1270,8 +1270,9 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($external > 0) { $parts[] = $external . ' ouverture(s) externe(s)'; }
         return $parts === [] ? '0' : implode(' / ', $parts);
     }
-    private function renderStrugglingLearners(array $dashboard): string
+        private function renderStrugglingLearners(array $dashboard): string
     {
+        // ITXEB V0.25.5 learner identity display py36 preflight.
         $rows = is_array($dashboard['expert_rows'] ?? null) ? $dashboard['expert_rows'] : [];
         $learners = [];
 
@@ -1279,10 +1280,14 @@ class ilIliasTraxEventBridgeCourseUIScreen
             if (!is_array($row) || (string) ($row['obj_type'] ?? '') !== 'tst') {
                 continue;
             }
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId <= 0) {
+
+            $learnerIdentity = trim((string) ($row['learner_identity'] ?? ''));
+            $technicalUserId = trim((string) ($row['user_id'] ?? ''));
+            $learnerDisplay = $learnerIdentity !== '' ? $learnerIdentity : $technicalUserId;
+            if ($learnerDisplay === '') {
                 continue;
             }
+            $learnerKey = $learnerIdentity !== '' ? 'identity:' . strtolower($learnerIdentity) : 'user:' . $technicalUserId;
 
             $score = is_numeric($row['score_raw'] ?? null) ? (float) $row['score_raw'] : null;
             $success = $row['success'] ?? null;
@@ -1294,9 +1299,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 continue;
             }
 
-            if (!isset($learners[$userId])) {
-                $learners[$userId] = [
-                    'anonymous_id' => 'Apprenant ' . substr(sha1('itxeb:' . (string) $userId), 0, 8),
+            if (!isset($learners[$learnerKey])) {
+                $learners[$learnerKey] = [
+                    'learner_identity' => $learnerDisplay,
+                    'technical_user_id' => $technicalUserId,
                     'alerts' => 0,
                     'failed' => 0,
                     'low_scores' => 0,
@@ -1307,24 +1313,24 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 ];
             }
 
-            $learners[$userId]['alerts']++;
+            $learners[$learnerKey]['alerts']++;
             if ($failed) {
-                $learners[$userId]['failed']++;
+                $learners[$learnerKey]['failed']++;
             }
             if ($lowScore) {
-                $learners[$userId]['low_scores']++;
+                $learners[$learnerKey]['low_scores']++;
             }
             if ($score !== null) {
-                $learners[$userId]['scores_total'] += $score;
-                $learners[$userId]['scores_count']++;
+                $learners[$learnerKey]['scores_total'] += $score;
+                $learners[$learnerKey]['scores_count']++;
             }
             $createdAt = (string) ($row['created_at'] ?? '');
-            if ($createdAt !== '' && $createdAt > (string) $learners[$userId]['last_at']) {
-                $learners[$userId]['last_at'] = $createdAt;
+            if ($createdAt !== '' && $createdAt > (string) $learners[$learnerKey]['last_at']) {
+                $learners[$learnerKey]['last_at'] = $createdAt;
             }
             $title = trim((string) ($row['object_title'] ?? ''));
             if ($title !== '') {
-                $learners[$userId]['resources'][$title] = true;
+                $learners[$learnerKey]['resources'][$title] = true;
             }
         }
 
@@ -1344,7 +1350,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $visible = array_slice($visible, 0, 10);
 
         $html = '<section class="itxeb-cui-section"><h3>Apprenants en difficulté</h3>'
-            . '<p>Vue anonymisée : aucun nom ni courriel n’est affiché. Les identifiants sont des pseudonymes techniques.</p>';
+            . '<p>Vue nominative : les apprenants sont affichés avec l’identité transmise par TRAX/LRS afin de faciliter le suivi formateur.</p>';
         if (count($visible) === 0) {
             return $html . '<p><em>Aucun apprenant en difficulté détecté sur la période et le filtre sélectionnés.</em></p></section>';
         }
@@ -1358,7 +1364,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
                 $resourceText .= ' +' . (count($resources) - 3);
             }
             $scoreText = $learner['avg_score'] === null ? '-' : (string) $learner['avg_score'] . ' %';
-            $html .= '<tr><td><span class="itxeb-signal itxeb-signal-warning">' . $this->esc((string) $learner['anonymous_id']) . '</span></td>'
+            $html .= '<tr><td><span class="itxeb-signal itxeb-signal-warning">' . $this->esc((string) ($learner['learner_identity'] ?? '')) . '</span></td>'
                 . '<td>' . $this->esc((string) ($learner['alerts'] ?? 0)) . '</td>'
                 . '<td>' . $this->esc((string) ($learner['failed'] ?? 0)) . '</td>'
                 . '<td>' . $this->esc((string) ($learner['low_scores'] ?? 0)) . '</td>'
@@ -1371,8 +1377,10 @@ class ilIliasTraxEventBridgeCourseUIScreen
     }
 
     /** @param array<string,mixed> $course */
+        /** @param array<string,mixed> $course */
     private function renderExpert(array $course): string
     {
+        // ITXEB V0.25.5 learner identity display py36 preflight.
         $dashboard = $this->loadDashboard($course);
         $rows = is_array($dashboard['expert_rows'] ?? null) ? $dashboard['expert_rows'] : [];
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
@@ -1389,9 +1397,14 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if (count($rows) === 0) {
             return $html . '<p><em>Aucun statement xAPI TRAX pour cette période ou cette ressource.</em></p></section>';
         }
-        $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table itxeb-cui-expert-table"><thead><tr><th>Date</th><th>User ID</th><th>Verbe</th><th>Ressource</th><th>Type</th><th>Score</th><th>Completion</th><th>Success</th><th>Source</th><th>Statement ID</th></tr></thead><tbody>';
+        $html .= '<div class="itxeb-cui-table-wrapper"><table class="itxeb-cui-table itxeb-cui-expert-table"><thead><tr><th>Date</th><th>User ID</th><th>Apprenant</th><th>Verbe</th><th>Ressource</th><th>Type</th><th>Score</th><th>Completion</th><th>Success</th><th>Source</th><th>Statement ID</th></tr></thead><tbody>';
         foreach ($rows as $row) {
+            $learnerIdentity = trim((string) ($row['learner_identity'] ?? ''));
+            if ($learnerIdentity === '') {
+                $learnerIdentity = (string) ($row['user_id'] ?? '');
+            }
             $html .= '<tr><td>' . $this->esc((string) ($row['created_at'] ?? '')) . '</td><td>' . $this->esc((string) ($row['user_id'] ?? 0)) . '</td>'
+                . '<td>' . $this->esc($learnerIdentity) . '</td>'
                 . '<td>' . $this->esc((string) ($row['verb_label'] ?? '')) . '<br><small>' . $this->esc((string) ($row['verb_id'] ?? '')) . '</small></td>'
                 . '<td><strong>' . $this->esc((string) ($row['object_title'] ?? '')) . '</strong><br><small>ref_id ' . $this->esc((string) ($row['ref_id'] ?? 0)) . '</small></td>'
                 . '<td>' . $this->esc((string) ($row['obj_type'] ?? '')) . '</td><td>' . $this->esc($row['score_raw'] === null ? '-' : (string) $row['score_raw'] . ' %') . '</td>'
@@ -1614,7 +1627,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $out = fopen('php://output', 'w');
         if ($out !== false) {
             fputcsv($out, [
-                'date', 'course_ref_id', 'filter_ref_id', 'user_id',
+                'date', 'course_ref_id', 'filter_ref_id', 'user_id', 'learner_identity',
                 'verb_label', 'verb_id', 'resource_title', 'ref_id', 'obj_id', 'obj_type',
                 'score_raw', 'completion', 'success', 'status', 'outbox_id', 'statement_uuid', 'last_error',
                 'pedagogical_status', 'pedagogical_label', 'pedagogical_reason',
@@ -1631,6 +1644,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
                     (string) $courseRefId,
                     $filterRefId > 0 ? (string) $filterRefId : '',
                     (string) ($row['user_id'] ?? 0),
+                    (string) ($row['learner_identity'] ?? ''),
                     (string) ($row['verb_label'] ?? ''),
                     (string) ($row['verb_id'] ?? ''),
                     $resourceTitle,

@@ -1,7 +1,7 @@
 <?php
 
 $id = 'itxeb';
-$version = '0.24.17-dev';
+$version = '0.25.6-dev';
 $ilias_min_version = '10.0.0';
 $ilias_max_version = '10.999.999';
 $responsible = 'TRAX / ILIAS integration';
