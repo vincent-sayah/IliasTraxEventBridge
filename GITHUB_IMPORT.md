@@ -2,39 +2,33 @@
 
 Ce document explique comment maintenir ou réimporter le dépôt **IliasTraxEventBridge** sur GitHub.
 
-Version stable actuelle : **v0.5.5**.
+Version stable actuelle après promotion : **V0.25.6**.
 
 ## État attendu du dépôt GitHub
 
 Branches principales :
 
 ```text
-main   -> version stable courante v0.5.5
-v0.5   -> branche stable de la série V0.5, alignée sur main
-v0.4   -> archive de la série V0.4
+main                             -> version stable courante V0.25.6
+v0.25-learner-identity-display   -> branche de validation V0.25.6, alignée fonctionnellement avant promotion
+v0.24-dashboard-synthesis-layout -> archive de validation V0.24.17
+v0.23-mediacast-media-tracking   -> archive de validation V0.23.8
 ```
 
-Tags importants :
+Commit fonctionnel V0.25.6 :
 
 ```text
-v0.5.5 -> tag stable de la version V0.5.5
-v0.4.3 -> tag stable de la version V0.4.3 si présent
+8d97685 V0.25.6 validate learner login display
 ```
 
-Le dépôt peut conserver les anciennes branches d'import historique :
+Versions attendues :
 
 ```text
-v0.1.0
-v0.1.1
-v0.1.2
-v0.1.3
-v0.1.4
-v0.1.5
-v0.2.0
-v0.2.1
-v0.3.0
-v0.3.1
+plugin.php                                         -> 0.25.6-dev
+companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl -> 0.8.44
 ```
+
+Le dépôt conserve aussi les anciennes branches historiques V0.1 à V0.22 pour traçabilité.
 
 ## Vérifier l'état local
 
@@ -44,15 +38,16 @@ Depuis Git Bash Windows :
 git fetch origin --tags
 
 git branch -vv
-git log --oneline -1
+git log --oneline -5
 git tag --points-at HEAD
 ```
 
-État attendu après stabilisation V0.5.5 :
+État attendu après stabilisation V0.25.6 :
 
 ```text
-main et v0.5 pointent sur le même commit stable/documentaire
-plugin.php contient $version = "0.5.5";
+main pointe sur le dernier commit documentaire V0.25.6
+le commit 8d97685 est présent dans l'historique de main
+plugin.php contient $version = '0.25.6-dev';
 ```
 
 ## Mettre à jour `main` depuis GitHub
@@ -63,85 +58,47 @@ git checkout main
 git pull --ff-only origin main
 
 grep -n '\$version' plugin.php
-grep -n "Version stable actuelle" README.md
+grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 ```
 
-Résultat attendu :
+Résultat attendu après promotion :
 
 ```text
-$version = "0.5.5";
-Version stable actuelle : **v0.5.5**
+$version = '0.25.6-dev';
+$version = '0.8.44';
 ```
 
-## Aligner la branche `v0.5` sur `main`
+## Import d'un commit validé depuis un serveur sans authentification GitHub
 
-À utiliser après une correction documentaire stable sur `main` :
+Lorsque le serveur ILIAS ne peut pas pousser directement vers GitHub, créer un bundle serveur :
 
 ```bash
-git checkout v0.5
-git reset --hard origin/main
-git push --force-with-lease origin v0.5
+git bundle create /tmp/v0256_validated.bundle origin/v0.25-learner-identity-display..HEAD
+git bundle verify /tmp/v0256_validated.bundle
 ```
 
-Vérification :
+Copier le bundle vers Windows :
 
 ```bash
-git log --oneline -1
-git branch -vv
+scp root@<serveur>:/tmp/v0256_validated.bundle /c/Users/vincent/Downloads/v0256_validated.bundle
 ```
 
-`main` et `v0.5` doivent pointer sur le même commit.
-
-## Créer le tag stable V0.5.5
-
-À faire uniquement si le tag n'existe pas déjà :
+Importer puis pousser depuis Git Bash Windows :
 
 ```bash
-git checkout v0.5
-git pull --ff-only origin v0.5
+cd ~/Downloads/IliasTraxEventBridge_github_ready_package/package/IliasTraxEventBridge
 
-grep -n '\$version' plugin.php
+git fetch origin
+git checkout v0.25-learner-identity-display
+git pull --ff-only origin v0.25-learner-identity-display
 
-git tag -a v0.5.5 -m "IliasTraxEventBridge v0.5.5 stable"
-git push origin v0.5.5
+git bundle verify /c/Users/vincent/Downloads/v0256_validated.bundle
+git pull /c/Users/vincent/Downloads/v0256_validated.bundle HEAD
+
+git push origin v0.25-learner-identity-display
 ```
 
-Vérification :
-
-```bash
-git ls-remote --tags origin v0.5.5
-git show --stat v0.5.5
-git branch --contains v0.5.5
-```
-
-## Import dans un nouveau repository GitHub
-
-Créer d'abord un repository vide sur GitHub nommé :
-
-```text
-IliasTraxEventBridge
-```
-
-Puis, depuis le dossier local du dépôt :
-
-```bash
-git remote add origin https://github.com/<organisation-ou-user>/IliasTraxEventBridge.git
-
-git push -u origin main
-git push origin v0.5
-git push origin v0.4
-
-git push origin --tags
-```
-
-Si vous voulez aussi conserver toutes les branches historiques :
-
-```bash
-git push origin --all
-git push origin --tags
-```
-
-## Installation depuis GitHub après import
+## Installation depuis GitHub après promotion
 
 Sur le serveur ILIAS :
 
@@ -155,10 +112,14 @@ export PLUGIN_NAME="IliasTraxEventBridge"
 mkdir -p "$EVENTHOOK_DIR"
 cd "$EVENTHOOK_DIR"
 
-git clone -b main --single-branch https://github.com/<organisation-ou-user>/IliasTraxEventBridge.git "$PLUGIN_NAME"
-
+git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
 cd "$PLUGIN_NAME"
+
 grep -n '\$version' plugin.php
+grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
+
+export HTTPD_USER="apache"
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
 
 chown -R apache:apache "$EVENTHOOK_DIR/$PLUGIN_NAME"
 find "$EVENTHOOK_DIR/$PLUGIN_NAME" -type d -exec chmod 755 {} \;
@@ -167,10 +128,38 @@ find "$EVENTHOOK_DIR/$PLUGIN_NAME" -type f -exec chmod 644 {} \;
 cd "$ILIAS_ROOT"
 sudo -u apache composer du
 sudo -u apache php cli/setup.php build --yes
+systemctl restart httpd
+systemctl restart php-fpm
 ```
 
 Puis dans ILIAS :
 
 ```text
 Administration > Plugins > EventHook > IliasTraxEventBridge > Installer / Activer / Configurer
+Administration > Plugins > UIHook > IliasTraxEventBridgeCourseUI > Installer / Activer
+```
+
+## Documentation à jour pour V0.25.6
+
+```text
+README.md
+README_TECHNIQUE.md
+CHANGELOG.md
+GITHUB_IMPORT.md
+companion/IliasTraxEventBridgeCourseUI/README.md
+docs/INSTALLATION.md
+docs/INDEX_0.25.6.md
+docs/RELEASE_0.25.6.md
+docs/VALIDATION_0.25.6.md
+```
+
+## Tag stable recommandé
+
+Après promotion de V0.25.6 dans `main`, créer le tag si nécessaire :
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag -a v0.25.6 -m "IliasTraxEventBridge v0.25.6 stable"
+git push origin v0.25.6
 ```
