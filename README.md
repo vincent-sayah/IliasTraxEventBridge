@@ -1,24 +1,24 @@
 # IliasTraxEventBridge
 
-Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS en statements xAPI, de les envoyer vers un LRS xAPI comme TRAX 3, puis d'afficher un pilotage pédagogique de cours dans ILIAS.
+Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS en statements xAPI, de les envoyer vers un LRS xAPI comme TRAX 3, puis d'afficher un pilotage pédagogique de cours directement dans ILIAS.
 
 ## Version courante validée
 
 | Élément | Valeur |
 |---|---|
-| Branche stable officielle avant promotion | `main` |
-| Version stable précédente | `0.23.8-dev` |
-| Branche de développement V0.24 | `v0.24-dashboard-synthesis-layout` |
-| Version V0.24 validée | `0.24.17-dev` |
-| Commit de validation V0.24.17 | `3a05d77` — `V0.24.17 validate dashboard synthesis and activity layout` |
+| Branche stable officielle | `main` après promotion V0.25.6 |
+| Version stable précédente | `0.24.17-dev` |
+| Branche de développement V0.25 | `v0.25-learner-identity-display` |
+| Version V0.25 validée | `0.25.6-dev` |
+| Commit de validation V0.25.6 | `8d97685` — `V0.25.6 validate learner login display` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
-| Version plugin compagnon V0.24.17 | `0.8.37` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type plugin compagnon | `UIHook` |
+| Version plugin compagnon V0.25.6 | `0.8.44` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
 
-Pour une installation stable courante, utiliser `main` après promotion de la version validée :
+Installation stable courante :
 
 ```bash
 git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git IliasTraxEventBridge
@@ -42,6 +42,7 @@ Tableau de bord / Analyse = seules les questions problématiques sont remontées
 Analyse IA = seules les questions problématiques sont intégrées au payload IA.
 Expert = vision technique complète.
 Analyse = vue MediaCast des vidéos internes lues et médias externes ouverts.
+Analyse / Expert = affichage du login ILIAS pour les apprenants lorsque le login est résolu.
 ```
 
 ## Fonctionnalités principales
@@ -55,13 +56,11 @@ Analyse = vue MediaCast des vidéos internes lues et médias externes ouverts.
 - Tableau de bord pédagogique.
 - Synthèse pédagogique enrichie et regroupée dans le tableau de bord.
 - Cartes KPI avec icônes et suppression des doublons visuels.
-- Activité dans le temps avec choix d'affichage : 7 jours, 14 jours, 30 jours, par semaine, détail complet.
-- Graphique linéaire SVG pour la progression de l'activité.
-- Alignement du bloc `Activité dans le temps` selon le modèle ILIAS : titre à gauche, contenu à droite.
-- Affichage `Progression de l’activité` et `Top ressources` sur une même ligne en vue large.
+- Activité dans le temps avec graphique linéaire SVG.
+- Alignement du bloc `Activité dans le temps` et de `Top ressources` sur une même ligne en vue large.
 - Filtrage contextuel du bloc `Questions à fort taux d’échec`.
-- Présentation des blocs de type formulaire ILIAS : intitulé à gauche, données à droite.
 - Analyse formateur.
+- Bloc `Apprenants en difficulté` avec affichage du login ILIAS.
 - Vue `Médias MediaCast vus` dans l'onglet Analyse uniquement.
 - Suivi des vidéos internes MediaCast lancées.
 - Suivi des médias externes MediaCast sélectionnés, dont YouTube/Vimeo.
@@ -69,14 +68,13 @@ Analyse = vue MediaCast des vidéos internes lues et médias externes ouverts.
 - Onglet `Analyse IA` séparé.
 - Historique local des analyses IA.
 - Comparaison d'analyses IA historisées.
-- Retrait contrôlé d'analyses IA historisées avec retour correct sur l'onglet Analyse IA.
-- Vue Expert technique.
-- Export CSV Expert.
+- Retrait contrôlé d'analyses IA historisées.
+- Vue Expert technique avec colonne `Apprenant` entre `User ID` et `Verbe`.
+- Export CSV Expert avec colonne `learner_identity`.
 - Export PDF du tableau de bord.
 - Diagnostic TRAX/LRS dans l'onglet Configuration.
 - Supervision technique de l'outbox.
 - Traces question par question pour les tests ILIAS.
-- Bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse lorsque le contexte est pertinent.
 - Intégration des questions problématiques dans le payload IA.
 
 ## Vues du pilotage xAPI
@@ -88,39 +86,64 @@ Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu
 | Vue | Rôle |
 |---|---|
 | Tableau de bord | Synthèse pédagogique du cours, activité dans le temps, ressources, tests, questions problématiques, export PDF. |
-| Analyse | Lecture formateur des ressources, priorités, questions à surveiller et médias MediaCast vus. |
+| Analyse | Lecture formateur des ressources, priorités, questions à surveiller, apprenants en difficulté et médias MediaCast vus. |
 | Analyse IA | Génération, historique, comparaison et retrait d'analyses IA. |
-| Expert | Vue technique détaillée des statements et export CSV. |
+| Expert | Vue technique détaillée des statements, colonne `Apprenant`, export CSV. |
 | Configuration | Activation cours/ressources, préférences, diagnostic LRS, supervision outbox. |
 
-## Tableau de bord V0.24.17
+## V0.25.6 — affichage du login apprenant
+
+La V0.25.6 ajoute l'affichage du login ILIAS dans les vues `Analyse` et `Expert`.
+
+### Analyse
+
+Le bloc `Apprenants en difficulté` n'affiche plus de pseudonyme de type :
+
+```text
+Apprenant xxxxxxxx
+```
+
+Il n'affiche plus non plus l'acteur brut lorsque le login existe :
+
+```text
+ilias-user-6
+ilias-user-401
+```
+
+Il affiche le login ILIAS résolu depuis `usr_data.login`.
+
+### Expert
+
+La vue Expert affiche désormais :
+
+```text
+Date | User ID | Apprenant | Verbe | Ressource | Type | Score | Completion | Success | Source | Statement ID
+```
+
+`User ID` reste un identifiant technique pseudonymisé. `Apprenant` contient le login ILIAS.
+
+### Export CSV Expert
+
+L'export CSV Expert contient la colonne :
+
+```text
+learner_identity
+```
+
+## Tableau de bord V0.24.17 conservé
 
 La V0.24.17 améliore la lisibilité du tableau de bord sans changer les règles de captation xAPI.
 
-### Synthèse pédagogique
-
-- Les indicateurs sont regroupés dans `Synthèse pédagogique`.
-- Les anciennes tuiles doublonnées sont retirées de la vue globale.
-- Les KPI sont rendus plus lisibles grâce à des icônes.
-
-### Activité dans le temps
-
-Le bloc `Activité dans le temps` affiche :
-
 | Zone | Description |
 |---|---|
-| Titre | Aligné avec les autres titres de sections ILIAS. |
-| Introduction | Description courte de l'activité du cours. |
-| Sélecteur | 7 jours, 14 jours, 30 jours, par semaine, détail complet. |
-| KPI | Périodes actives, périodes sans activité, pic, moyenne. |
-| Progression de l'activité | Graphique linéaire SVG. |
-| Top ressources | Ressources les plus consultées, alignées avec le graphique en vue large. |
+| Synthèse pédagogique | Indicateurs regroupés et cartes KPI avec icônes. |
+| Questions à fort taux d'échec | Bloc affiché uniquement en contexte test ou global. |
+| Activité dans le temps | Graphique linéaire SVG avec choix 7 jours, 14 jours, 30 jours, semaine, détail complet. |
+| Top ressources | Aligné avec le graphique en vue large. |
 
 ## Suivi MediaCast V0.23.8 conservé
 
 La V0.23.8 ajoute un suivi pédagogique MediaCast sans modifier le fonctionnement des tests ILIAS.
-
-### Statements générés
 
 | Action utilisateur | Verbe xAPI | Vue concernée |
 |---|---|---|
@@ -128,20 +151,7 @@ La V0.23.8 ajoute un suivi pédagogique MediaCast sans modifier le fonctionnemen
 | Lancement d'une vidéo interne | `played-media` | Expert et Analyse |
 | Sélection d'un média externe, par exemple YouTube | `opened-external-media` | Expert et Analyse |
 
-### Affichage formateur
-
-Dans l'onglet `Analyse`, le bloc `Médias MediaCast vus` affiche :
-
-| Colonne | Description |
-|---|---|
-| Média | Titre de la vidéo interne ou du média externe. |
-| Type | `Vidéo interne` ou `Média externe`. |
-| Actions | Nombre de lancements ou d'ouvertures. |
-| Apprenants | Nombre d'apprenants ayant déclenché l'action. |
-| MediaCast | Objet MediaCast parent et `ref_id`. |
-| Dernière trace | Dernière date reçue depuis TRAX/LRS. |
-
-Le bloc MediaCast n'est pas affiché dans `Tableau de bord` afin de conserver une synthèse générale. Le détail pédagogique est centralisé dans `Analyse`.
+Dans l'onglet `Analyse`, le bloc `Médias MediaCast vus` affiche le média, son type, le nombre d'actions, le nombre d'apprenants, le MediaCast parent et la dernière trace.
 
 ## Architecture synthétique
 
@@ -159,7 +169,8 @@ ILIAS 10
   │
   └─ UIHook IliasTraxEventBridgeCourseUI
        ├─ affiche Pilotage xAPI dans le cours
-       └─ injecte le suivi MediaCast côté navigateur
+       ├─ injecte le suivi MediaCast côté navigateur
+       └─ affiche les vues Tableau de bord, Analyse, Analyse IA, Expert et Configuration
 
 TRAX / LRS
   ├─ reçoit les statements xAPI
@@ -185,11 +196,12 @@ systemctl restart php-fpm
 systemctl restart httpd
 ```
 
-Contrôle des versions après promotion V0.24.17 :
+Contrôle des versions après promotion V0.25.6 :
 
 ```bash
-grep -n "0.24.17-dev\|0.8.37\|ITXEB V0.24.17 top resources aligned with graph card safe\|itxeb-dashboard-activity-chart-row\|itxeb-dashboard-top-card" \
+grep -n "0.25.6-dev\|0.8.44\|ITXEB V0.25.6 learner login resolution\|lookupIliasLogin\|usr_data\|learner_identity" \
 plugin.php \
+classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php \
 companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
 companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl \
 /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php \
@@ -200,6 +212,9 @@ companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCours
 
 | Document | Rôle |
 |---|---|
+| [`docs/INDEX_0.25.6.md`](docs/INDEX_0.25.6.md) | Index de référence de la V0.25.6. |
+| [`docs/RELEASE_0.25.6.md`](docs/RELEASE_0.25.6.md) | Note de release V0.25.6. |
+| [`docs/VALIDATION_0.25.6.md`](docs/VALIDATION_0.25.6.md) | Checklist de validation V0.25.6. |
 | [`docs/INDEX_0.24.17.md`](docs/INDEX_0.24.17.md) | Index de référence de la V0.24.17. |
 | [`docs/RELEASE_0.24.17.md`](docs/RELEASE_0.24.17.md) | Note de release V0.24.17. |
 | [`docs/VALIDATION_0.24.17.md`](docs/VALIDATION_0.24.17.md) | Checklist de validation V0.24.17. |
@@ -207,18 +222,11 @@ companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCours
 | [`docs/RELEASE_0.23.8.md`](docs/RELEASE_0.23.8.md) | Note de release V0.23.8. |
 | [`docs/VALIDATION_0.23.8.md`](docs/VALIDATION_0.23.8.md) | Checklist de validation V0.23.8. |
 | [`docs/V0.23_MEDIACAST.md`](docs/V0.23_MEDIACAST.md) | Cadrage fonctionnel et technique du suivi MediaCast. |
-| [`docs/INDEX_0.22.4.md`](docs/INDEX_0.22.4.md) | Index de référence de la V0.22.4 précédente. |
-| [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation et mise à jour depuis `main`, avec `ILIAS_ROOT` personnalisable. |
-| [`docs/RELEASE_0.22.4.md`](docs/RELEASE_0.22.4.md) | Note de release V0.22.4. |
-| [`docs/V0.22_ACTIVITY_TIMELINE.md`](docs/V0.22_ACTIVITY_TIMELINE.md) | Cadrage du bloc Activité dans le temps. |
-| [`docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md`](docs/V0.22.1_ILIAS_LIKE_DASHBOARD_LAYOUT.md) | Cadrage de la présentation type formulaire ILIAS. |
-| [`docs/FONCTIONNEL_0.21.2.md`](docs/FONCTIONNEL_0.21.2.md) | Base fonctionnelle V0.21.2, complétée par les releases suivantes. |
-| [`docs/TECHNIQUE_0.21.2.md`](docs/TECHNIQUE_0.21.2.md) | Base technique V0.21.2, complétée par les releases suivantes. |
-| [`docs/GUIDE_DEVELOPPEUR_0.21.2.md`](docs/GUIDE_DEVELOPPEUR_0.21.2.md) | Guide développeur : classes, tables, flux. |
-| [`docs/EXPLOITATION_0.21.2.md`](docs/EXPLOITATION_0.21.2.md) | Exploitation et diagnostic courant. |
+| [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Installation et mise à jour depuis `main`. |
+| [`README_TECHNIQUE.md`](README_TECHNIQUE.md) | Architecture technique courante. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
-Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13`, `RELEASE_0.15.2`, `V0.21.2`, `V0.22.4` et `V0.23.8` sont conservés pour historique et continuité.
+Les documents des versions précédentes sont conservés pour historique et continuité.
 
 ## Copie écran
 
