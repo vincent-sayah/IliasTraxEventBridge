@@ -6,9 +6,9 @@ Plugin compagnon UIHook pour `IliasTraxEventBridge`.
 
 | Élément | Valeur |
 |---|---|
-| Branche stable projet | `main` |
-| Version stable courante | `0.22.4-dev` validée et promue dans `main` |
-| Version companion UI | `0.8.10` |
+| Branche stable projet | `main` après promotion V0.25.6 |
+| Version stable courante | `0.25.6-dev` |
+| Version companion UI | `0.8.44` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type | UIHook ILIAS |
@@ -30,14 +30,14 @@ L'écran expose les vues :
 Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu du cours
 ```
 
-## Rôle des vues V0.22.4
+## Rôle des vues V0.25.6
 
 | Vue | Rôle |
 |---|---|
 | Tableau de bord | Synthèse pédagogique, activité dans le temps, ressources, tests, questions à fort taux d'échec, export PDF. |
-| Analyse | Analyse formateur des ressources, priorités et questions problématiques. |
+| Analyse | Analyse formateur des ressources, priorités, questions problématiques, apprenants en difficulté et médias MediaCast vus. |
 | Analyse IA | Génération, historique, comparaison et retrait d'analyses IA. |
-| Expert | Vision technique détaillée et export CSV. |
+| Expert | Vision technique détaillée, colonne `Apprenant`, export CSV. |
 | Configuration | Activation cours / ressources, préférences, diagnostic LRS, supervision outbox. |
 
 ## Règle métier
@@ -47,15 +47,31 @@ TRAX = toutes les questions de test ILIAS sont tracées.
 Tableau de bord / Analyse = questions problématiques uniquement.
 Analyse IA = questions problématiques uniquement.
 Expert = vision technique complète.
+Analyse / Expert = affichage du login ILIAS lorsque le login est résolu.
 ```
 
-## Améliorations V0.22.4
+## Améliorations conservées
 
-- Bloc `Activité dans le temps` compact.
-- Choix d'affichage : `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet`.
-- Présentation titre/données proche des formulaires ILIAS.
-- Alignement corrigé de la `Synthèse pédagogique`.
-- Correction de l'onglet actif après retrait d'une analyse IA historisée.
+### V0.25.6
+
+- Bloc `Apprenants en difficulté` avec affichage du login ILIAS.
+- Colonne `Apprenant` dans la vue Expert entre `User ID` et `Verbe`.
+- Colonne `learner_identity` dans l'export CSV Expert.
+- Fin de l'affichage `Apprenant xxxxxxxx` et `ilias-user-ID` lorsque le login ILIAS existe.
+
+### V0.24.17
+
+- Bloc `Activité dans le temps` avec graphique linéaire SVG.
+- Alignement de `Top ressources` avec la carte du graphique.
+- Cartes KPI avec icônes.
+- Filtrage contextuel du bloc `Questions à fort taux d'échec`.
+
+### V0.23.8
+
+- Bloc `Médias MediaCast vus` dans l'onglet Analyse.
+- Suivi des vidéos internes lancées.
+- Suivi des médias externes ouverts.
+- Affichage du titre réel des médias externes lorsque disponible.
 
 ## Packaging
 
@@ -92,6 +108,9 @@ git checkout main
 git pull --ff-only origin main
 
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
+
+systemctl restart php-fpm
+systemctl restart httpd
 ```
 
 Si ILIAS n'est pas dans `/var/www/ilias`, remplacer `ILIAS_ROOT` par le chemin réel :
@@ -128,12 +147,13 @@ COMPANION_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponen
 php -l "$COMPANION_DIR/plugin.php"
 php -l "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 
-grep -n "Activité dans le temps\|V0.22.4 alignment\|showCourseAiAnalysis" \
+grep -n "0.8.44\|learner_identity\|<th>User ID</th><th>Apprenant</th><th>Verbe</th>\|Vue nominative" \
+"$COMPANION_DIR/plugin.php" \
 "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
 ```
 
 La validation détaillée est décrite dans :
 
 ```text
-docs/VALIDATION_0.22.4.md
+docs/VALIDATION_0.25.6.md
 ```
