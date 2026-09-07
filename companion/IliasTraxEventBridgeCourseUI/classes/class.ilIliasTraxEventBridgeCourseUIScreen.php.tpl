@@ -428,35 +428,120 @@ class ilIliasTraxEventBridgeCourseUIScreen
         $widgets = $this->dashboardWidgets((int) ($course['course_ref_id'] ?? 0));
         $html = '<section class="itxeb-cui-section"><h2>Tableau de bord du cours</h2><p>Vue synthétique des statements xAPI présents dans TRAX pour ce cours.</p>'
             . $this->renderPeriodSelector('showCourseDashboard') . $this->renderResourceFilter($course, 'showCourseDashboard') . $this->renderAnalyticsWarning()
-            . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course)
-            . '<div class="itxeb-kpi-grid">'
-            . $this->metricCard('Statements TRAX', (string) ($summary['total'] ?? 0), 'Lecture LRS')
-            . $this->metricCard('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme')
-            . $this->metricCard('Ressources utilisées', (string) ($summary['resources_with_traces'] ?? 0) . ' / ' . (string) ($summary['resources_total'] ?? 0), 'Au moins une trace')
-            . $this->metricCard('Sans statement TRAX', (string) $this->countEnabledWithoutTraceResources($dashboard), 'À surveiller')
-            . $this->metricCard('Pages LRS', (string) ($dashboard['pages'] ?? 0), 'pagination')
-            . $this->metricCard('Critiques', (string) ($dashboard['pedagogy']['critical_count'] ?? 0), 'Priorité')
-            . $this->metricCard('À surveiller', (string) ($dashboard['pedagogy']['watch_count'] ?? 0), 'Signal pédagogique')
-            . $this->metricCard('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests')
-            . '</div>';
+            . $this->renderPedagogicalSynthesis($dashboard) . ($this->shouldRenderQuestionFailureHotspots($course) ? $this->renderQuestionFailureHotspots($dashboard, $course) : '')
+            . '';
         if (!empty($widgets['comparison'])) {
             $html .= $this->renderPeriodComparison($course);
         }
-        if (!empty($widgets['activity_by_day'])) {
-            $html .= $this->renderActivityByDay($dashboard);
+
+        if (!empty($widgets['activity_by_day']) || !empty($widgets['top_resources'])) {
+            $html .= $this->renderDashboardActivityTopLayout($dashboard, !empty($widgets['activity_by_day']), !empty($widgets['top_resources']));
         }
         if (!empty($widgets['verb_distribution'])) {
             $html .= $this->renderVerbDistribution($dashboard);
         }
-        if (!empty($widgets['top_resources'])) {
-            $html .= $this->renderTopResources($dashboard);
-        }
+
         if (!empty($widgets['enabled_without_trace'])) {
             $html .= $this->renderEnabledWithoutTraceResources($dashboard);
         }
         return $html . '</section>';
     }
 
+    /** @param array<string,mixed> $dashboard */
+    private function renderDashboardActivityTopLayout(array $dashboard, bool $showActivity, bool $showTopResources): string
+    {
+        // ITXEB V0.24.17 top resources aligned with graph card safe
+        if (!$showActivity && !$showTopResources) {
+            return '';
+        }
+        if ($showActivity && !$showTopResources) {
+            return $this->renderActivityByDay($dashboard);
+        }
+        if (!$showActivity && $showTopResources) {
+            return $this->renderTopResources($dashboard);
+        }
+
+        $byDay = is_array($dashboard['by_day'] ?? null) ? $dashboard['by_day'] : [];
+        $periodDays = max(1, min(365, $this->getPeriodDays()));
+        $mode = $this->getActivityTimelineMode($periodDays);
+        $daily = $this->normalizeActivityDays($byDay, $periodDays);
+        $total = array_sum(array_map('intval', array_values($daily)));
+
+        $activityHead = '<p>Vue compacte de l’activité du cours. Le détail complet reste disponible sans occuper toute la page.</p>'
+            . $this->renderActivityTimelineSelector($mode);
+        $activitySummary = '';
+        $activityChart = '';
+
+        if ($total <= 0) {
+            $activityChart = '<div class="itxeb-line-chart-card"><p><em>Aucune activité enregistrée sur la période sélectionnée.</em></p></div>';
+        } elseif ($mode === 'week') {
+            $items = $this->aggregateActivityByWeek($daily);
+            $activitySummary = $this->renderActivityTimelineSummary($items, 'semaine(s)');
+            $activityChart = $this->renderActivityTimelineLineChart($items);
+        } elseif ($mode === 'all') {
+            $items = $daily;
+            $summaryItems = $periodDays > 30 ? $this->aggregateActivityByWeek($daily) : $daily;
+            $activitySummary = $this->renderActivityTimelineSummary($summaryItems, $periodDays > 30 ? 'semaine(s)' : 'jour(s)');
+            $activityChart = '<details class="itxeb-activity-details" open="open"><summary>Détail complet par jour (' . $this->esc((string) count($items)) . ' jour(s))</summary>'
+                . $this->renderActivityTimelineLineChart($items)
+                . '</details>';
+        } else {
+            $limit = (int) $mode;
+            if ($limit <= 0) {
+                $limit = min(14, $periodDays);
+            }
+            $limit = min($limit, $periodDays);
+            $items = array_slice($daily, -$limit, null, true);
+            $activitySummary = $this->renderActivityTimelineSummary($items, 'jour(s)');
+            $activityChart = $this->renderActivityTimelineLineChart($items);
+        }
+
+        $resources = [];
+        foreach ((array) ($dashboard['by_resource'] ?? []) as $stats) {
+            if ((int) ($stats['traces'] ?? 0) > 0) {
+                $resources[(string) ($stats['title'] ?? ('ref_id ' . ($stats['ref_id'] ?? '')))] = (int) ($stats['traces'] ?? 0);
+            }
+        }
+        arsort($resources);
+        $resources = array_slice($resources, 0, 10, true);
+
+        $topResources = '<div class="itxeb-dashboard-top-card"><div class="itxeb-dashboard-top-card-head"><strong>Top ressources</strong><br><small>Ressources les plus consultées sur la période affichée</small></div>';
+        if (count($resources) === 0) {
+            $topResources .= '<p><em>Aucune donnée.</em></p>';
+        } else {
+            $max = max(array_map('intval', array_values($resources)));
+            $topResources .= '<div class="itxeb-bar-list">';
+            foreach ($resources as $label => $count) {
+                $topResources .= $this->barRow((string) $label, (int) $count, $max);
+            }
+            $topResources .= '</div>';
+        }
+        $topResources .= '</div>';
+
+        return '<style>'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-final.itxeb-cui-section{grid-column:1 / -1!important;display:grid!important;grid-template-columns:260px minmax(0,1fr)!important;column-gap:24px!important;row-gap:8px!important;border-top:1px solid #d9d9d9!important;padding:14px 0!important;margin:0!important;background:#fff!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-final>h3{grid-column:1!important;margin:0!important;padding:5px 0 0!important;border:0!important;font-size:16px!important;line-height:1.35!important;color:#333!important;font-weight:700!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-content{grid-column:2!important;display:block!important;min-width:0!important;margin:0!important;padding:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-head{display:block!important;margin:0 0 12px 0!important;padding:0!important;min-width:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-head p{margin-top:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-head .itxeb-kpi-grid{margin:.6rem 0 0!important;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-chart-row{display:grid!important;grid-template-columns:minmax(0,1.05fr) minmax(420px,.95fr)!important;column-gap:24px!important;row-gap:12px!important;align-items:start!important;margin:0!important;padding:0!important;min-width:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-chart,#itxeb-course-ui-screen .itxeb-dashboard-activity-top{min-width:0!important;margin:0!important;padding:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-activity-chart .itxeb-line-chart-card{margin:0!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-top-card{border:1px solid #d9e2ec;border-radius:10px;background:#fff;padding:14px 16px;margin:0!important;box-shadow:0 1px 4px rgba(0,0,0,.05)}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-top-card-head{margin:0 0 8px!important}'
+            . '#itxeb-course-ui-screen .itxeb-dashboard-top-card .itxeb-bar-list{margin:0!important}'
+            . '@media (max-width:1400px){#itxeb-course-ui-screen .itxeb-dashboard-activity-chart-row{grid-template-columns:1fr!important}}'
+            . '@media (max-width:900px){#itxeb-course-ui-screen .itxeb-dashboard-activity-final.itxeb-cui-section{grid-template-columns:1fr!important}#itxeb-course-ui-screen .itxeb-dashboard-activity-final>h3,#itxeb-course-ui-screen .itxeb-dashboard-activity-content{grid-column:1!important}}'
+            . '</style>'
+            . '<section class="itxeb-cui-section itxeb-dashboard-activity-final"><h3>Activité dans le temps</h3>'
+            . '<div class="itxeb-dashboard-activity-content">'
+            . '<div class="itxeb-dashboard-activity-head">' . $activityHead . $activitySummary . '</div>'
+            . '<div class="itxeb-dashboard-activity-chart-row">'
+            . '<div class="itxeb-dashboard-activity-chart">' . $activityChart . '</div>'
+            . '<div class="itxeb-dashboard-activity-top">' . $topResources . '</div>'
+            . '</div></div></section>';
+    }
     /** @param array<string,mixed> $course */
     private function renderLrsDirectSummary(array $course): string
     {
@@ -497,13 +582,20 @@ class ilIliasTraxEventBridgeCourseUIScreen
     /** @param array<string,mixed> $dashboard */
     private function renderPedagogicalSynthesis(array $dashboard): string
     {
+        // ITXEB V0.24 dashboard synthesis layout
         $pedagogy = is_array($dashboard['pedagogy'] ?? null) ? $dashboard['pedagogy'] : [];
+        $summary = is_array($dashboard['summary'] ?? null) ? $dashboard['summary'] : [];
         $lines = is_array($pedagogy['synthesis_lines'] ?? null) ? $pedagogy['synthesis_lines'] : [];
-        $html = '<div class="itxeb-pedagogy-summary"><h3>Synthèse pédagogique</h3><div class="itxeb-pedagogy-kpis">'
-            . $this->metricCard('OK', (string) ($pedagogy['ok_count'] ?? 0), 'Ressources sans signal')
-            . $this->metricCard('À surveiller', (string) ($pedagogy['watch_count'] ?? 0), 'Signal faible')
-            . $this->metricCard('Critiques', (string) ($pedagogy['critical_count'] ?? 0), 'Priorité')
-            . $this->metricCard('Sans trace', (string) ($pedagogy['resources_without_trace'] ?? 0), 'Sans statement TRAX')
+        $html = '<div class="itxeb-pedagogy-summary itxeb-v024-synthesis"><h3>Synthèse pédagogique</h3><div class="itxeb-pedagogy-kpis itxeb-v024-synthesis-kpis">'
+            . $this->metricCardWithIcon('OK', (string) ($pedagogy['ok_count'] ?? 0), 'Ressources sans signal', '✅')
+            . $this->metricCardWithIcon('À surveiller', (string) ($pedagogy['watch_count'] ?? 0), 'Signal faible', '⚠️')
+            . $this->metricCardWithIcon('Critiques', (string) ($pedagogy['critical_count'] ?? 0), 'Priorité', '🚨')
+            . $this->metricCardWithIcon('Sans activité enregistrée', (string) ($pedagogy['resources_without_trace'] ?? 0), 'Ressources sans activité', '🔇')
+            . $this->metricCardWithIcon('Données d’apprentissage', (string) ($summary['total'] ?? 0), 'Lecture des données', '📊')
+            . $this->metricCardWithIcon('Apprenants actifs', (string) ($summary['active_learners'] ?? 0), 'Comptage anonyme', '👥')
+            . $this->metricCardWithIcon('Ressources utilisées', (string) ($summary['resources_with_traces'] ?? 0) . ' / ' . (string) ($summary['resources_total'] ?? 0), 'Au moins une activité enregistrée', '📚')
+            . $this->metricCardWithIcon('Lots de données lus', (string) ($dashboard['pages'] ?? 0), 'lecture par lots', '📦')
+            . $this->metricCardWithIcon('Score moyen', $summary['avg_score_raw'] === null ? '-' : (string) $summary['avg_score_raw'] . ' %', 'Tests', '🎯')
             . '</div>';
         if (count($lines) > 0) {
             $html .= '<ul class="itxeb-pedagogy-lines">';
@@ -517,6 +609,35 @@ class ilIliasTraxEventBridgeCourseUIScreen
         return $html . '</div>';
     }
 
+    private function metricCardWithIcon(string $label, string $value, string $hint, string $icon): string
+    {
+        return '<div class="itxeb-kpi-card itxeb-kpi-card-icon" style="display:flex;align-items:center;gap:10px;min-height:86px">'
+            . '<div class="itxeb-kpi-icon" aria-hidden="true" style="font-size:24px;line-height:1;width:34px;text-align:center;flex:0 0 34px">' . $this->esc($icon) . '</div>'
+            . '<div class="itxeb-kpi-body" style="min-width:0">'
+            . '<div class="itxeb-kpi-label">' . $this->esc($label) . '</div>'
+            . '<div class="itxeb-kpi-value">' . $this->esc($value) . '</div>'
+            . '<div class="itxeb-kpi-hint">' . $this->esc($hint) . '</div>'
+            . '</div></div>';
+    }
+
+    /** @param array<string,mixed> $course */
+    private function shouldRenderQuestionFailureHotspots(array $course): bool
+    {
+        // ITXEB V0.24.1 question hotspot visibility filter.
+        // Le bloc Questions a fort taux d'echec ne doit apparaitre que pour les tests.
+        $selectedRefId = $this->getSelectedResourceRefId();
+        if ($selectedRefId > 0) {
+            foreach ((array) ($course['resources'] ?? []) as $resource) {
+                if (is_array($resource) && (int) ($resource['ref_id'] ?? 0) === $selectedRefId) {
+                    return (string) ($resource['obj_type'] ?? '') === 'tst';
+                }
+            }
+            return false;
+        }
+
+        $selectedObjectType = $this->getSelectedObjectType();
+        return $selectedObjectType === '' || $selectedObjectType === 'tst';
+    }
     /** @param array<string,mixed> $dashboard @param array<string,mixed> $course */
     private function renderQuestionFailureHotspots(array $dashboard, array $course): string
     {
@@ -578,7 +699,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
     {
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard) . $this->renderQuestionFailureHotspots($dashboard, $course) . $this->renderMediaCastMediaDashboard($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les signaux critiques et à surveiller.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderPedagogicalSynthesis($dashboard) . ($this->shouldRenderQuestionFailureHotspots($course) ? $this->renderQuestionFailureHotspots($dashboard, $course) : '') . $this->renderMediaCastMediaDashboard($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -1738,7 +1859,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
         if ($mode === 'week') {
             $items = $this->aggregateActivityByWeek($daily);
-            return $html . $this->renderActivityTimelineSummary($items, 'semaine(s)') . $this->renderActivityTimelineBars($items) . '</section>';
+            return $html . $this->renderActivityTimelineSummary($items, 'semaine(s)') . $this->renderActivityTimelineLineChart($items) . '</section>';
         }
 
         if ($mode === 'all') {
@@ -1747,7 +1868,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
             return $html
                 . $this->renderActivityTimelineSummary($summaryItems, $periodDays > 30 ? 'semaine(s)' : 'jour(s)')
                 . '<details class="itxeb-activity-details"><summary>Afficher le détail complet par jour (' . $this->esc((string) count($items)) . ' jour(s))</summary>'
-                . $this->renderActivityTimelineBars($items)
+                . $this->renderActivityTimelineLineChart($items)
                 . '</details></section>';
         }
 
@@ -1755,7 +1876,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if ($limit <= 0) { $limit = min(14, $periodDays); }
         $limit = min($limit, $periodDays);
         $items = array_slice($daily, -$limit, null, true);
-        return $html . $this->renderActivityTimelineSummary($items, 'jour(s)') . $this->renderActivityTimelineBars($items) . '</section>';
+        return $html . $this->renderActivityTimelineSummary($items, 'jour(s)') . $this->renderActivityTimelineLineChart($items) . '</section>';
     }
 
     private function getActivityTimelineMode(int $periodDays): string
@@ -1844,15 +1965,71 @@ class ilIliasTraxEventBridgeCourseUIScreen
     }
 
     /** @param array<string,int> $items */
-    private function renderActivityTimelineBars(array $items): string
+    private function renderActivityTimelineLineChart(array $items): string
     {
+        // ITXEB V0.24.2 activity line chart
         if (count($items) === 0) { return '<p><em>Aucune donnée.</em></p>'; }
-        $max = max(array_map('intval', array_values($items)));
-        $html = '<div class="itxeb-bar-list itxeb-activity-bars">';
+
+        $values = [];
         foreach ($items as $label => $count) {
-            $html .= $this->barRow($this->formatActivityTimelineLabel((string) $label), (int) $count, $max);
+            $values[(string) $label] = max(0, (int) $count);
         }
-        return $html . '</div>';
+        if (count($values) === 0) { return '<p><em>Aucune donnée.</em></p>'; }
+
+        $max = max(1, max(array_values($values)));
+        $width = 920;
+        $height = 280;
+        $padLeft = 54;
+        $padRight = 28;
+        $padTop = 34;
+        $padBottom = 48;
+        $chartWidth = $width - $padLeft - $padRight;
+        $chartHeight = $height - $padTop - $padBottom;
+        $count = count($values);
+        $index = 0;
+        $points = [];
+        $dots = '';
+        $xLabels = '';
+        $stepLabel = max(1, (int) ceil($count / 6));
+
+        foreach ($values as $label => $value) {
+            $x = $padLeft + ($count === 1 ? ($chartWidth / 2) : (($index * $chartWidth) / max(1, $count - 1)));
+            $y = $padTop + $chartHeight - (($value / $max) * $chartHeight);
+            $points[] = round($x, 2) . ',' . round($y, 2);
+            $dots .= '<circle cx="' . $this->esc((string) round($x, 2)) . '" cy="' . $this->esc((string) round($y, 2)) . '" r="4.5"><title>' . $this->esc($this->formatActivityTimelineLabel((string) $label) . ' : ' . (string) $value) . '</title></circle>';
+            if ($index === 0 || $index === ($count - 1) || ($index % $stepLabel) === 0) {
+                $xLabels .= '<text x="' . $this->esc((string) round($x, 2)) . '" y="' . $this->esc((string) ($height - 16)) . '" text-anchor="middle">' . $this->esc($this->formatActivityTimelineLabel((string) $label)) . '</text>';
+            }
+            $index++;
+        }
+
+        $grid = '';
+        for ($i = 0; $i <= 4; $i++) {
+            $ratio = $i / 4;
+            $value = (int) round($max * (1 - $ratio));
+            $y = $padTop + ($chartHeight * $ratio);
+            $grid .= '<line x1="' . $padLeft . '" y1="' . $this->esc((string) round($y, 2)) . '" x2="' . ($width - $padRight) . '" y2="' . $this->esc((string) round($y, 2)) . '"></line>'
+                . '<text x="' . ($padLeft - 12) . '" y="' . $this->esc((string) (round($y, 2) + 4)) . '" text-anchor="end">' . $this->esc((string) $value) . '</text>';
+        }
+
+        $polyline = implode(' ', $points);
+        $total = array_sum($values);
+        $average = round($total / max(1, count($values)), 1);
+
+        return '<div class="itxeb-line-chart-card">'
+            . '<div class="itxeb-line-chart-head"><div><strong>Progression de l’activité</strong><br><small>Données d’apprentissage par période affichée</small></div>'
+            . '<div class="itxeb-line-chart-legend"><span class="itxeb-line-dot"></span> Activité</div></div>'
+            . '<svg class="itxeb-line-chart" viewBox="0 0 ' . $width . ' ' . $height . '" role="img" aria-label="Activité dans le temps">'
+            . '<style>.itxeb-line-chart-card{border:1px solid #d9e2ec;border-radius:10px;background:#fff;padding:14px 16px;margin:12px 0;box-shadow:0 1px 4px rgba(0,0,0,.05)}.itxeb-line-chart-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.itxeb-line-chart-legend{font-size:13px;color:#444;white-space:nowrap}.itxeb-line-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#1f8fc2;margin-right:6px}.itxeb-line-chart{width:100%;height:auto;display:block}.itxeb-line-chart .grid line{stroke:#e6ebf1;stroke-width:1}.itxeb-line-chart text{font-size:12px;fill:#667085}.itxeb-line-chart .axis{stroke:#d0d7de;stroke-width:1.2}.itxeb-line-chart .series{fill:none;stroke:#1f8fc2;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.itxeb-line-chart .dots circle{fill:#1f8fc2;stroke:#fff;stroke-width:2}</style>'
+            . '<g class="grid">' . $grid . '</g>'
+            . '<line class="axis" x1="' . $padLeft . '" y1="' . ($height - $padBottom) . '" x2="' . ($width - $padRight) . '" y2="' . ($height - $padBottom) . '"></line>'
+            . '<line class="axis" x1="' . $padLeft . '" y1="' . $padTop . '" x2="' . $padLeft . '" y2="' . ($height - $padBottom) . '"></line>'
+            . '<polyline class="series" points="' . $this->esc($polyline) . '"></polyline>'
+            . '<g class="dots">' . $dots . '</g>'
+            . '<g class="x-labels">' . $xLabels . '</g>'
+            . '</svg>'
+            . '<p style="margin:8px 0 0;color:#555"><small>Total : ' . $this->esc((string) $total) . ' donnée(s) — moyenne : ' . $this->esc((string) $average) . ' par période affichée.</small></p>'
+            . '</div>';
     }
 
     private function formatActivityTimelineLabel(string $label): string
