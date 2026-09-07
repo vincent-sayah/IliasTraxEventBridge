@@ -1,10 +1,10 @@
-# Installation — IliasTraxEventBridge V0.22.4
+# Installation — IliasTraxEventBridge V0.25.6
 
-Ce document décrit l'installation complète de la version stable validée V0.22.4 du plugin `IliasTraxEventBridge` sur ILIAS 10.
+Ce document décrit l'installation et la mise à jour de la version stable validée V0.25.6 du plugin `IliasTraxEventBridge` sur ILIAS 10.
 
 ## 1. Périmètre
 
-La V0.22.4 contient :
+La V0.25.6 contient :
 
 - le plugin principal EventHook `IliasTraxEventBridge` ;
 - le plugin compagnon UIHook `IliasTraxEventBridgeCourseUI` ;
@@ -12,14 +12,16 @@ La V0.22.4 contient :
 - l'accès cours `Pilotage xAPI` ;
 - les vues `Tableau de bord`, `Analyse`, `Analyse IA`, `Expert`, `Configuration` ;
 - le suivi des tests ILIAS avec traces question par question ;
-- le bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse ;
+- le bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse lorsque le contexte est pertinent ;
 - l'intégration des questions problématiques dans le payload Analyse IA ;
-- le bloc `Activité dans le temps` compact ;
-- une présentation titre/données proche des formulaires ILIAS ;
-- la correction du retour d'onglet après retrait d'une analyse IA ;
-- l'export CSV Expert ;
+- le bloc `Activité dans le temps` avec graphique linéaire SVG ;
+- l'alignement `Activité dans le temps` / `Top ressources` validé en V0.24.17 ;
+- le suivi MediaCast validé en V0.23.8 ;
+- le bloc `Apprenants en difficulté` avec affichage du login ILIAS ;
+- la colonne `Apprenant` dans l'onglet Expert ;
+- la colonne `learner_identity` dans l'export CSV Expert ;
 - l'export PDF du tableau de bord ;
-- la documentation V0.22.4.
+- la documentation V0.25.6.
 
 ## 2. Pré-requis
 
@@ -53,14 +55,6 @@ export ILIAS_ROOT="/var/www/ilias"
 ```
 
 Si ILIAS n'est pas installé dans `/var/www/ilias`, remplacer cette valeur par le chemin réel.
-
-Exemples :
-
-```bash
-export ILIAS_ROOT="/var/www/html/ilias"
-export ILIAS_ROOT="/data/www/ilias"
-export ILIAS_ROOT="/srv/ilias"
-```
 
 Chemin cible du plugin EventHook :
 
@@ -101,52 +95,31 @@ git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEven
 cd "$PLUGIN_NAME"
 ```
 
-Ne plus utiliser l'ancienne branche :
-
-```text
-v0.10-lrs-direct-read
-```
-
-Cette branche correspond à une ancienne version historique. La référence stable actuelle est `main`.
-
-Vérifier la version :
+Vérifier les versions :
 
 ```bash
 grep -n '\$version' plugin.php
 grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
 ```
 
-Résultat attendu :
+Résultat attendu après promotion V0.25.6 :
 
 ```text
-$version = '0.22.4-dev';
-$version = '0.8.10';
-```
-
-Vérifier la syntaxe PHP :
-
-```bash
-php -l plugin.php
-php -l classes/class.ilIliasTraxEventBridgeEventRouter.php
-php -l classes/class.ilIliasTraxEventBridgeStatementFactory.php
-php -l classes/class.ilIliasTraxEventBridgeTestQuestionResultExtractor.php
-php -l classes/class.ilIliasTraxEventBridgeQuestionRiskRepository.php
-php -l classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php
+$version = '0.25.6-dev';
+$version = '0.8.44';
 ```
 
 ## 4. Installation du plugin compagnon UIHook
 
 Le plugin compagnon ajoute l'accès `Pilotage xAPI` dans l'objet cours.
 
-### 4.1 Cas standard
-
 Depuis le dossier du plugin principal :
 
 ```bash
-cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
-export ILIAS_ROOT="$ILIAS_ROOT"
+export ILIAS_ROOT="/var/www/ilias"
 export HTTPD_USER="apache"
 
+cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 ```
 
@@ -156,38 +129,7 @@ Le script génère ou met à jour le plugin compagnon dans :
 $ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
 ```
 
-### 4.2 Cas où ILIAS n'est pas dans `/var/www/ilias`
-
-Le script accepte explicitement la variable `ILIAS_ROOT`.
-
-Exemple avec ILIAS installé dans `/data/www/ilias` :
-
-```bash
-export ILIAS_ROOT="/data/www/ilias"
-export HTTPD_USER="apache"
-
-cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
-bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
-
-Depuis V0.21.2, le script tente aussi de déduire automatiquement `ILIAS_ROOT` à partir du chemin réel du plugin principal. La variable explicite reste toutefois recommandée en exploitation.
-
-### 4.3 Contrôle du compagnon
-
-```bash
-COMPANION_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI"
-
-ls -la "$COMPANION_DIR"
-php -l "$COMPANION_DIR/plugin.php"
-php -l "$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-```
-
-Contrôler les marqueurs V0.22.4 :
-
-```bash
-grep -n "Activité dans le temps\|V0.22.4 alignment\|showCourseAiAnalysis" \
-"$COMPANION_DIR/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
-```
+Si ILIAS n'est pas dans `/var/www/ilias`, définir `ILIAS_ROOT` avec le chemin réel avant de lancer le script.
 
 ## 5. Reconstruction ILIAS
 
@@ -281,13 +223,13 @@ itxeb_send_outbox_to_trax
 
 ```bash
 export ILIAS_ROOT="/var/www/ilias"
+export HTTPD_USER="apache"
 cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
 
 git fetch origin
 git checkout main
 git pull --ff-only origin main
 
-export HTTPD_USER="apache"
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 
 cd "$ILIAS_ROOT"
@@ -304,55 +246,54 @@ Administration > Plugins > IliasTraxEventBridge > Mettre à jour
 Administration > Plugins > IliasTraxEventBridgeCourseUI > Mettre à jour
 ```
 
-## 12. Contrôles post-installation
+## 12. Contrôles post-installation V0.25.6
 
-### 12.1 Contrôle plugin
+### 12.1 Contrôle versions et marqueurs
 
 ```bash
 cd "$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge"
 
-grep -n '\$version' plugin.php
-grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-find . -name "*.php" -print0 | xargs -0 -n1 php -l
+grep -n "0.25.6-dev\|0.8.44\|ITXEB V0.25.6 learner login resolution\|lookupIliasLogin\|usr_data\|learner_identity" \
+plugin.php \
+classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php \
+companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
+companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
 ```
 
-### 12.2 Contrôle fonctionnel V0.22.4
+### 12.2 Contrôle PHP
+
+```bash
+php -l plugin.php
+php -l classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php
+php -l companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
+php -l companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
+php -l "$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php"
+php -l "$ILIAS_ROOT/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php"
+```
+
+### 12.3 Contrôle fonctionnel
 
 Dans ILIAS :
 
 ```text
-Pilotage xAPI > Tableau de bord
+Pilotage xAPI > Analyse
 ```
 
-Vérifier :
-
-- bloc `Activité dans le temps` ;
-- choix `7 jours`, `14 jours`, `30 jours`, `Par semaine`, `Détail complet` ;
-- présentation titre/données alignée ;
-- `Synthèse pédagogique` alignée comme les autres blocs.
+Vérifier que le bloc `Apprenants en difficulté` affiche le login ILIAS.
 
 Dans :
 
 ```text
-Pilotage xAPI > Analyse IA
+Pilotage xAPI > Expert
 ```
 
-Vérifier :
+Vérifier que le tableau affiche :
 
-- retrait d'une analyse IA historisée ;
-- après validation, l'onglet `Analyse IA` reste sélectionné.
-
-### 12.3 Contrôle SQL questions de test
-
-Après une tentative de test ILIAS :
-
-```sql
-SELECT id, event_type, verb_id, ref_id, obj_type, status, created_at
-FROM evnt_evhk_itxeb_out
-WHERE statement_json LIKE '%question_id%'
-ORDER BY id DESC
-LIMIT 20;
+```text
+Date | User ID | Apprenant | Verbe | Ressource | Type | Score | Completion | Success | Source | Statement ID
 ```
+
+La colonne `Apprenant` doit afficher le login ILIAS.
 
 ## 13. Dépannage rapide
 
@@ -380,13 +321,27 @@ GROUP BY status;
 
 Vérifier ensuite le cron ILIAS et le diagnostic du plugin.
 
-## 14. Tag stable recommandé
+### L'apprenant s'affiche encore sous la forme `ilias-user-ID`
 
-La V0.22.4 est promue dans `main`.
+Vérifier que le login existe dans ILIAS :
 
-Si un tag de release doit être créé après validation finale :
+```sql
+SELECT usr_id, login
+FROM usr_data
+WHERE usr_id IN (6, 401);
+```
+
+Vérifier ensuite que le marqueur V0.25.6 est présent :
 
 ```bash
-git tag -a v0.22.4 -m "Release stable v0.22.4"
-git push origin v0.22.4
+grep -n "ITXEB V0.25.6 learner login resolution\|lookupIliasLogin" classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php
+```
+
+## 14. Tag stable recommandé
+
+Après promotion de V0.25.6 dans `main`, un tag peut être créé :
+
+```bash
+git tag -a v0.25.6 -m "Release stable v0.25.6"
+git push origin v0.25.6
 ```
