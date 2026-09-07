@@ -2,23 +2,23 @@
 
 Plugin ILIAS 10 EventHook permettant de transformer certains événements ILIAS en statements xAPI, de les envoyer vers un LRS xAPI comme TRAX 3, puis d'afficher un pilotage pédagogique de cours dans ILIAS.
 
-## Version stable actuelle
+## Version courante validée
 
 | Élément | Valeur |
 |---|---|
-| Branche stable officielle | `main` |
-| Version stable courante | `0.23.8-dev` validée pour promotion dans `main` |
-| Commit de gel fonctionnel | `630ad8e` — `V0.23.8 validate MediaCast analysis view and external titles` |
+| Branche stable officielle avant promotion | `main` |
+| Version stable précédente | `0.23.8-dev` |
+| Branche de développement V0.24 | `v0.24-dashboard-synthesis-layout` |
+| Version V0.24 validée | `0.24.17-dev` |
+| Commit de validation V0.24.17 | `3a05d77` — `V0.24.17 validate dashboard synthesis and activity layout` |
 | Plugin principal | `IliasTraxEventBridge` |
 | Type plugin principal | `EventHook` |
-| Version plugin compagnon | `0.8.19` |
+| Version plugin compagnon V0.24.17 | `0.8.37` |
 | Plugin compagnon | `IliasTraxEventBridgeCourseUI` |
 | Type plugin compagnon | `UIHook` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
-| Branche de développement V0.23 | `v0.23-mediacast-media-tracking` |
-| Version stable précédente | `0.22.4-dev` |
 
-Pour une installation stable courante, utiliser `main` après promotion de la V0.23.8 :
+Pour une installation stable courante, utiliser `main` après promotion de la version validée :
 
 ```bash
 git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git IliasTraxEventBridge
@@ -26,7 +26,7 @@ git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEven
 
 Ne plus utiliser les anciennes branches d'installation comme `v0.10-lrs-direct-read` pour une nouvelle installation.
 
-## Règle métier V0.23.8
+## Règle métier conservée
 
 ```text
 TRAX/LRS = destination xAPI et source principale de suivi pédagogique.
@@ -53,7 +53,13 @@ Analyse = vue MediaCast des vidéos internes lues et médias externes ouverts.
 - Activation stricte par cours et par ressource.
 - Accès `Pilotage xAPI` depuis l'objet cours via le plugin compagnon UIHook.
 - Tableau de bord pédagogique.
+- Synthèse pédagogique enrichie et regroupée dans le tableau de bord.
+- Cartes KPI avec icônes et suppression des doublons visuels.
 - Activité dans le temps avec choix d'affichage : 7 jours, 14 jours, 30 jours, par semaine, détail complet.
+- Graphique linéaire SVG pour la progression de l'activité.
+- Alignement du bloc `Activité dans le temps` selon le modèle ILIAS : titre à gauche, contenu à droite.
+- Affichage `Progression de l’activité` et `Top ressources` sur une même ligne en vue large.
+- Filtrage contextuel du bloc `Questions à fort taux d’échec`.
 - Présentation des blocs de type formulaire ILIAS : intitulé à gauche, données à droite.
 - Analyse formateur.
 - Vue `Médias MediaCast vus` dans l'onglet Analyse uniquement.
@@ -70,7 +76,7 @@ Analyse = vue MediaCast des vidéos internes lues et médias externes ouverts.
 - Diagnostic TRAX/LRS dans l'onglet Configuration.
 - Supervision technique de l'outbox.
 - Traces question par question pour les tests ILIAS.
-- Bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse.
+- Bloc `Questions à fort taux d’échec` dans Tableau de bord et Analyse lorsque le contexte est pertinent.
 - Intégration des questions problématiques dans le payload IA.
 
 ## Vues du pilotage xAPI
@@ -87,7 +93,30 @@ Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu
 | Expert | Vue technique détaillée des statements et export CSV. |
 | Configuration | Activation cours/ressources, préférences, diagnostic LRS, supervision outbox. |
 
-## Suivi MediaCast V0.23.8
+## Tableau de bord V0.24.17
+
+La V0.24.17 améliore la lisibilité du tableau de bord sans changer les règles de captation xAPI.
+
+### Synthèse pédagogique
+
+- Les indicateurs sont regroupés dans `Synthèse pédagogique`.
+- Les anciennes tuiles doublonnées sont retirées de la vue globale.
+- Les KPI sont rendus plus lisibles grâce à des icônes.
+
+### Activité dans le temps
+
+Le bloc `Activité dans le temps` affiche :
+
+| Zone | Description |
+|---|---|
+| Titre | Aligné avec les autres titres de sections ILIAS. |
+| Introduction | Description courte de l'activité du cours. |
+| Sélecteur | 7 jours, 14 jours, 30 jours, par semaine, détail complet. |
+| KPI | Périodes actives, périodes sans activité, pic, moyenne. |
+| Progression de l'activité | Graphique linéaire SVG. |
+| Top ressources | Ressources les plus consultées, alignées avec le graphique en vue large. |
+
+## Suivi MediaCast V0.23.8 conservé
 
 La V0.23.8 ajoute un suivi pédagogique MediaCast sans modifier le fonctionnement des tests ILIAS.
 
@@ -156,23 +185,24 @@ systemctl restart php-fpm
 systemctl restart httpd
 ```
 
-Contrôle des versions :
+Contrôle des versions après promotion V0.24.17 :
 
 ```bash
-grep -n "0.23.8-dev\|0.8.19\|Médias MediaCast vus\|ITXEB V0.23.8 external playlist title" \
+grep -n "0.24.17-dev\|0.8.37\|ITXEB V0.24.17 top resources aligned with graph card safe\|itxeb-dashboard-activity-chart-row\|itxeb-dashboard-top-card" \
 plugin.php \
 companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
 companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl \
-companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl \
 /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php \
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php \
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php
+/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php
 ```
 
 ## Documentation de référence
 
 | Document | Rôle |
 |---|---|
+| [`docs/INDEX_0.24.17.md`](docs/INDEX_0.24.17.md) | Index de référence de la V0.24.17. |
+| [`docs/RELEASE_0.24.17.md`](docs/RELEASE_0.24.17.md) | Note de release V0.24.17. |
+| [`docs/VALIDATION_0.24.17.md`](docs/VALIDATION_0.24.17.md) | Checklist de validation V0.24.17. |
 | [`docs/INDEX_0.23.8.md`](docs/INDEX_0.23.8.md) | Index de référence de la V0.23.8. |
 | [`docs/RELEASE_0.23.8.md`](docs/RELEASE_0.23.8.md) | Note de release V0.23.8. |
 | [`docs/VALIDATION_0.23.8.md`](docs/VALIDATION_0.23.8.md) | Checklist de validation V0.23.8. |
@@ -188,9 +218,10 @@ companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCours
 | [`docs/EXPLOITATION_0.21.2.md`](docs/EXPLOITATION_0.21.2.md) | Exploitation et diagnostic courant. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions. |
 
-Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13`, `RELEASE_0.15.2`, `V0.21.2` et `V0.22.4` sont conservés pour historique et continuité. Pour une installation ou une maintenance courante, utiliser `main` et les documents V0.23.8.
+Les documents `V0.10`, `V0.11`, `V0.12`, `V0.13`, `RELEASE_0.15.2`, `V0.21.2`, `V0.22.4` et `V0.23.8` sont conservés pour historique et continuité.
 
 ## Copie écran
+
 ![Tableau de bord](docs/images/1.png)
 
 ![Tableau de bord](docs/images/2.png)
