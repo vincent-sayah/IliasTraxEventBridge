@@ -1,247 +1,132 @@
 # README technique — IliasTraxEventBridge
 
-Version stable courante après promotion : **V0.25.6** sur `main`, plugin principal **0.25.6-dev**.
+## Version technique courante
 
-Plugin compagnon UIHook : **IliasTraxEventBridgeCourseUI 0.8.44**.
-
-## 1. Type de plugin
-
-Le plugin principal est un plugin ILIAS de type :
-
-```text
-Services/EventHandling/EventHook
-```
-
-Chemin d'installation attendu :
-
-```text
-public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-```
-
-Classe principale :
-
-```text
-classes/class.ilIliasTraxEventBridgePlugin.php
-```
-
-Méthode appelée par ILIAS 10 :
-
-```php
-public function handleEvent(string $a_component, string $a_event, array $a_parameter): void
-```
-
-Le plugin compagnon est un plugin ILIAS de type :
-
-```text
-Services/UIComponent/UserInterfaceHook
-```
-
-Chemin d'installation actif :
-
-```text
-public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI
-```
-
-## 2. Architecture courante V0.25.6
-
-```mermaid
-flowchart TD
-    A[ILIAS EventHook] --> B[IliasTraxEventBridgePlugin]
-    B --> C[EventRouter]
-    C --> D[evnt_evhk_itxeb_log]
-    C --> E{Cours et ressource activés ?}
-    E -->|oui| F[StatementFactory]
-    F --> G[evnt_evhk_itxeb_out]
-    E -->|non| H{Diagnostic refus activé ?}
-    H -->|oui| I[evnt_evhk_itxeb_dlog]
-    H -->|non| J[Pas de journalisation refus]
-
-    K[read_event ILIAS] --> L[ReadEventTracker]
-    L --> E
-    M[Cron ILIAS] --> L
-    M --> N[OutboxSender]
-    N --> O[TRAX / LRS]
-
-    O --> P[LrsCourseSummary]
-    P --> Q[Dashboard]
-    P --> R[Analyse]
-    P --> S[Expert]
-    P --> T[Analyse IA]
-    P --> U[Résolution login ILIAS]
-    U --> V[usr_data.login]
-
-    W[UIHook CourseUI] --> Q
-    W --> R
-    W --> S
-    W --> T
-```
-
-## 3. Règle de filtrage
-
-La règle métier est stricte :
-
-```text
-statement xAPI autorisé = cours activé ET ressource activée
-```
-
-Si le cours ou la ressource n'est pas explicitement activé, aucune ligne n'est insérée dans `evnt_evhk_itxeb_out`.
-
-TRAX/LRS reste la source principale de lecture pédagogique. L'outbox locale reste une file technique d'envoi.
-
-## 4. Tables SQL principales
-
-| Table | Rôle |
+| Élément | Valeur |
 |---|---|
-| `evnt_evhk_itxeb_log` | Journal brut des événements EventHook reçus. |
-| `evnt_evhk_itxeb_out` | Outbox locale des statements xAPI. |
-| `evnt_evhk_itxeb_read` | Suivi anti-doublon des consultations issues de `read_event`. |
-| `evnt_evhk_itxeb_ccfg` | Configuration xAPI par cours. |
-| `evnt_evhk_itxeb_rcfg` | Configuration xAPI par ressource dans un cours. |
-| `evnt_evhk_itxeb_dlog` | Diagnostic des traces refusées. |
-| `evnt_evhk_itxeb_aih` | Historique local des analyses IA. |
-| `usr_data` | Table ILIAS utilisée en lecture pour résoudre `ilias-user-ID` vers `login`. |
+| Version plugin principal | `0.27.1-dev` |
+| Version plugin compagnon UI | `0.8.47` |
+| Branche stable | `main` |
+| Commit fonctionnel validé | `de90cb1` |
 
-## 5. Classes principales
+## Architecture
 
-| Classe | Rôle |
+```text
+ILIAS 10
+  ├─ EventHook IliasTraxEventBridge
+  │    ├─ capte les événements ILIAS
+  │    ├─ génère les statements xAPI
+  │    ├─ génère les traces question par question
+  │    ├─ génère les traces MediaCast client
+  │    └─ alimente l'outbox locale technique
+  │
+  ├─ Cron ILIAS
+  │    └─ envoie l'outbox vers TRAX/LRS
+  │
+  └─ UIHook IliasTraxEventBridgeCourseUI
+       ├─ affiche Pilotage xAPI dans le cours
+       ├─ lit TRAX/LRS pour les indicateurs xAPI
+       ├─ lit la progression ILIAS pour la réussite du cours
+       └─ affiche Tableau de bord, Analyse, Analyse IA, Expert, Configuration
+```
+
+## Sources de données
+
+| Donnée | Source |
 |---|---|
-| `ilIliasTraxEventBridgePlugin` | Point d'entrée EventHook ILIAS. |
-| `ilIliasTraxEventBridgeConfig` | Lecture/écriture de la configuration via `ilSetting`. |
-| `ilIliasTraxEventBridgeConfigGUI` | Écran admin, supervision, actions manuelles, diagnostic refus. |
-| `ilIliasTraxEventBridgeEventRouter` | Normalisation, résolution cours, filtrage, outbox ou refus. |
-| `ilIliasTraxEventBridgeStatementFactory` | Mapping événements/consultations vers statements xAPI. |
-| `ilIliasTraxEventBridgeTestQuestionResultExtractor` | Extraction des résultats de questions de test ILIAS. |
-| `ilIliasTraxEventBridgeQuestionRiskRepository` | Calcul des questions à fort taux d'échec. |
-| `ilIliasTraxEventBridgeOutboxRepository` | Gestion de l'outbox, compteurs et statuts. |
-| `ilIliasTraxEventBridgeOutboxSender` | Envoi xAPI manuel ou cron. |
-| `ilIliasTraxEventBridgeLrsReadClient` | Lecture directe TRAX/LRS. |
-| `ilIliasTraxEventBridgeLrsCourseSummary` | Construction des données Tableau de bord, Analyse, Expert et IA. |
-| `ilIliasTraxEventBridgeCourseAiAnalyzer` | Préparation et envoi du payload Analyse IA. |
-| `ilIliasTraxEventBridgeAiAnalysisHistory` | Historique local des analyses IA. |
-| `ilIliasTraxEventBridgeReadEventTracker` | Traitement de la table ILIAS `read_event`. |
+| Statements xAPI | TRAX/LRS |
+| Activité, ressources, verbes, questions, MediaCast | TRAX/LRS |
+| Apprenants actifs xAPI | TRAX/LRS |
+| Login apprenant affiché | ILIAS `usr_data.login` après résolution `ilias-user-ID` |
+| Taux de réussite du cours | Progression ILIAS (`ut_lp_settings`, `ut_lp_marks`, participants cours) |
+| Préférences tableau de bord | Table locale de configuration cours `evnt_evhk_itxeb_ccfg` |
+| Préférences synthèse pédagogique | Table locale de configuration cours `evnt_evhk_itxeb_ccfg` |
+| Outbox | Tables locales du plugin EventHook |
 
-## 6. Résolution login apprenant V0.25.6
+## V0.27.1 — centre de décision pédagogique
 
-La V0.25.6 ajoute `learner_identity` dans les lignes détaillées lues depuis TRAX/LRS.
+La V0.27.1 ajoute une couche de restitution formateur au-dessus des indicateurs existants.
 
-Ordre de résolution :
+### Nouveaux rendus
 
-1. lecture de `actor.account.name` ;
+- `renderDashboardCommandCenter()` : état global du cours.
+- `renderCourseSuccessGauge()` : jauge graphique de réussite avec icône 🎓.
+- `renderLearnerFunnel()` : entonnoir pédagogique.
+- `renderRecommendedActions()` : actions recommandées.
+- `renderResourceSignalMatrix()` : matrice activité / réussite / signal.
+- `dashboardDisplayMode()` : mode `Compact`, `Standard`, `Complet`.
+
+### Configuration
+
+Les préférences sont stockées par cours via les préférences du tableau de bord.
+
+Les modes utilisent des clés techniques internes :
+
+```text
+__mode_compact
+__mode_standard
+__mode_full
+```
+
+Les blocs restent sélectionnables depuis l'onglet `Configuration`.
+
+## V0.26 intégrée
+
+### Progression ILIAS
+
+La réussite du cours est calculée localement dans ILIAS lorsque la progression du cours est paramétrée.
+
+Tables et mécanismes utilisés :
+
+```text
+ut_lp_settings.u_mode
+ut_lp_marks.status
+crs_members ou ilCourseParticipants
+ilLPStatus::LP_STATUS_COMPLETED_NUM si disponible
+```
+
+La donnée est exposée dans le résumé LRS enrichi sous :
+
+```text
+course_progress
+summary.course_success_rate
+summary.course_progress_configured
+```
+
+### Synthèse pédagogique configurable
+
+Les cartes de synthèse sont configurables par cours. Le stockage utilise :
+
+```text
+synthesis_cards_json
+synthesis_cards_updated_at
+synthesis_cards_updated_by
+```
+
+## V0.25.6 intégrée
+
+La résolution nominative applique l'ordre suivant :
+
+1. lecture `actor.account.name` ;
 2. détection du format `ilias-user-ID` ;
-3. résolution via `ilObjUser::_lookupLogin()` si disponible ;
-4. fallback via `$DIC->database()` ;
-5. fallback via `$ilDB` ;
-6. lecture de `usr_data.login` ;
-7. fallback sur l'identité acteur xAPI.
+3. recherche dans ILIAS via `ilObjUser::_lookupLogin` ;
+4. fallback SQL `usr_data.login` ;
+5. fallback sur l'identité brute TRAX/LRS si aucun login n'est trouvé.
 
-Un cache local `actorLoginCache` évite de relire plusieurs fois le même `usr_id` pendant une requête.
-
-Le `User ID` affiché dans Expert reste pseudonymisé. La colonne `Apprenant` affiche le login ILIAS.
-
-## 7. Plugin compagnon CourseUI
-
-Le plugin compagnon expose :
-
-```text
-Cours > Pilotage xAPI
-```
-
-Vues disponibles :
-
-```text
-Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu du cours
-```
-
-Classes générées dans le slot UIHook :
-
-```text
-class.ilIliasTraxEventBridgeCourseUIPlugin.php
-class.ilIliasTraxEventBridgeCourseUIBridge.php
-class.ilIliasTraxEventBridgeCourseUIScreen.php
-class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php
-```
-
-Dans le dépôt principal, ces fichiers sont conservés en templates `.php.tpl` pour éviter les doublons Composer :
-
-```text
-companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-companion/IliasTraxEventBridgeCourseUI/classes/*.php.tpl
-```
-
-Installation/régénération :
+## Contrôles techniques
 
 ```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
+php -l plugin.php
+php -l classes/class.ilIliasTraxEventBridgeCourseTrackingRepository.php
+php -l classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php
+php -l companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
+php -l companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
+```
+
+## Installation du compagnon UI
+
+```bash
 export ILIAS_ROOT="/var/www/ilias"
 export HTTPD_USER="apache"
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
-```
-
-## 8. Installation technique V0.25.6
-
-```bash
-sudo -i
-
-export ILIAS_ROOT="/var/www/ilias"
-export HTTPD_USER="apache"
-export EVENTHOOK_DIR="$ILIAS_ROOT/public/Customizing/global/plugins/Services/EventHandling/EventHook"
-export PLUGIN_NAME="IliasTraxEventBridge"
-
-mkdir -p "$EVENTHOOK_DIR"
-cd "$EVENTHOOK_DIR"
-
-git clone -b main --single-branch https://github.com/vincent-sayah/IliasTraxEventBridge.git "$PLUGIN_NAME"
-cd "$PLUGIN_NAME"
-
-grep -n '\$version' plugin.php
-grep -n '\$version' companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-find . -name "*.php" -print0 | xargs -0 -n1 php -l
-bash scripts/install_course_ui_companion_with_standalone_fix.sh
-
-cd "$ILIAS_ROOT"
-sudo -u "$HTTPD_USER" composer du
-sudo -u "$HTTPD_USER" php cli/setup.php build --yes
-systemctl restart httpd
-systemctl restart php-fpm
-```
-
-Résultat attendu :
-
-```text
-$version = '0.25.6-dev';
-$version = '0.8.44';
-```
-
-## 9. Contrôles techniques utiles
-
-```bash
-grep -n "0.25.6-dev\|0.8.44\|ITXEB V0.25.6 learner login resolution\|lookupIliasLogin\|usr_data\|learner_identity" \
-plugin.php \
-classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php \
-companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
-companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
-```
-
-```sql
-SELECT usr_id, login
-FROM usr_data
-WHERE usr_id IN (6, 401);
-```
-
-```sql
-SELECT status, COUNT(*) AS total
-FROM evnt_evhk_itxeb_out
-GROUP BY status;
-```
-
-## 10. Documentation liée
-
-```text
-README.md
-CHANGELOG.md
-docs/INDEX_0.25.6.md
-docs/RELEASE_0.25.6.md
-docs/VALIDATION_0.25.6.md
-docs/INSTALLATION.md
-companion/IliasTraxEventBridgeCourseUI/README.md
 ```
