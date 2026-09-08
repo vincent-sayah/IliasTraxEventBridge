@@ -190,6 +190,91 @@ class ilIliasTraxEventBridgeCourseTrackingRepository
         );
     }
 
+    public function synthesisCardsAvailable(): bool
+    {
+        if (!$this->courseTableExists() || !method_exists($this->db, 'tableColumnExists') || !method_exists($this->db, 'addTableColumn')) {
+            return false;
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'synthesis_cards_json')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'synthesis_cards_json', [
+                'type' => 'clob', 'notnull' => false,
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'synthesis_cards_updated_at')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'synthesis_cards_updated_at', [
+                'type' => 'text', 'length' => 19, 'notnull' => true, 'default' => '',
+            ]);
+        }
+        if (!$this->db->tableColumnExists(self::COURSE_TABLE, 'synthesis_cards_updated_by')) {
+            $this->db->addTableColumn(self::COURSE_TABLE, 'synthesis_cards_updated_by', [
+                'type' => 'integer', 'length' => 8, 'notnull' => true, 'default' => 0,
+            ]);
+        }
+        return $this->db->tableColumnExists(self::COURSE_TABLE, 'synthesis_cards_json');
+    }
+
+    /** @return array<string,bool> */
+    public function getSynthesisCards(int $courseRefId): array
+    {
+        if ($courseRefId <= 0 || !$this->synthesisCardsAvailable()) {
+            return [];
+        }
+        try {
+            $set = $this->db->query(
+                'SELECT synthesis_cards_json FROM ' . self::COURSE_TABLE
+                . ' WHERE course_ref_id = ' . $courseRefId
+            );
+            $row = $this->db->fetchAssoc($set);
+            $json = is_array($row) ? (string) ($row['synthesis_cards_json'] ?? '') : '';
+            if (trim($json) === '') {
+                return [];
+            }
+            $decoded = json_decode($json, true);
+            if (!is_array($decoded)) {
+                return [];
+            }
+            $result = [];
+            foreach ($decoded as $key => $value) {
+                if (is_string($key)) {
+                    $result[$key] = (bool) $value;
+                }
+            }
+            return $result;
+        } catch (Throwable $ignored) {
+            return [];
+        }
+    }
+
+    /** @param array<string,bool> $cards */
+    public function setSynthesisCards(int $courseRefId, int $courseObjId, array $cards, int $updatedBy = 0): void
+    {
+        if ($courseRefId <= 0 || !$this->courseTableExists()) {
+            return;
+        }
+
+        if (!$this->isCourseConfigured($courseRefId)) {
+            $this->setCourseEnabled($courseRefId, $courseObjId, false, $updatedBy);
+        }
+
+        if (!$this->synthesisCardsAvailable()) {
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $json = json_encode($cards, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($json)) {
+            $json = '{}';
+        }
+
+        $this->db->manipulate(
+            'UPDATE ' . self::COURSE_TABLE
+            . ' SET synthesis_cards_json = ' . $this->db->quote($json, 'text')
+            . ', synthesis_cards_updated_at = ' . $this->db->quote($now, 'text')
+            . ', synthesis_cards_updated_by = ' . max(0, $updatedBy)
+            . ' WHERE course_ref_id = ' . $courseRefId
+        );
+    }
+
     /** @return array<int,array<string,mixed>> */
     public function findResourceConfigs(int $courseRefId): array
     {

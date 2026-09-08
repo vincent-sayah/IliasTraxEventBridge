@@ -78,6 +78,8 @@ class ilIliasTraxEventBridgeLrsCourseSummary
                 'mediacast_media_total' => 0,
                 'mediacast_media_unique' => 0,
                 'mediacast_media_learners' => 0,
+                'course_success_rate' => null,
+                'course_progress_configured' => false,
             ],
             'pedagogy' => [
                 'ok_count' => 0,
@@ -95,6 +97,7 @@ class ilIliasTraxEventBridgeLrsCourseSummary
             'by_resource' => [],
             'by_mediacast_media' => [],
             'mediacast_media_learners' => [],
+            'course_progress' => $this->courseProgressSummary($courseRefId, $courseObjId),
             'expert_rows' => [],
         ];
 
@@ -503,6 +506,9 @@ class ilIliasTraxEventBridgeLrsCourseSummary
         }));
         $scores = (array) ($summary['scores'] ?? []);
         $summary['summary']['avg_score_raw'] = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : null;
+        $courseProgress = is_array($summary['course_progress'] ?? null) ? $summary['course_progress'] : [];
+        $summary['summary']['course_progress_configured'] = !empty($courseProgress['configured']);
+        $summary['summary']['course_success_rate'] = is_numeric($courseProgress['success_rate'] ?? null) ? (float) $courseProgress['success_rate'] : null;
         unset($summary['learners'], $summary['scores']);
         return $summary;
     }
@@ -596,11 +602,13 @@ class ilIliasTraxEventBridgeLrsCourseSummary
     }
 
     /** @param array<string,mixed> $pedagogy @param array<string,mixed> $summary @return array<string,mixed> */
+        /** @param array<string,mixed> $pedagogy @param array<string,mixed> $summary @return array<string,mixed> */
     private function finalizePedagogy(array $pedagogy, array $summary): array
     {
         $lines = [];
         $activeLearners = count((array) ($summary['learners'] ?? []));
         $totalStatements = (int) ($summary['returned'] ?? 0);
+        $courseProgress = is_array($summary['course_progress'] ?? null) ? $summary['course_progress'] : [];
 
         if ($totalStatements <= 0) {
             $lines[] = 'Aucune trace TRAX/LRS trouvée sur la période.';
@@ -610,6 +618,13 @@ class ilIliasTraxEventBridgeLrsCourseSummary
 
         if ($activeLearners > 0) {
             $lines[] = $activeLearners . ' apprenant(s) actif(s) détecté(s).';
+        }
+
+        if (!empty($courseProgress['configured'])) {
+            $rate = is_numeric($courseProgress['success_rate'] ?? null) ? (string) $courseProgress['success_rate'] . ' %' : '-';
+            $lines[] = 'Progression ILIAS du cours : ' . $rate . ' de réussite ('
+                . (string) ($courseProgress['completed'] ?? 0) . ' / '
+                . (string) ($courseProgress['total'] ?? 0) . ' apprenant(s)).';
         }
 
         if ((int) $pedagogy['resources_without_trace'] > 0) {
@@ -635,6 +650,248 @@ class ilIliasTraxEventBridgeLrsCourseSummary
 
         $pedagogy['synthesis_lines'] = $lines;
         return $pedagogy;
+    }
+
+    private function courseProgressSummary(int $courseRefId, int $courseObjId): array
+    {
+        $empty = [
+            'configured' => false,
+            'available' => false,
+            'mode' => 0,
+            'total' => 0,
+            'completed' => 0,
+            'failed' => 0,
+            'in_progress' => 0,
+            'not_attempted' => 0,
+            'success_rate' => null,
+            'label' => 'Progression du cours non paramétrée',
+            'hint' => '',
+            'source' => 'ILIAS learning progress',
+        ];
+
+        if ($courseObjId <= 0) {
+            $empty['hint'] = 'course_obj_id indisponible.';
+            return $empty;
+        }
+
+        $db = $this->getIliasDb();
+        if (!is_object($db)) {
+            $empty['hint'] = 'Base ILIAS indisponible.';
+            return $empty;
+        }
+
+        $mode = $this->courseProgressMode($db, $courseObjId);
+        if ($mode <= 0) {
+            return $empty;
+        }
+
+        $constants = $this->courseProgressStatusConstants();
+        $participantIds = $this->courseProgressParticipantIds($db, $courseObjId);
+        $statuses = $this->courseProgressStatuses($db, $courseObjId);
+
+        $userIds = $participantIds;
+        if (count($userIds) === 0) {
+            $userIds = array_keys($statuses);
+        }
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+        sort($userIds);
+
+        $total = count($userIds);
+        $completed = 0;
+        $failed = 0;
+        $inProgress = 0;
+        $notAttempted = 0;
+
+        foreach ($userIds as $userId) {
+            $status = isset($statuses[$userId]) ? (int) $statuses[$userId] : (int) $constants['not_attempted'];
+            if ($status === (int) $constants['completed']) {
+                $completed++;
+            } elseif ($status === (int) $constants['failed']) {
+                $failed++;
+            } elseif ($status === (int) $constants['in_progress']) {
+                $inProgress++;
+            } else {
+                $notAttempted++;
+            }
+        }
+
+        $rate = $total > 0 ? round(($completed / max(1, $total)) * 100, 1) : null;
+        return [
+            'configured' => true,
+            'available' => true,
+            'mode' => $mode,
+            'total' => $total,
+            'completed' => $completed,
+            'failed' => $failed,
+            'in_progress' => $inProgress,
+            'not_attempted' => $notAttempted,
+            'success_rate' => $rate,
+            'label' => $rate === null ? '-' : ((string) $rate . ' %'),
+            'hint' => $total > 0
+                ? ($completed . ' réussi(s) / ' . $total . ' apprenant(s)')
+                : 'Progression paramétrée, aucun apprenant trouvé.',
+            'source' => 'ILIAS learning progress',
+        ];
+    }
+
+    private function getIliasDb()
+    {
+        try {
+            global $DIC;
+            if (isset($DIC) && is_object($DIC) && method_exists($DIC, 'database')) {
+                return $DIC->database();
+            }
+        } catch (Throwable $ignored) {
+            // fallback global $ilDB ci-dessous
+        }
+
+        try {
+            global $ilDB;
+            if (isset($ilDB) && is_object($ilDB)) {
+                return $ilDB;
+            }
+        } catch (Throwable $ignored) {
+            return null;
+        }
+
+        return null;
+    }
+
+    private function courseProgressMode($db, int $courseObjId): int
+    {
+        if (!$this->dbTableExists($db, 'ut_lp_settings')) {
+            return 0;
+        }
+        try {
+            $res = $db->query('SELECT u_mode FROM ut_lp_settings WHERE obj_id = ' . $db->quote($courseObjId, 'integer'));
+            $row = $db->fetchAssoc($res);
+            return is_array($row) && is_numeric($row['u_mode'] ?? null) ? (int) $row['u_mode'] : 0;
+        } catch (Throwable $ignored) {
+            return 0;
+        }
+    }
+
+    private function courseProgressStatusConstants(): array
+    {
+        $completed = 2;
+        $failed = 3;
+        $inProgress = 1;
+        $notAttempted = 0;
+
+        try {
+            if (class_exists('ilLPStatus')) {
+                if (defined('ilLPStatus::LP_STATUS_COMPLETED_NUM')) {
+                    $completed = (int) constant('ilLPStatus::LP_STATUS_COMPLETED_NUM');
+                }
+                if (defined('ilLPStatus::LP_STATUS_FAILED_NUM')) {
+                    $failed = (int) constant('ilLPStatus::LP_STATUS_FAILED_NUM');
+                }
+                if (defined('ilLPStatus::LP_STATUS_IN_PROGRESS_NUM')) {
+                    $inProgress = (int) constant('ilLPStatus::LP_STATUS_IN_PROGRESS_NUM');
+                }
+                if (defined('ilLPStatus::LP_STATUS_NOT_ATTEMPTED_NUM')) {
+                    $notAttempted = (int) constant('ilLPStatus::LP_STATUS_NOT_ATTEMPTED_NUM');
+                }
+            }
+        } catch (Throwable $ignored) {
+            // valeurs numériques de secours
+        }
+
+        return [
+            'completed' => $completed,
+            'failed' => $failed,
+            'in_progress' => $inProgress,
+            'not_attempted' => $notAttempted,
+        ];
+    }
+
+    /** @return array<int,int> */
+    private function courseProgressParticipantIds($db, int $courseObjId): array
+    {
+        $ids = [];
+
+        try {
+            if (class_exists('ilCourseParticipants') && is_callable(['ilCourseParticipants', '_getInstanceByObjId'])) {
+                $participants = ilCourseParticipants::_getInstanceByObjId($courseObjId);
+                if (is_object($participants)) {
+                    foreach (['getMembers', 'getParticipants'] as $method) {
+                        if (method_exists($participants, $method)) {
+                            $values = $participants->{$method}();
+                            if (is_array($values)) {
+                                foreach ($values as $value) {
+                                    if (is_scalar($value) && (int) $value > 0) {
+                                        $ids[(int) $value] = (int) $value;
+                                    } elseif (is_array($value) && isset($value['usr_id']) && (int) $value['usr_id'] > 0) {
+                                        $ids[(int) $value['usr_id']] = (int) $value['usr_id'];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $ignored) {
+            // fallback SQL ci-dessous
+        }
+
+        if (count($ids) === 0 && $this->dbTableExists($db, 'crs_members')) {
+            try {
+                $res = $db->query('SELECT usr_id FROM crs_members WHERE obj_id = ' . $db->quote($courseObjId, 'integer'));
+                while ($row = $db->fetchAssoc($res)) {
+                    if (is_array($row) && isset($row['usr_id']) && (int) $row['usr_id'] > 0) {
+                        $ids[(int) $row['usr_id']] = (int) $row['usr_id'];
+                    }
+                }
+            } catch (Throwable $ignored) {
+                // fallback aux lignes de statut uniquement
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /** @return array<int,int> */
+    private function courseProgressStatuses($db, int $courseObjId): array
+    {
+        $statuses = [];
+        if (!$this->dbTableExists($db, 'ut_lp_marks')) {
+            return $statuses;
+        }
+        try {
+            $res = $db->query('SELECT usr_id, status FROM ut_lp_marks WHERE obj_id = ' . $db->quote($courseObjId, 'integer'));
+            while ($row = $db->fetchAssoc($res)) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $usrId = isset($row['usr_id']) ? (int) $row['usr_id'] : 0;
+                if ($usrId > 0 && is_numeric($row['status'] ?? null)) {
+                    $statuses[$usrId] = (int) $row['status'];
+                }
+            }
+        } catch (Throwable $ignored) {
+            return [];
+        }
+        return $statuses;
+    }
+
+    private function dbTableExists($db, string $table): bool
+    {
+        if (!is_object($db) || !preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            return false;
+        }
+        try {
+            if (method_exists($db, 'tableExists')) {
+                return (bool) $db->tableExists($table);
+            }
+        } catch (Throwable $ignored) {
+            // fallback SELECT ci-dessous
+        }
+        try {
+            $db->query('SELECT 1 FROM ' . $table . ' WHERE 1 = 0');
+            return true;
+        } catch (Throwable $ignored) {
+            return false;
+        }
     }
 
     private function courseActivityId(int $courseRefId, int $courseObjId): string
