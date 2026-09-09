@@ -11,6 +11,7 @@ Plugin ILIAS 10 EventHook permettant de transformer des événements ILIAS en st
 | Version plugin compagnon UI | `0.8.50` |
 | Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
 | Commit fonctionnel validé | `eabc786` — `V0.28.5 validate plugin configuration layout` |
+| Commit final main/doc | `0fcd545` — `Docs add V0.28.5 validation report` |
 | Compatibilité ILIAS | `10.0.0` à `10.999.999` |
 
 Installation stable courante :
