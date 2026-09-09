@@ -4,11 +4,11 @@
 
 | Élément | Valeur |
 |---|---|
-| Version validée | V0.27.1 |
-| Plugin principal | `0.27.1-dev` |
-| Plugin compagnon UI | `0.8.47` |
-| Branche de validation | `v0.27-dashboard-command-center-validated` |
-| Commit validé serveur | `de90cb1` |
+| Version validée | V0.28.5 |
+| Plugin principal | `0.28.5-dev` |
+| Plugin compagnon UI | `0.8.50` |
+| Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
+| Commit validé serveur | `eabc786` |
 | Branche stable cible | `main` |
 
 ## Principe retenu
@@ -18,60 +18,85 @@ Le serveur ILIAS ne pousse pas directement vers GitHub.
 Le flux de promotion reste :
 
 ```text
-Serveur ILIAS -> git bundle -> Git Bash Windows -> branche GitHub -> documentation GitHub -> promotion main
+Serveur ILIAS
+  -> git commit local validé
+  -> git bundle /tmp/v0285_validated.bundle
+  -> copie SCP vers Windows
+  -> import bundle dans dépôt Windows
+  -> push vers GitHub sur branche de validation
+  -> mise à jour documentation .md
+  -> promotion de main
 ```
 
-## Étapes utilisées pour V0.27.1
+## Commandes utilisées pour V0.28.5
 
-### Serveur
+### Serveur ILIAS
 
 ```bash
 cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
 
-git add plugin.php \
-classes/class.ilIliasTraxEventBridgeCourseTrackingRepository.php \
-classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php \
+rm -rf scripts/__pycache__
+
+git status -sb
+git diff --stat
+
+git add \
+plugin.php \
+classes/class.ilIliasTraxEventBridgeConfig.php \
+classes/class.ilIliasTraxEventBridgeConfigGUI.php \
+classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php \
 companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
 companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl \
-scripts/apply_v0261_course_progress_success_rate.py \
-scripts/apply_v0262_synthesis_card_configuration.py \
-scripts/apply_v0271_dashboard_command_center.py
+companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIBridge.php.tpl \
+companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl \
+scripts/apply_v0281_dashboard_analysis_config_ai_prompt.py \
+scripts/apply_v0283_pilotage_button_course_access_fix.py \
+scripts/apply_v0284_config_plugin_layout.py \
+scripts/apply_v0285_config_purge_buttons_layout.py
 
-git commit -m "V0.27.1 validate dashboard command center"
+git commit -m "V0.28.5 validate plugin configuration layout"
 
-git bundle create /tmp/v0271_validated.bundle origin/main..HEAD
-git bundle verify /tmp/v0271_validated.bundle
+git fetch origin
+git bundle create /tmp/v0285_validated.bundle origin/main..HEAD
+git bundle verify /tmp/v0285_validated.bundle
+ls -lh /tmp/v0285_validated.bundle
 ```
 
-### Windows / Git Bash
+### Windows Git Bash
 
 ```bash
-scp root@192.168.56.50:/tmp/v0271_validated.bundle /c/Users/vincent/Downloads/v0271_validated.bundle
+scp root@192.168.56.50:/tmp/v0285_validated.bundle /c/Users/vincent/Downloads/v0285_validated.bundle
 
 cd ~/Downloads/IliasTraxEventBridge_github_ready_package/package/IliasTraxEventBridge
 
 git fetch origin
-git checkout -B v0.27-dashboard-command-center-validated origin/main
+git checkout -B v0.28-dashboard-analysis-config-ai-prompt-validated origin/main
 
-git bundle verify /c/Users/vincent/Downloads/v0271_validated.bundle
-git pull /c/Users/vincent/Downloads/v0271_validated.bundle HEAD
+git bundle verify /c/Users/vincent/Downloads/v0285_validated.bundle
+git pull /c/Users/vincent/Downloads/v0285_validated.bundle HEAD
 
-git push origin HEAD:v0.27-dashboard-command-center-validated
+git push -u origin v0.28-dashboard-analysis-config-ai-prompt-validated
 ```
 
-## Promotion finale
+## Résultat validé
 
-La promotion finale est faite côté GitHub après mise à jour des fichiers `.md`.
+```text
+eabc786 V0.28.5 validate plugin configuration layout
+```
 
-## Contrôle après promotion
+Le bundle validé contenait `eabc786` et nécessitait `f7f8611`, commit stable V0.27.1.
+
+## Après promotion main
 
 ```bash
 git fetch origin
 git checkout -f main
 git reset --hard origin/main
 
-git status -sb
-git log --oneline -8
-```
+export ILIAS_ROOT="/var/www/ilias"
+export HTTPD_USER="apache"
+bash scripts/install_course_ui_companion_with_standalone_fix.sh
 
-Résultat attendu : `main` pointe sur la documentation V0.27.1, avec `de90cb1` dans l'historique.
+systemctl restart php-fpm
+systemctl restart httpd
+```
