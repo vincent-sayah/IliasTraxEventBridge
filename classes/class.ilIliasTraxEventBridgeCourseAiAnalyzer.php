@@ -73,28 +73,12 @@ class ilIliasTraxEventBridgeCourseAiAnalyzer
         ];
     }
 
+    
     private function systemPrompt(): string
     {
-        return implode("\n", [
-            'Tu es un assistant pédagogique pour un formateur utilisant ILIAS connecté à un LRS TRAX.',
-            'Tu analyses uniquement des indicateurs xAPI agrégés, anonymisés et déjà filtrés côté serveur.',
-            'Tu ne dois jamais inventer de chiffres, de ressources, de noms, de profils ou de causes absentes du payload.',
-            'Tu ne dois jamais identifier, classer ou évaluer nominativement un apprenant.',
-            'Tu peux citer les titres de ressources pédagogiques, car ils servent au plan d’action du formateur.',
-            'Tu dois distinguer clairement les constats mesurés, les hypothèses pédagogiques prudentes et les actions recommandées.',
-            'Tu dois répondre en français, en Markdown, avec des formulations opérationnelles et directement exploitables.',
-            'Respecte exactement la structure suivante :',
-            '## 1. Synthèse opérationnelle',
-            '## 2. Lecture des indicateurs',
-            '## 3. Priorités formateur',
-            '## 4. Ressources à traiter',
-            '## 5. Actions pédagogiques recommandées',
-            '## 6. Points d’attention anonymisés',
-            '## 7. Limites et fiabilité',
-            'Dans chaque section, reste concis. Utilise des puces actionnables lorsque c’est pertinent.',
-            'Si les données sont insuffisantes, indique-le explicitement au lieu de produire une conclusion forte.',
-        ]);
+        return $this->config->getAiSystemPrompt();
     }
+
 
     private function userPrompt(string $encodedPayload): string
     {

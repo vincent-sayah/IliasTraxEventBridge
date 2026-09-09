@@ -140,27 +140,21 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     /** @param array<string,mixed> $course */
         /** @param array<string,mixed> $course */
+    
     private function saveDashboardPreferences(array $course): void
     {
-        // ITXEB V0.27.1 dashboard command center preferences.
+        // ITXEB V0.28.2 dashboard presets: les modes appliquent un vrai préréglage.
         $requestedMode = $this->postString('dashboard_display_mode');
         if (!in_array($requestedMode, ['compact', 'standard', 'full'], true)) {
             $requestedMode = 'standard';
         }
 
         $widgets = $this->dashboardDefaultWidgets($requestedMode);
-        $enabled = array_fill_keys($this->postStringArray('dashboard_widgets'), true);
-        foreach ($this->dashboardWidgetDefinitions() as $key => $label) {
-            if (strpos($key, '__mode_') === 0) {
-                $widgets[$key] = $key === ('__mode_' . $requestedMode);
-                continue;
-            }
-            $widgets[$key] = isset($enabled[$key]);
-        }
         $this->repository->setDashboardWidgets((int) ($course['course_ref_id'] ?? 0), (int) ($course['course_obj_id'] ?? 0), $widgets, $this->getCurrentUserId());
-        $this->message = 'Préférences du tableau de bord enregistrées.';
+        $this->message = 'Affichage du tableau de bord enregistré : mode ' . $this->dashboardModeLabel($requestedMode) . '.';
         $this->messageType = 'success';
     }
+
 
     /** @param array<string,mixed> $course */
     private function saveSynthesisCardsPreferences(array $course): void
@@ -348,11 +342,12 @@ class ilIliasTraxEventBridgeCourseUIScreen
     }
 
     /** @param array<string,mixed> $course */
+    
     private function renderConfigForm(array $course): string
     {
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
-        return '<section class="itxeb-cui-section"><h2>Activation xAPI</h2>'
-            . '<form method="post" action="' . $this->esc($this->currentRequestUri()) . '">'
+        return '<section id="itxeb-course-activation" class="itxeb-cui-section"><h2>Activation xAPI</h2>'
+            . '<form method="post" action="' . $this->esc($this->currentRequestUri() . '#itxeb-course-activation') . '">'
             . '<input type="hidden" name="itxeb_cui_cmd" value="saveCourseTracking">'
             . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
             . '<p><label><input type="checkbox" name="course_enabled" value="1"' . (!empty($course['course_enabled']) ? ' checked="checked"' : '') . '> Activer les traces xAPI pour ce cours</label></p>'
@@ -361,42 +356,41 @@ class ilIliasTraxEventBridgeCourseUIScreen
             . '</form></section>';
     }
 
+
     /** @param array<string,mixed> $course */
         /** @param array<string,mixed> $course */
+    
     private function renderDashboardPreferencesForm(array $course): string
     {
-        // ITXEB V0.27.1 dashboard command center form.
+        // ITXEB V0.28.2 dashboard display modes.
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
-        $widgets = $this->dashboardWidgets($courseRefId);
         $mode = $this->dashboardDisplayMode($courseRefId);
-        $html = '<section class="itxeb-cui-section"><h2>Personnalisation du tableau de bord</h2>'
-            . '<p>Choisir le mode de lecture et les blocs visibles dans l’onglet Tableau de bord pour ce cours.</p>'
-            . '<form method="post" action="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseTracking', 'itxeb_course_ref_id' => (string) $courseRefId])) . '">'
+        $html = '<section id="itxeb-dashboard-preferences" class="itxeb-cui-section"><h2>Personnalisation du tableau de bord</h2>'
+            . '<p>Choisir un mode de lecture. Chaque mode applique maintenant un vrai préréglage de blocs visibles.</p>'
+            . '<div class="itxeb-cui-alert"><strong>Compact :</strong> état global, réussite du cours, entonnoir pédagogique.<br>'
+            . '<strong>Standard :</strong> compact + synthèse pédagogique, activité, top ressources.<br>'
+            . '<strong>Complet :</strong> standard + comparaison, actions xAPI, ressources sans activité.</div>'
+            . '<form method="post" action="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseTracking', 'itxeb_course_ref_id' => (string) $courseRefId]) . '#itxeb-dashboard-preferences') . '">'
             . '<input type="hidden" name="itxeb_cui_cmd" value="showCourseTracking">'
             . '<input type="hidden" name="itxeb_dashboard_save" value="1">'
             . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
             . '<div class="itxeb-dashboard-mode-grid">';
-        foreach (['compact' => 'Compact — décision rapide', 'standard' => 'Standard — suivi formateur recommandé', 'full' => 'Complet — tous les blocs disponibles'] as $modeKey => $label) {
+        foreach (['compact' => 'Compact — décision rapide', 'standard' => 'Standard — suivi formateur recommandé', 'full' => 'Complet — tous les blocs disponibles du tableau de bord'] as $modeKey => $label) {
             $html .= '<label class="itxeb-widget-choice itxeb-dashboard-mode-choice"><input type="radio" name="dashboard_display_mode" value="' . $this->esc($modeKey) . '"' . ($mode === $modeKey ? ' checked="checked"' : '') . '> <strong>' . $this->esc($label) . '</strong></label>';
-        }
-        $html .= '</div><h3>Blocs du tableau de bord</h3><div class="itxeb-widget-grid">';
-        foreach ($this->dashboardWidgetDefinitions() as $key => $label) {
-            if (strpos($key, '__mode_') === 0) {
-                continue;
-            }
-            $html .= '<label class="itxeb-widget-choice"><input type="checkbox" name="dashboard_widgets[]" value="' . $this->esc($key) . '"' . (!empty($widgets[$key]) ? ' checked="checked"' : '') . '> ' . $this->esc($label) . '</label>';
         }
         return $html . '</div><p><button class="btn btn-default" type="submit">Enregistrer l’affichage du tableau de bord</button></p></form></section>';
     }
 
+
     /** @param array<string,mixed> $course */
+    
     private function renderSynthesisCardsPreferencesForm(array $course): string
     {
         $courseRefId = (int) ($course['course_ref_id'] ?? 0);
         $cards = $this->synthesisCards($courseRefId);
-        $html = '<section class="itxeb-cui-section"><h2>Synthèse pédagogique</h2>'
-            . '<p>Choisir les cartes visibles dans le bloc <strong>Synthèse pédagogique</strong>. Le réglage est enregistré pour ce cours et s’applique dans Tableau de bord et Analyse.</p>'
-            . '<form method="post" action="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseTracking', 'itxeb_course_ref_id' => (string) $courseRefId])) . '">'
+        $html = '<section id="itxeb-synthesis-cards" class="itxeb-cui-section"><h2>Synthèse pédagogique</h2>'
+            . '<p>Choisir les cartes visibles dans le bloc <strong>Synthèse pédagogique</strong>. Le réglage est enregistré pour ce cours et s’applique dans le Tableau de bord.</p>'
+            . '<form method="post" action="' . $this->esc($this->currentUrlWith(['itxeb_cui_cmd' => 'showCourseTracking', 'itxeb_course_ref_id' => (string) $courseRefId]) . '#itxeb-synthesis-cards') . '">'
             . '<input type="hidden" name="itxeb_cui_cmd" value="showCourseTracking">'
             . '<input type="hidden" name="itxeb_synthesis_cards_save" value="1">'
             . '<input type="hidden" name="itxeb_course_ref_id" value="' . $this->esc((string) $courseRefId) . '">'
@@ -406,6 +400,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
         return $html . '</div><p><button class="btn btn-default" type="submit">Enregistrer la synthèse pédagogique</button></p></form></section>';
     }
+
 
     /** @param array<string,mixed> $course */
     private function renderResourcesTable(array $course): string
@@ -483,13 +478,14 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     /** @param array<string,mixed> $course */
         /** @param array<string,mixed> $course */
+    
     private function renderDashboard(array $course): string
     {
-        // ITXEB V0.27.1 dashboard command center.
+        // ITXEB V0.28.2 dashboard without analysis duplication.
         $dashboard = $this->loadDashboard($course);
         $widgets = $this->dashboardWidgets((int) ($course['course_ref_id'] ?? 0));
         $mode = $this->dashboardModeLabel($this->dashboardDisplayMode((int) ($course['course_ref_id'] ?? 0)));
-        $html = '<section class="itxeb-cui-section itxeb-dashboard-v027"><h2>Tableau de bord du cours</h2><p>Vue de décision rapide pour le formateur. Mode actuel : <strong>' . $this->esc($mode) . '</strong>.</p>'
+        $html = '<section class="itxeb-cui-section itxeb-dashboard-v027"><h2>Tableau de bord du cours</h2><p>Vue rapide de décision pour le formateur. Les détails d’investigation sont dans l’onglet <strong>Analyse</strong>. Mode actuel : <strong>' . $this->esc($mode) . '</strong>.</p>'
             . $this->renderPeriodSelector('showCourseDashboard') . $this->renderResourceFilter($course, 'showCourseDashboard') . $this->renderAnalyticsWarning();
 
         if (!empty($widgets['command_center'])) {
@@ -501,15 +497,8 @@ class ilIliasTraxEventBridgeCourseUIScreen
         if (!empty($widgets['learner_funnel'])) {
             $html .= $this->renderLearnerFunnel($dashboard);
         }
-        if (!empty($widgets['recommended_actions'])) {
-            $html .= $this->renderRecommendedActions($dashboard, $course);
-        }
-        $html .= $this->renderPedagogicalSynthesis($dashboard, $course);
-        if (!empty($widgets['resource_matrix'])) {
-            $html .= $this->renderResourceSignalMatrix($dashboard);
-        }
-        if ($this->shouldRenderQuestionFailureHotspots($course)) {
-            $html .= $this->renderQuestionFailureHotspots($dashboard, $course);
+        if (!empty($widgets['pedagogical_synthesis'])) {
+            $html .= $this->renderPedagogicalSynthesis($dashboard, $course);
         }
         if (!empty($widgets['comparison'])) {
             $html .= $this->renderPeriodComparison($course);
@@ -525,6 +514,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
         return $html . '</section>';
     }
+
 
     /** @param array<string,mixed> $dashboard */
     private function renderDashboardActivityTopLayout(array $dashboard, bool $showActivity, bool $showTopResources): string
@@ -1045,12 +1035,13 @@ class ilIliasTraxEventBridgeCourseUIScreen
     }
     /** @param array<string,mixed> $course */
         /** @param array<string,mixed> $course */
+    
     private function renderAnalysis(array $course): string
     {
-        // ITXEB V0.27.1 analysis action dashboard.
+        // ITXEB V0.28.2 analysis page: analyse des résultats sans doublon dashboard.
         $dashboard = $this->loadDashboard($course);
         $resources = is_array($dashboard['by_resource'] ?? null) ? $dashboard['by_resource'] : [];
-        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse formateur</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les actions recommandées et les signaux critiques.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue opérationnelle des ressources utilisées, peu utilisées, activées sans trace ou associées à des signaux pédagogiques.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderRecommendedActions($dashboard, $course) . $this->renderPedagogicalSynthesis($dashboard, $course) . $this->renderResourceSignalMatrix($dashboard) . ($this->shouldRenderQuestionFailureHotspots($course) ? $this->renderQuestionFailureHotspots($dashboard, $course) : '') . $this->renderMediaCastMediaDashboard($dashboard);
+        $html = '<section class="itxeb-cui-section itxeb-trainer-page"><h2>Analyse des résultats</h2><div style="border:2px solid #c8d6e5;background:#f8fbff;border-radius:6px;padding:12px 14px;margin:10px 0 14px"><strong>Mode d’emploi rapide</strong><ul style="margin:8px 0 0 18px"><li>Choisir la période de suivi.</li><li>Lire les actions recommandées, les signaux ressources et les questions à fort taux d’échec.</li><li>Utiliser l’onglet Analyse IA pour générer ou comparer les synthèses IA.</li></ul></div><p style="color:#555">Vue d’investigation : ressources utilisées, ressources à surveiller, questions problématiques, apprenants à accompagner et médias MediaCast vus.</p>' . $this->renderPeriodSelector('showCourseAnalysis') . $this->renderResourceFilter($course, 'showCourseAnalysis') . $this->renderAnalyticsWarning() . $this->renderTrainerActionSummary($dashboard) . $this->renderRecommendedActions($dashboard, $course) . $this->renderResourceSignalMatrix($dashboard) . ($this->shouldRenderQuestionFailureHotspots($course) ? $this->renderQuestionFailureHotspots($dashboard, $course) : '') . $this->renderMediaCastMediaDashboard($dashboard);
         if (count($resources) === 0) {
             return $html . '<p><em>Aucune ressource traçable détectée.</em></p></section>';
         }
@@ -1071,6 +1062,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
         }
         return $html . '</tbody></table></div>' . $this->renderStrugglingLearners($dashboard) . '</section>';
     }
+
     /** @param array<string,mixed> $course */
     private function runCourseAiAnalysis(array $course): void
     {
@@ -2816,6 +2808,7 @@ class ilIliasTraxEventBridgeCourseUIScreen
 
     /** @return array<string,string> */
         /** @return array<string,string> */
+    
     private function dashboardWidgetDefinitions(): array
     {
         return [
@@ -2825,46 +2818,51 @@ class ilIliasTraxEventBridgeCourseUIScreen
             'command_center' => 'État global du cours',
             'success_gauge' => 'Jauge réussite du cours',
             'learner_funnel' => 'Entonnoir pédagogique',
-            'recommended_actions' => 'Actions recommandées',
-            'resource_matrix' => 'Matrice ressources',
+            'pedagogical_synthesis' => 'Synthèse pédagogique',
             'comparison' => 'Comparaison entre périodes',
             'activity_by_day' => 'Activité par jour',
             'verb_distribution' => 'Actions xAPI',
             'top_resources' => 'Top ressources',
             'enabled_without_trace' => 'Ressources sans statement TRAX',
+            'recommended_actions' => 'Actions recommandées — Analyse uniquement',
+            'resource_matrix' => 'Matrice ressources — Analyse uniquement',
         ];
     }
 
+
     /** @return array<string,bool> */
         /** @return array<string,bool> */
+    
     private function dashboardWidgets(int $courseRefId): array
     {
-        $defaults = $this->dashboardDefaultWidgets('standard');
         if (!$this->repository) {
-            return $defaults;
+            return $this->dashboardDefaultWidgets('standard');
         }
         $stored = $this->repository->getDashboardWidgets($courseRefId);
         $mode = $this->dashboardDisplayModeFromStored($stored);
-        return array_merge($this->dashboardDefaultWidgets($mode), $stored);
+        return $this->dashboardDefaultWidgets($mode);
     }
 
+
     /** @return array<string,bool> */
+    
     private function dashboardDefaultWidgets(string $mode): array
     {
         $all = [
             '__mode_compact' => false,
             '__mode_standard' => false,
             '__mode_full' => false,
-            'command_center' => true,
-            'success_gauge' => true,
-            'learner_funnel' => true,
-            'recommended_actions' => true,
-            'resource_matrix' => true,
-            'comparison' => true,
-            'activity_by_day' => true,
-            'verb_distribution' => true,
-            'top_resources' => true,
-            'enabled_without_trace' => true,
+            'command_center' => false,
+            'success_gauge' => false,
+            'learner_funnel' => false,
+            'pedagogical_synthesis' => false,
+            'comparison' => false,
+            'activity_by_day' => false,
+            'verb_distribution' => false,
+            'top_resources' => false,
+            'enabled_without_trace' => false,
+            'recommended_actions' => false,
+            'resource_matrix' => false,
         ];
 
         if ($mode === 'compact') {
@@ -2872,25 +2870,33 @@ class ilIliasTraxEventBridgeCourseUIScreen
             $all['command_center'] = true;
             $all['success_gauge'] = true;
             $all['learner_funnel'] = true;
-            $all['recommended_actions'] = true;
-            $all['resource_matrix'] = false;
-            $all['comparison'] = false;
-            $all['activity_by_day'] = true;
-            $all['verb_distribution'] = false;
-            $all['top_resources'] = false;
-            $all['enabled_without_trace'] = false;
             return $all;
         }
 
         if ($mode === 'full') {
             $all['__mode_full'] = true;
+            $all['command_center'] = true;
+            $all['success_gauge'] = true;
+            $all['learner_funnel'] = true;
+            $all['pedagogical_synthesis'] = true;
+            $all['comparison'] = true;
+            $all['activity_by_day'] = true;
+            $all['verb_distribution'] = true;
+            $all['top_resources'] = true;
+            $all['enabled_without_trace'] = true;
             return $all;
         }
 
         $all['__mode_standard'] = true;
-        $all['verb_distribution'] = false;
+        $all['command_center'] = true;
+        $all['success_gauge'] = true;
+        $all['learner_funnel'] = true;
+        $all['pedagogical_synthesis'] = true;
+        $all['activity_by_day'] = true;
+        $all['top_resources'] = true;
         return $all;
     }
+
 
     private function dashboardDisplayModeFromStored(array $stored): string
     {

@@ -58,7 +58,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
 
         $context = $this->getCurrentCourseContext();
         $courseRefId = (int) ($context['course_ref_id'] ?? 0);
-        if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage'])) {
+        if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage']) || empty($context['pilotage_enabled_for_course'])) {
             return ['mode' => ilUIHookPluginGUI::KEEP, 'html' => ''];
         }
 
@@ -91,7 +91,7 @@ class ilIliasTraxEventBridgeCourseUIUIHookGUI extends ilUIHookPluginGUI
             if ($this->isRoutedPluginRequest() || !$this->isCourseContentRequest()) { return; }
             $context = $this->getCurrentCourseContext();
             $courseRefId = (int) ($context['course_ref_id'] ?? 0);
-            if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage'])) { return; }
+            if ($courseRefId <= 0 || empty($context['main_plugin_available']) || empty($context['course_tracking_classes_available']) || empty($context['can_manage']) || empty($context['pilotage_enabled_for_course'])) { return; }
             if (!isset($GLOBALS['DIC']) || !is_object($GLOBALS['DIC']) || !method_exists($GLOBALS['DIC'], 'toolbar')) { return; }
             $toolbar = $GLOBALS['DIC']->toolbar();
             if (is_object($toolbar) && method_exists($toolbar, 'addButton')) {

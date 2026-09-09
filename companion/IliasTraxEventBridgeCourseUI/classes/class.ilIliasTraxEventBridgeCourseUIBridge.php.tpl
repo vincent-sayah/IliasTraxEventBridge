@@ -34,6 +34,7 @@ class ilIliasTraxEventBridgeCourseUIBridge
         }
 
         foreach ([
+            'class.ilIliasTraxEventBridgeConfig.php',
             'class.ilIliasTraxEventBridgeCourseTrackingRepository.php',
             'class.ilIliasTraxEventBridgeCourseResourceResolver.php',
         ] as $file) {
@@ -58,13 +59,48 @@ class ilIliasTraxEventBridgeCourseUIBridge
             'course_obj_id' => $courseRefId > 0 ? $this->lookupObjectId($courseRefId) : 0,
             'course_title' => $courseRefId > 0 ? $this->lookupTitleByRefId($courseRefId) : '',
             'can_manage' => $courseRefId > 0 && $this->canManageCourse($courseRefId),
+            'pilotage_enabled_for_course' => $courseRefId > 0 && $this->isPilotageEnabledForCourse($courseRefId),
             'main_plugin_available' => $this->isMainPluginAvailable(),
             'course_tracking_classes_available' => $this->loadCourseTrackingClasses(),
             'configuration_url' => $courseRefId > 0 ? $this->buildContextualConfigurationUrl($courseRefId) : '',
         ];
     }
 
-    public function detectCourseRefId(): int
+        private function loadMainConfigClass(): bool
+    {
+        if (!$this->isMainPluginAvailable()) {
+            return false;
+        }
+        $path = $this->mainPluginPath . '/classes/class.ilIliasTraxEventBridgeConfig.php';
+        if (!is_file($path)) {
+            return false;
+        }
+        require_once $path;
+        return class_exists('ilIliasTraxEventBridgeConfig');
+    }
+
+    public function isPilotageEnabledForCourse(int $courseRefId): bool
+    {
+        if ($courseRefId <= 0) {
+            return false;
+        }
+        if (!$this->loadMainConfigClass()) {
+            // Sécurité de compatibilité : si la classe de configuration n'est pas
+            // lisible, on ne casse pas le comportement historique du bouton.
+            return true;
+        }
+        try {
+            $config = new ilIliasTraxEventBridgeConfig();
+            if (method_exists($config, 'isPilotageEnabledForCourse')) {
+                return $config->isPilotageEnabledForCourse($courseRefId);
+            }
+        } catch (Throwable $ignored) {
+            return true;
+        }
+        return true;
+    }
+
+public function detectCourseRefId(): int
     {
         foreach ($this->collectCourseRefIdCandidates() as $candidate) {
             if ($candidate > 0 && $this->isCourseRefId($candidate)) {
@@ -146,6 +182,9 @@ class ilIliasTraxEventBridgeCourseUIBridge
             return false;
         }
     }
+
+
+    
 
     public function canManageCourse(int $courseRefId): bool
     {

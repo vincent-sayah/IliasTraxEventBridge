@@ -242,7 +242,142 @@ class ilIliasTraxEventBridgeConfig
         return 'absente';
     }
 
-    private function yesNo(string $key): string
+
+    /** @return array<int,int> */
+    
+
+    public function getPilotageCourseRefIdsRaw(): string
+    {
+        return trim($this->get('pilotage_course_ref_ids', ''));
+    }
+
+    public function setPilotageCourseRefIdsRaw(string $raw): void
+    {
+        $ids = [];
+        foreach (preg_split('/[\s,;]+/', $raw) ?: [] as $part) {
+            $id = (int) trim((string) $part);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        ksort($ids);
+        $this->set('pilotage_course_ref_ids', implode("\n", array_values($ids)));
+    }
+
+    
+
+    public function getDefaultAiSystemPrompt(): string
+    {
+        return implode("\n", [
+            'Tu es un assistant pédagogique pour un formateur utilisant ILIAS connecté à un LRS TRAX.',
+            'Tu analyses uniquement des indicateurs xAPI agrégés, anonymisés et déjà filtrés côté serveur.',
+            'Tu ne dois jamais inventer de chiffres, de ressources, de noms, de profils ou de causes absentes du payload.',
+            'Tu ne dois jamais identifier, classer ou évaluer nominativement un apprenant.',
+            'Tu peux citer les titres de ressources pédagogiques, car ils servent au plan d’action du formateur.',
+            'Tu dois distinguer clairement les constats mesurés, les hypothèses pédagogiques prudentes et les actions recommandées.',
+            'Tu dois répondre en français, en Markdown, avec des formulations opérationnelles et directement exploitables.',
+            'Respecte exactement la structure suivante :',
+            '## 1. Synthèse opérationnelle',
+            '## 2. Lecture des indicateurs',
+            '## 3. Priorités formateur',
+            '## 4. Ressources à traiter',
+            '## 5. Actions pédagogiques recommandées',
+            '## 6. Points d’attention anonymisés',
+            '## 7. Limites et fiabilité',
+            'Dans chaque section, reste concis. Utilise des puces actionnables lorsque c’est pertinent.',
+            'Si les données sont insuffisantes, indique-le explicitement au lieu de produire une conclusion forte.',
+        ]);
+    }
+
+    public function getAiSystemPrompt(): string
+    {
+        $stored = trim($this->get('ai_system_prompt', ''));
+        return $stored !== '' ? $stored : $this->getDefaultAiSystemPrompt();
+    }
+
+    public function setAiSystemPrompt(string $prompt): void
+    {
+        $this->set('ai_system_prompt', trim($prompt));
+    }
+
+    public function resetAiSystemPrompt(): void
+    {
+        $this->set('ai_system_prompt', '');
+    }
+
+        public function getPilotageAccessMode(): string
+    {
+        $mode = strtolower(trim($this->get('pilotage_access_mode', 'all')));
+        return in_array($mode, ['all', 'selected'], true) ? $mode : 'all';
+    }
+
+    public function setPilotageAccessMode(string $mode): void
+    {
+        $mode = strtolower(trim($mode));
+        $this->set('pilotage_access_mode', in_array($mode, ['all', 'selected'], true) ? $mode : 'all');
+    }
+
+    /** @return array<int,int> */
+    public function getPilotageCourseRefIds(): array
+    {
+        return $this->parseCourseRefIds($this->get('pilotage_course_ref_ids', ''));
+    }
+
+    public function getPilotageCourseRefIdsText(): string
+    {
+        $ids = $this->getPilotageCourseRefIds();
+        return implode("\n", array_map('strval', $ids));
+    }
+
+    /** @param array<int,int> $ids */
+    public function setPilotageCourseRefIds(array $ids): void
+    {
+        $clean = [];
+        foreach ($ids as $id) {
+            $value = (int) $id;
+            if ($value > 0) {
+                $clean[$value] = $value;
+            }
+        }
+        $clean = array_values($clean);
+        sort($clean);
+        $this->set('pilotage_course_ref_ids', implode("\n", array_map('strval', $clean)));
+    }
+
+    public function setPilotageCourseRefIdsFromText(string $text): void
+    {
+        $this->setPilotageCourseRefIds($this->parseCourseRefIds($text));
+    }
+
+    public function isPilotageEnabledForCourse(int $courseRefId): bool
+    {
+        if ($courseRefId <= 0) {
+            return false;
+        }
+        if ($this->getPilotageAccessMode() === 'all') {
+            return true;
+        }
+        return in_array($courseRefId, $this->getPilotageCourseRefIds(), true);
+    }
+
+    /** @return array<int,int> */
+    private function parseCourseRefIds(string $text): array
+    {
+        $ids = [];
+        if (preg_match_all('/\d+/', $text, $matches)) {
+            foreach ($matches[0] as $raw) {
+                $value = (int) $raw;
+                if ($value > 0) {
+                    $ids[$value] = $value;
+                }
+            }
+        }
+        $ids = array_values($ids);
+        sort($ids);
+        return $ids;
+    }
+
+private function yesNo(string $key): string
     {
         $value = $this->get($key, '');
         if ($value === '') { return ''; }
