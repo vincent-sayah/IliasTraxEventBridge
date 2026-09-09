@@ -6,10 +6,11 @@ Plugin compagnon UIHook du plugin principal `IliasTraxEventBridge`.
 
 | Élément | Valeur |
 |---|---|
-| Version compagnon | `0.8.47` |
-| Version plugin principal associée | `0.27.1-dev` |
+| Version compagnon | `0.8.50` |
+| Version plugin principal associée | `0.28.5-dev` |
 | Branche stable | `main` |
-| Commit fonctionnel validé | `de90cb1` |
+| Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
+| Commit fonctionnel validé | `eabc786` |
 
 ## Rôle
 
@@ -19,43 +20,55 @@ Le compagnon UIHook affiche l'entrée `Pilotage xAPI` dans le cours ILIAS et fou
 Tableau de bord | Analyse | Analyse IA | Expert | Configuration | Retour contenu du cours
 ```
 
-## V0.27.1
+## Contrôle d'accès
 
-La version `0.8.47` ajoute le tableau de bord pédagogique amélioré :
+Depuis V0.28.5, l'affichage du bouton `Pilotage xAPI` suit deux contrôles :
 
-- état global du cours ;
-- jauge de réussite du cours avec icône diplôme 🎓 ;
-- entonnoir pédagogique ;
-- actions recommandées ;
-- matrice ressources ;
-- modes `Compact`, `Standard`, `Complet` ;
-- configuration des blocs visibles depuis l'onglet `Configuration`.
+```text
+1. l'utilisateur doit administrer le cours ;
+2. le cours doit être autorisé par la configuration globale du plugin.
+```
 
-## V0.26 intégrée
+La configuration globale permet :
 
-- affichage du taux de réussite du cours quand la progression ILIAS est paramétrée ;
-- configuration des cartes de `Synthèse pédagogique` par cours ;
-- icône diplôme 🎓 sur la réussite du cours.
+```text
+- tous les cours administrés ;
+- seulement les cours listés par ref_id.
+```
 
-## V0.25.6 intégrée
+En mode sélection, plusieurs `ref_id` peuvent être ajoutés. Un cours peut être retiré en décochant sa ligne puis en enregistrant.
 
-- affichage du login ILIAS dans `Analyse > Apprenants en difficulté` ;
-- ajout de la colonne `Apprenant` dans `Expert` ;
-- export CSV Expert avec `learner_identity`.
+## Répartition fonctionnelle des vues
 
-## Installation depuis le plugin principal
+### Tableau de bord
+
+Vue de décision rapide. Les blocs d'analyse détaillée ne sont pas dupliqués.
+
+### Analyse
+
+Vue d'investigation des résultats : actions recommandées, matrice ressources, questions à fort taux d'échec, MediaCast et apprenants en difficulté.
+
+### Configuration cours
+
+Configuration locale du cours : activation xAPI du cours, ressources traçables, mode d'affichage du tableau de bord et cartes de synthèse pédagogique.
+
+## Installation / mise à jour du compagnon
+
+Depuis le dossier du plugin principal :
 
 ```bash
-cd /var/www/ilias/public/Customizing/global/plugins/Services/EventHandling/EventHook/IliasTraxEventBridge
-
 export ILIAS_ROOT="/var/www/ilias"
 export HTTPD_USER="apache"
+
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
+
+systemctl restart php-fpm
+systemctl restart httpd
 ```
 
-## Contrôle
+## Fichiers compagnon impactés par V0.28.5
 
-```bash
-php -l /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php
-php -l /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php
-```
+- `plugin.php.tpl`
+- `classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`
+- `classes/class.ilIliasTraxEventBridgeCourseUIBridge.php.tpl`
+- `classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl`
