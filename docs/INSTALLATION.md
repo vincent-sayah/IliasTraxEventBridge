@@ -5,9 +5,10 @@
 | Élément | Valeur |
 |---|---|
 | Branche stable | `main` |
-| Version plugin principal | `0.27.1-dev` |
-| Version plugin compagnon UI | `0.8.47` |
-| Commit fonctionnel validé | `de90cb1` |
+| Version plugin principal | `0.28.5-dev` |
+| Version plugin compagnon UI | `0.8.50` |
+| Commit fonctionnel validé | `eabc786` |
+| Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
 
 ## Mise à jour depuis `main`
 
@@ -20,48 +21,87 @@ git fetch origin
 git checkout -f main
 git reset --hard origin/main
 
-git update-index --assume-unchanged scripts/apply_v0243_dashboard_dual_chart_row.php || true
+git status -sb
+git log --oneline -8
+```
 
+Puis réinstaller le compagnon UIHook :
+
+```bash
 export ILIAS_ROOT="/var/www/ilias"
 export HTTPD_USER="apache"
+
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
 
 systemctl restart php-fpm
 systemctl restart httpd
 ```
 
-## Contrôle des versions
+## Vérification rapide
 
 ```bash
-grep -n "0.27.1-dev\|0.8.47\|renderDashboardCommandCenter\|renderCourseSuccessGauge\|renderLearnerFunnel\|renderRecommendedActions\|renderResourceSignalMatrix\|🎓" \
+grep -n "0.28.5-dev\|0.8.50\|isPilotageEnabledForCourse\|Prompt système IA\|itxeb-outbox\|itxeb-recent-events" \
 plugin.php \
+classes/class.ilIliasTraxEventBridgeConfig.php \
+classes/class.ilIliasTraxEventBridgeConfigGUI.php \
+classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php \
 companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl \
-companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl \
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php \
-/var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php
+companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIBridge.php.tpl \
+companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl
 ```
 
-## Contrôle PHP
+## Points de validation visuelle V0.28.5
 
-```bash
-php -l plugin.php
-php -l classes/class.ilIliasTraxEventBridgeCourseTrackingRepository.php
-php -l classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php
-php -l companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-php -l companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
-php -l /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/plugin.php
-php -l /var/www/ilias/public/Customizing/global/plugins/Services/UIComponent/UserInterfaceHook/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php
+### Configuration globale du plugin
+
+La page doit afficher une présentation gauche/droite : titre de section à gauche, formulaire ou tableau à droite.
+
+Blocs attendus :
+
+- Santé / Diagnostic
+- État
+- Diagnostics TRAX / cron
+- Bouton Pilotage xAPI dans les cours
+- Configuration TRAX / cron
+- Configuration IA
+- Envoi vers TRAX
+- Supervision outbox
+- Diagnostic des traces refusées
+- Outbox xAPI locale
+- Derniers événements ILIAS reçus
+
+Le bloc `Ouvrir la configuration xAPI d’un cours` ne doit plus être affiché.
+
+### Boutons de purge
+
+```text
+Outbox xAPI locale -> Vider l'outbox xAPI locale
+Derniers événements ILIAS reçus -> Vider le journal debug
 ```
 
-## Validation navigateur
+### Bouton Pilotage xAPI
 
-Dans un cours ILIAS avec `Pilotage xAPI` :
+En configuration globale, choisir :
 
-- onglet `Tableau de bord` : vérifier l'état global, la jauge de réussite, l'entonnoir, les actions et la matrice ;
-- onglet `Analyse` : vérifier les actions recommandées, la matrice et la synthèse ;
-- onglet `Configuration` : vérifier le mode Compact / Standard / Complet et la sélection des blocs ;
-- onglet `Expert` : vérifier la colonne `Apprenant`.
+```text
+Tous les cours où l'utilisateur est administrateur du cours
+```
 
-## Remarques
+ou :
 
-Le taux de réussite du cours est lu depuis la progression ILIAS lorsque celle-ci est paramétrée. Il ne provient pas des statements TRAX/xAPI.
+```text
+Seulement les cours listés ci-dessous
+```
+
+En mode sélection, renseigner un ou plusieurs `ref_id` de cours. Pour retirer un cours, décocher son `ref_id` dans la liste des cours autorisés puis enregistrer.
+
+### Prompt IA
+
+Dans `Configuration IA`, le prompt système doit être visible, modifiable et restaurable via le bouton de retour au prompt par défaut.
+
+## Scripts V0.28 à conserver
+
+- `scripts/apply_v0281_dashboard_analysis_config_ai_prompt.py`
+- `scripts/apply_v0283_pilotage_button_course_access_fix.py`
+- `scripts/apply_v0284_config_plugin_layout.py`
+- `scripts/apply_v0285_config_purge_buttons_layout.py`
