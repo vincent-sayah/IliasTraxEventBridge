@@ -10,6 +10,7 @@
 | Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
 | Commit validé serveur | `eabc786` |
 | Branche stable cible | `main` |
+| Promotion GitHub | branche validée puis `main` |
 
 ## Principe retenu
 
