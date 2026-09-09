@@ -1,5 +1,72 @@
 # CHANGELOG
 
+## v0.28.5 — configuration plugin réorganisée et stabilisation V0.28
+
+### Statut
+
+Version validée fonctionnellement sur serveur ILIAS 10 puis intégrée dans GitHub.
+
+- Plugin principal : `0.28.5-dev`
+- Plugin compagnon UI : `0.8.50`
+- Branche de validation : `v0.28-dashboard-analysis-config-ai-prompt-validated`
+- Commit fonctionnel validé : `eabc786`
+- Promotion cible : `main`
+
+### Changements fonctionnels
+
+- Réaménagement des onglets `Tableau de bord` et `Analyse` pour supprimer les redondances.
+- `Tableau de bord` recentré sur la décision rapide : état global, réussite du cours, entonnoir pédagogique, synthèse et indicateurs essentiels.
+- `Analyse` recentré sur l'investigation : actions recommandées, matrice ressources, questions à fort taux d'échec, MediaCast et apprenants en difficulté.
+- Modes `Compact`, `Standard` et `Complet` réellement différenciés dans la personnalisation du tableau de bord.
+- Retour sur la même zone de page après les actions d'enregistrement grâce aux ancres.
+- Bouton `Pilotage xAPI` toujours réservé aux administrateurs du cours, avec choix global : tous les cours administrés ou seulement les cours listés.
+- Gestion de plusieurs `ref_id` de cours autorisés pour le bouton `Pilotage xAPI`.
+- Possibilité de retirer un cours de la liste en décochant son `ref_id`.
+- Prompt système IA rendu configurable dans la configuration du plugin.
+- Possibilité de restaurer le prompt IA par défaut.
+- Page de configuration plugin réorganisée avec une présentation gauche/droite.
+- Suppression du bloc global `Ouvrir la configuration xAPI d’un cours`.
+- Bouton `Vider l’outbox xAPI locale` déplacé dans le bloc `Outbox xAPI locale`.
+- Bouton `Vider le journal debug` déplacé dans le bloc `Derniers événements ILIAS reçus`.
+
+### Blocs conservés dans la configuration plugin
+
+- Santé / Diagnostic
+- État
+- Diagnostics TRAX / cron
+- Bouton Pilotage xAPI dans les cours
+- Configuration TRAX / cron
+- Configuration IA
+- Envoi vers TRAX
+- Supervision outbox
+- Diagnostic des traces refusées
+- Outbox xAPI locale
+- Derniers événements ILIAS reçus
+
+### Scripts de migration / patch
+
+- `scripts/apply_v0281_dashboard_analysis_config_ai_prompt.py`
+- `scripts/apply_v0283_pilotage_button_course_access_fix.py`
+- `scripts/apply_v0284_config_plugin_layout.py`
+- `scripts/apply_v0285_config_purge_buttons_layout.py`
+
+### Validation serveur
+
+Validation réalisée côté serveur avec :
+
+```bash
+python3 -m py_compile scripts/apply_v0284_config_plugin_layout.py
+python3 -m py_compile scripts/apply_v0285_config_purge_buttons_layout.py
+python3 scripts/apply_v0284_config_plugin_layout.py
+python3 scripts/apply_v0285_config_purge_buttons_layout.py
+systemctl restart php-fpm
+systemctl restart httpd
+```
+
+Les contrôles `php -l` ont été exécutés par les scripts avant et après écriture.
+
+---
+
 ## v0.27.1 — tableau de bord pédagogique amélioré
 
 ### Statut
@@ -18,56 +85,14 @@ Version validée fonctionnellement sur serveur ILIAS 10 puis intégrée dans Git
 - Ajout d'une carte `État global du cours` avec statut stable, à surveiller ou critique.
 - Ajout d'une jauge `Réussite du cours` avec icône diplôme 🎓.
 - Ajout d'un entonnoir pédagogique : inscrits, actifs, tentatives, réussites.
-- Ajout d'un bloc `Actions recommandées` pour prioriser les interventions formateur.
-- Ajout d'une matrice ressources indiquant activité, réussite, signal pédagogique et dernière trace.
-- Ajout d'un mode d'affichage du tableau de bord : `Compact`, `Standard`, `Complet`.
-- Ajout des blocs V0.27 dans la personnalisation du tableau de bord.
-- Reprise des actions recommandées et de la matrice ressources dans l'onglet `Analyse`.
+- Ajout d'un bloc `Actions recommandées`.
+- Ajout d'une matrice ressources.
+- Ajout des modes `Compact`, `Standard`, `Complet` dans la configuration du tableau de bord.
 
-### Changements hérités intégrés
+---
 
-- V0.26.1 : calcul du taux de réussite du cours depuis la progression ILIAS.
-- V0.26.2 : icône diplôme 🎓 et configuration des cartes de `Synthèse pédagogique`.
-- V0.25.6 : affichage du login ILIAS dans `Analyse` et `Expert`.
-
-### Validation
-
-- Script V0.27.1 exécuté avec préflight complet.
-- Lint PHP OK sur les fichiers modifiés.
-- Redémarrage `php-fpm` et `httpd` OK.
-- Validation navigateur réalisée par l'utilisateur.
-
-## v0.25.6 — affichage login apprenant validé
-
-### Statut
-
-Version validée fonctionnellement sur serveur ILIAS 10.
-
-- Plugin principal : `0.25.6-dev`
-- Plugin compagnon UI : `0.8.44`
-- Branche : `v0.25-learner-identity-display`
-- Commit fonctionnel validé : `8d97685`
-
-### Changements
+## v0.25.6 — affichage identité apprenant
 
 - Affichage du login ILIAS dans `Apprenants en difficulté`.
-- Ajout de la colonne `Apprenant` dans la vue Expert entre `User ID` et `Verbe`.
-- Ajout de `learner_identity` dans l'export CSV Expert.
-- Résolution de `ilias-user-ID` vers `usr_data.login`.
-- Conservation de `User ID` comme identifiant technique pseudonymisé.
-
-## v0.24.17 — tableau de bord stabilisé
-
-- Alignement du graphique d'activité et de `Top ressources`.
-- Correction de régressions de rendu du tableau de bord.
-- Conservation de la synthèse pédagogique enrichie.
-
-## v0.23.8 — suivi MediaCast stabilisé
-
-- Suivi des vidéos internes MediaCast lancées.
-- Suivi des médias externes sélectionnés.
-- Vue MediaCast dans l'onglet Analyse.
-
-## Historique précédent
-
-Les versions précédentes sont conservées dans les branches et documents historiques du dépôt.
+- Ajout de la colonne `Apprenant` dans la vue Expert.
+- Export CSV Expert avec colonne `learner_identity`.
