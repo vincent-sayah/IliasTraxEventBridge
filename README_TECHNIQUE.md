@@ -4,10 +4,11 @@
 
 | Élément | Valeur |
 |---|---|
-| Version plugin principal | `0.27.1-dev` |
-| Version plugin compagnon UI | `0.8.47` |
+| Version plugin principal | `0.28.5-dev` |
+| Version plugin compagnon UI | `0.8.50` |
 | Branche stable | `main` |
-| Commit fonctionnel validé | `de90cb1` |
+| Branche de validation | `v0.28-dashboard-analysis-config-ai-prompt-validated` |
+| Commit fonctionnel validé | `eabc786` |
 
 ## Architecture
 
@@ -18,16 +19,13 @@ ILIAS 10
   │    ├─ génère les statements xAPI
   │    ├─ génère les traces question par question
   │    ├─ génère les traces MediaCast client
-  │    └─ alimente l'outbox locale technique
-  │
-  ├─ Cron ILIAS
-  │    └─ envoie l'outbox vers TRAX/LRS
+  │    ├─ alimente l'outbox locale
+  │    └─ lit la configuration globale du plugin
   │
   └─ UIHook IliasTraxEventBridgeCourseUI
-       ├─ affiche Pilotage xAPI dans le cours
-       ├─ lit TRAX/LRS pour les indicateurs xAPI
-       ├─ lit la progression ILIAS pour la réussite du cours
-       └─ affiche Tableau de bord, Analyse, Analyse IA, Expert, Configuration
+       ├─ ajoute le bouton Pilotage xAPI dans les cours autorisés
+       ├─ affiche Tableau de bord / Analyse / Analyse IA / Expert / Configuration
+       └─ lit les données agrégées TRAX/LRS et la progression ILIAS
 ```
 
 ## Sources de données
@@ -35,98 +33,116 @@ ILIAS 10
 | Donnée | Source |
 |---|---|
 | Statements xAPI | TRAX/LRS |
-| Activité, ressources, verbes, questions, MediaCast | TRAX/LRS |
-| Apprenants actifs xAPI | TRAX/LRS |
-| Login apprenant affiché | ILIAS `usr_data.login` après résolution `ilias-user-ID` |
-| Taux de réussite du cours | Progression ILIAS (`ut_lp_settings`, `ut_lp_marks`, participants cours) |
-| Préférences tableau de bord | Table locale de configuration cours `evnt_evhk_itxeb_ccfg` |
-| Préférences synthèse pédagogique | Table locale de configuration cours `evnt_evhk_itxeb_ccfg` |
-| Outbox | Tables locales du plugin EventHook |
+| Statut d'envoi | Outbox locale |
+| Taux de réussite du cours | Progression ILIAS du cours |
+| Configuration cours / ressources | Tables `evnt_evhk_itxeb_ccfg` et `evnt_evhk_itxeb_rcfg` |
+| Préférences tableau de bord | `dashboard_widgets_json` |
+| Cartes de synthèse pédagogique | `synthesis_cards_json` |
+| Accès bouton Pilotage xAPI | `ilSetting` module `itxeb` |
+| Prompt système IA | `ilSetting` module `itxeb`, clé `ai_system_prompt` |
 
-## V0.27.1 — centre de décision pédagogique
+## Évolutions techniques V0.28.5
 
-La V0.27.1 ajoute une couche de restitution formateur au-dessus des indicateurs existants.
+### Séparation Tableau de bord / Analyse
 
-### Nouveaux rendus
-
-- `renderDashboardCommandCenter()` : état global du cours.
-- `renderCourseSuccessGauge()` : jauge graphique de réussite avec icône 🎓.
-- `renderLearnerFunnel()` : entonnoir pédagogique.
-- `renderRecommendedActions()` : actions recommandées.
-- `renderResourceSignalMatrix()` : matrice activité / réussite / signal.
-- `dashboardDisplayMode()` : mode `Compact`, `Standard`, `Complet`.
-
-### Configuration
-
-Les préférences sont stockées par cours via les préférences du tableau de bord.
-
-Les modes utilisent des clés techniques internes :
+La V0.28.5 évite de dupliquer les blocs entre les deux vues :
 
 ```text
-__mode_compact
-__mode_standard
-__mode_full
+Tableau de bord = lecture rapide, indicateurs principaux, décision immédiate.
+Analyse = investigation détaillée, ressources, signaux et éléments à traiter.
 ```
 
-Les blocs restent sélectionnables depuis l'onglet `Configuration`.
+Les blocs `Actions recommandées`, `Matrice ressources` et `Questions à fort taux d'échec` sont réservés à l'analyse des résultats. La `Synthèse pédagogique` reste côté tableau de bord.
 
-## V0.26 intégrée
+### Modes du tableau de bord
 
-### Progression ILIAS
+Les modes ne sont plus seulement une sélection visuelle. Ils appliquent un vrai préréglage :
 
-La réussite du cours est calculée localement dans ILIAS lorsque la progression du cours est paramétrée.
+| Mode | Contenu |
+|---|---|
+| Compact | état global, réussite du cours, entonnoir pédagogique |
+| Standard | compact + synthèse pédagogique, activité par jour, top ressources |
+| Complet | standard + comparaison entre périodes, actions xAPI, ressources sans activité |
 
-Tables et mécanismes utilisés :
+### Bouton Pilotage xAPI par cours
+
+La configuration globale permet deux modes :
 
 ```text
-ut_lp_settings.u_mode
-ut_lp_marks.status
-crs_members ou ilCourseParticipants
-ilLPStatus::LP_STATUS_COMPLETED_NUM si disponible
+all      = bouton visible dans tous les cours administrés par l'utilisateur.
+selected = bouton visible uniquement dans les ref_id déclarés.
 ```
 
-La donnée est exposée dans le résumé LRS enrichi sous :
+Le contrôle des droits ILIAS reste actif : un utilisateur qui n'administre pas le cours ne voit pas le bouton.
+
+### Prompt IA configurable
+
+Le prompt système n'est plus figé uniquement dans le code. La configuration du plugin expose :
 
 ```text
-course_progress
-summary.course_success_rate
-summary.course_progress_configured
+Prompt système IA
+Remettre le prompt IA par défaut
 ```
 
-### Synthèse pédagogique configurable
+Le prompt par défaut reste conservé dans `ilIliasTraxEventBridgeConfig::getDefaultAiSystemPrompt()`.
 
-Les cartes de synthèse sont configurables par cours. Le stockage utilise :
+### Configuration plugin gauche/droite
+
+`ilIliasTraxEventBridgeConfigGUI` affiche désormais les sections sous forme de grille : titre à gauche, contenu à droite.
+
+Blocs conservés :
+
+- Santé / Diagnostic
+- État
+- Diagnostics TRAX / cron
+- Bouton Pilotage xAPI dans les cours
+- Configuration TRAX / cron
+- Configuration IA
+- Envoi vers TRAX
+- Supervision outbox
+- Diagnostic des traces refusées
+- Outbox xAPI locale
+- Derniers événements ILIAS reçus
+
+Le bloc `Ouvrir la configuration xAPI d’un cours` a été retiré de la configuration globale.
+
+### Déplacement des actions de purge
+
+Les purges sont replacées dans leur contexte fonctionnel :
 
 ```text
-synthesis_cards_json
-synthesis_cards_updated_at
-synthesis_cards_updated_by
+Outbox xAPI locale -> Vider l'outbox xAPI locale
+Derniers événements ILIAS reçus -> Vider le journal debug
 ```
 
-## V0.25.6 intégrée
+## Fichiers modifiés par V0.28.5
 
-La résolution nominative applique l'ordre suivant :
+- `plugin.php`
+- `classes/class.ilIliasTraxEventBridgeConfig.php`
+- `classes/class.ilIliasTraxEventBridgeConfigGUI.php`
+- `classes/class.ilIliasTraxEventBridgeCourseAiAnalyzer.php`
+- `companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl`
+- `companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl`
+- `companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIBridge.php.tpl`
+- `companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIUIHookGUI.php.tpl`
 
-1. lecture `actor.account.name` ;
-2. détection du format `ilias-user-ID` ;
-3. recherche dans ILIAS via `ilObjUser::_lookupLogin` ;
-4. fallback SQL `usr_data.login` ;
-5. fallback sur l'identité brute TRAX/LRS si aucun login n'est trouvé.
+## Scripts V0.28
 
-## Contrôles techniques
+- `scripts/apply_v0281_dashboard_analysis_config_ai_prompt.py`
+- `scripts/apply_v0283_pilotage_button_course_access_fix.py`
+- `scripts/apply_v0284_config_plugin_layout.py`
+- `scripts/apply_v0285_config_purge_buttons_layout.py`
 
-```bash
-php -l plugin.php
-php -l classes/class.ilIliasTraxEventBridgeCourseTrackingRepository.php
-php -l classes/class.ilIliasTraxEventBridgeLrsCourseSummary.php
-php -l companion/IliasTraxEventBridgeCourseUI/plugin.php.tpl
-php -l companion/IliasTraxEventBridgeCourseUI/classes/class.ilIliasTraxEventBridgeCourseUIScreen.php.tpl
-```
+## Installation compagnon
 
-## Installation du compagnon UI
+Après mise à jour de `main`, réinstaller le compagnon UIHook :
 
 ```bash
 export ILIAS_ROOT="/var/www/ilias"
 export HTTPD_USER="apache"
+
 bash scripts/install_course_ui_companion_with_standalone_fix.sh
+
+systemctl restart php-fpm
+systemctl restart httpd
 ```
